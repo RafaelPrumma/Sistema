@@ -3,6 +3,7 @@ using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services;
+using Sistema.CORE.Common;
 
 namespace Sistema.API.Controllers;
 
@@ -38,8 +39,9 @@ public class PerfilController : ControllerBase
     public async Task<ActionResult<PerfilDto>> Post(PerfilDto dto)
     {
         var perfil = _mapper.Map<Perfil>(dto);
-        var created = await _service.AddAsync(perfil);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, _mapper.Map<PerfilDto>(created));
+        var result = await _service.AddAsync(perfil);
+        if (!result.Success) return BadRequest(result.Message);
+        return CreatedAtAction(nameof(Get), new { id = result.Data!.Id }, _mapper.Map<PerfilDto>(result.Data));
     }
 
     [HttpPut("{id}")]
@@ -47,14 +49,16 @@ public class PerfilController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         var perfil = _mapper.Map<Perfil>(dto);
-        await _service.UpdateAsync(perfil);
+        var result = await _service.UpdateAsync(perfil);
+        if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        await _service.DeleteAsync(id);
+        var result = await _service.DeleteAsync(id);
+        if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }
 }

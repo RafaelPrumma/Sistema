@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase("SistemaDB"));
         services.AddScoped<IPerfilRepository, PerfilRepository>();
+        services.AddScoped<ILogRepository, LogRepository>();
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
