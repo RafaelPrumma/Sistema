@@ -27,13 +27,7 @@ public static class ServiceCollectionExtensions
             context.Perfis.AddRange(AdminSeed.Get(), UserSeed.Get());
             context.SaveChanges();
         }
-
-        if (!context.Usuarios.Any())
-        {
-            context.Usuarios.AddRange(AdminUserSeed.Get(), ComercialUserSeed.Get());
-            context.SaveChanges();
-        }
-
+      
         return services;
     }
 }

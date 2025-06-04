@@ -36,7 +36,7 @@ public class PerfilRepository : IPerfilRepository
     {
         return await _context.Perfis.FirstOrDefaultAsync(p => p.Nome == nome);
     }
-
+    
     public async Task<Perfil?> GetByIdAsync(int id)
     {
         return await _context.Perfis.FindAsync(id);
