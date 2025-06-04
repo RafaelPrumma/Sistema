@@ -14,6 +14,9 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase("SistemaDB"));
         services.AddScoped<IPerfilRepository, PerfilRepository>();
+        services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<ILogRepository, LogRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -24,7 +27,7 @@ public static class ServiceCollectionExtensions
             context.Perfis.AddRange(AdminSeed.Get(), UserSeed.Get());
             context.SaveChanges();
         }
-
+      
         return services;
     }
 }

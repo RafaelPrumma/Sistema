@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services;
-
+using Sistema.CORE.Services; 
+using Sistema.CORE.Common; 
 namespace Sistema.API.Controllers;
 
 [ApiController]
@@ -37,24 +37,27 @@ public class PerfilController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PerfilDto>> Post(PerfilDto dto)
     {
-        var perfil = _mapper.Map<Perfil>(dto);
-        var created = await _service.AddAsync(perfil);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, _mapper.Map<PerfilDto>(created));
+        var perfil = _mapper.Map<Perfil>(dto); 
+        var result = await _service.AddAsync(perfil);
+        if (!result.Success) return BadRequest(result.Message);
+        return CreatedAtAction(nameof(Get), new { id = result.Data!.Id }, _mapper.Map<PerfilDto>(result.Data)); 
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Put(int id, PerfilDto dto)
     {
         if (id != dto.Id) return BadRequest();
-        var perfil = _mapper.Map<Perfil>(dto);
-        await _service.UpdateAsync(perfil);
+        var perfil = _mapper.Map<Perfil>(dto); 
+        var result = await _service.UpdateAsync(perfil);
+        if (!result.Success) return BadRequest(result.Message); 
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
-    {
-        await _service.DeleteAsync(id);
+    { 
+        var result = await _service.DeleteAsync(id);
+        if (!result.Success) return BadRequest(result.Message); 
         return NoContent();
     }
 }

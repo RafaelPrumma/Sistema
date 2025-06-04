@@ -14,11 +14,10 @@ public class PerfilRepository : IPerfilRepository
         _context = context;
     }
 
-    public async Task<Perfil> AddAsync(Perfil perfil)
+    public Task<Perfil> AddAsync(Perfil perfil)
     {
         _context.Perfis.Add(perfil);
-        await _context.SaveChangesAsync();
-        return perfil;
+        return Task.FromResult(perfil);
     }
 
     public async Task DeleteAsync(int id)
@@ -26,7 +25,6 @@ public class PerfilRepository : IPerfilRepository
         var perfil = await _context.Perfis.FindAsync(id);
         if (perfil is null) return;
         _context.Perfis.Remove(perfil);
-        await _context.SaveChangesAsync();
     }
 
     public async Task<IEnumerable<Perfil>> GetAllAsync()
@@ -34,14 +32,19 @@ public class PerfilRepository : IPerfilRepository
         return await _context.Perfis.ToListAsync();
     }
 
+    public async Task<Perfil?> GetByNameAsync(string nome)
+    {
+        return await _context.Perfis.FirstOrDefaultAsync(p => p.Nome == nome);
+    }
+    
     public async Task<Perfil?> GetByIdAsync(int id)
     {
         return await _context.Perfis.FindAsync(id);
     }
 
-    public async Task UpdateAsync(Perfil perfil)
+    public Task UpdateAsync(Perfil perfil)
     {
         _context.Perfis.Update(perfil);
-        await _context.SaveChangesAsync();
+        return Task.CompletedTask;
     }
 }
