@@ -8,4 +8,7 @@ public class Log
     public string Operacao { get; set; } = string.Empty;
     public bool Sucesso { get; set; }
     public string Mensagem { get; set; } = string.Empty;
+    public LogTipo Tipo { get; set; }
+    public string Usuario { get; set; } = string.Empty;
+    public string? Detalhe { get; set; }
 }
