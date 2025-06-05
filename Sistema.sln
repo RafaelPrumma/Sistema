@@ -14,11 +14,11 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2 - Dominio", "2 - Dominio", "{E66D17D9-8F71-420B-8B21-B8D8AB247A5B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sistema.CORE", "2 - Dominio\Sistema.CORE\Sistema.CORE.csproj", "{2067E1BB-CB8F-47BB-BC30-75A79A6DC125}"
-EndProject
+EndProject 
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3 - Infraestrutura", "3 - Infraestrutura", "{8D8B0520-6D41-45EC-81D9-8764C2EB016B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sistema.INFRA", "3 - Infraestrutura\Sistema.INFRA\Sistema.INFRA.csproj", "{5F8486C1-4449-418E-AD7B-20770C18B1C7}"
-EndProject
+EndProject 
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,14 +41,14 @@ Global
 		{2067E1BB-CB8F-47BB-BC30-75A79A6DC125}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2067E1BB-CB8F-47BB-BC30-75A79A6DC125}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5F8486C1-4449-418E-AD7B-20770C18B1C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5F8486C1-4449-418E-AD7B-20770C18B1C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5F8486C1-4449-418E-AD7B-20770C18B1C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5F8486C1-4449-418E-AD7B-20770C18B1C7}.Release|Any CPU.Build.0 = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
+		{5F8486C1-4449-418E-AD7B-20770C18B1C7}.Debug|Any CPU.Build.0 = Debug|Any CPU 
+               {5F8486C1-4449-418E-AD7B-20770C18B1C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+               {5F8486C1-4449-418E-AD7B-20770C18B1C7}.Release|Any CPU.Build.0 = Release|Any CPU
+        EndGlobalSection
+        GlobalSection(NestedProjects) = preSolution
 		{382C7763-E4ED-4B5C-8DE6-3A584A0A74B7} = {84482E06-A98B-40F9-AA7C-8C53E5B6A3DA}
 		{3F109813-0AAC-42E1-9F5D-19B4A33183FC} = {42820C64-636F-4818-9206-B0CAFA17BF76}
 		{2067E1BB-CB8F-47BB-BC30-75A79A6DC125} = {E66D17D9-8F71-420B-8B21-B8D8AB247A5B}
-		{5F8486C1-4449-418E-AD7B-20770C18B1C7} = {8D8B0520-6D41-45EC-81D9-8764C2EB016B}
-	EndGlobalSection
-EndGlobal
+                {5F8486C1-4449-418E-AD7B-20770C18B1C7} = {8D8B0520-6D41-45EC-81D9-8764C2EB016B}
+        EndGlobalSection
+EndGlobal 

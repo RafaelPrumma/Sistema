@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Interfaces; 
+using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
+using System.Linq; 
 
 namespace Sistema.INFRA.Repositories;
 
@@ -26,16 +28,28 @@ public class PerfilRepository : IPerfilRepository
         if (perfil is null) return;
         _context.Perfis.Remove(perfil);
     }
-
-    public async Task<IEnumerable<Perfil>> GetAllAsync()
+ 
+    public Task<PagedResult<Perfil>> GetAllAsync(int page, int pageSize)
     {
-        return await _context.Perfis.ToListAsync();
+        var query = _context.Perfis.AsNoTracking().OrderBy(p => p.Id);
+        return query.ToPagedResultAsync(page, pageSize);
+    }
+
+    public Task<PagedResult<Perfil>> GetFilteredAsync(bool? ativo, int page, int pageSize)
+    {
+        var query = _context.Perfis.AsQueryable();
+        if (ativo.HasValue)
+        {
+            query = query.Where(p => p.Ativo == ativo.Value);
+        }
+        query = query.AsNoTracking().OrderBy(p => p.Id);
+        return query.ToPagedResultAsync(page, pageSize); 
     }
 
     public async Task<Perfil?> GetByNameAsync(string nome)
     {
         return await _context.Perfis.FirstOrDefaultAsync(p => p.Nome == nome);
-    }
+    } 
     
     public async Task<Perfil?> GetByIdAsync(int id)
     {
