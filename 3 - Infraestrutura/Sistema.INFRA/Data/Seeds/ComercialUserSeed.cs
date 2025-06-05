@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Identity;
+ 
+using Microsoft.AspNetCore.Identity; 
 using Sistema.CORE.Entities;
 
 namespace Sistema.INFRA.Data.Seeds;
 
 public static class ComercialUserSeed
-{
+{ 
     public static Usuario Get()
     {
         var user = new Usuario
@@ -19,5 +20,5 @@ public static class ComercialUserSeed
         var hasher = new PasswordHasher<Usuario>();
         user.SenhaHash = hasher.HashPassword(user, "comercial123");
         return user;
-    }
+    } 
 }

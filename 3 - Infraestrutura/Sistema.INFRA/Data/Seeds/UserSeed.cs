@@ -7,8 +7,8 @@ public static class UserSeed
     public static Perfil Get() => new()
     {
         Id = 2,
-        Nome = "Comercial",
+        Nome = "Comercial", 
         UsuarioInclusao = "seed",
-        Ativo = true
+        Ativo = true 
     };
 }

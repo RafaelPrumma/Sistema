@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Interfaces; 
 using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
-using System.Linq;
+using System.Linq; 
 
 namespace Sistema.INFRA.Repositories;
 
@@ -28,7 +28,7 @@ public class UsuarioRepository : IUsuarioRepository
         if (usuario is null) return;
         _context.Usuarios.Remove(usuario);
     }
-
+ 
     public Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize)
     {
         var query = _context.Usuarios.AsNoTracking().OrderBy(u => u.Id);
