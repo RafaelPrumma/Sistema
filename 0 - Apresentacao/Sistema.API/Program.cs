@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Sistema.APP;
 using Sistema.INFRA;
+using Sistema.INFRA.Data;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +37,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    DbInitializer.Seed(context);
+}
 
 if (app.Environment.IsDevelopment())
 {

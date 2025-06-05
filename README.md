@@ -17,8 +17,8 @@ Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.
 - Campos de auditoria nas entidades e registro de operações em `Log`.
 - `UnitOfWork` centraliza o commit das alterações.
 - Seeds criam perfis e usuários iniciais (Admin e Comercial).
-- Serilog grava logs mensais na pasta `log` e as operações também ficam
-  salvas na tabela `Logs` com usuário e detalhes da exceção.
+- Serilog grava logs mensais na pasta `log` e as operações também ficam salvas na tabela `Logs` com usuário e detalhes da exceção.
+- Perfis e usuários podem ser ativados ou desativados e as APIs permitem filtrar registros por data, perfil e status.
 - Autenticação via JWT protege a API; obtenha um token em `/api/auth/login`.
 
 Para compilar a solução:
@@ -26,4 +26,3 @@ Para compilar a solução:
 ```bash
 dotnet build Sistema.sln -c Release
 ```
-

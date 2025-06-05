@@ -13,7 +13,8 @@ public static class AdminUserSeed
             Nome = "Rafael",
             Cpf = "00000000000",
             PerfilId = 1,
-            UsuarioInclusao = "seed"
+            UsuarioInclusao = "seed",
+            Ativo = true
         };
         var hasher = new PasswordHasher<Usuario>();
         user.SenhaHash = hasher.HashPassword(user, "admin123");

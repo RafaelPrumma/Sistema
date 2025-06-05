@@ -13,7 +13,8 @@ public static class ComercialUserSeed
             Nome = "Allison",
             Cpf = "00000000001",
             PerfilId = 2,
-            UsuarioInclusao = "seed"
+            UsuarioInclusao = "seed",
+            Ativo = true
         };
         var hasher = new PasswordHasher<Usuario>();
         user.SenhaHash = hasher.HashPassword(user, "comercial123");

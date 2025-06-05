@@ -23,9 +23,9 @@ public class PerfilController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<PerfilDto>> Get()
+    public async Task<IEnumerable<PerfilDto>> Get([FromQuery] bool? ativo)
     {
-        var perfis = await _service.GetAllAsync();
+        var perfis = ativo.HasValue ? await _service.GetFilteredAsync(ativo) : await _service.GetAllAsync();
         return _mapper.Map<IEnumerable<PerfilDto>>(perfis);
     }
 
@@ -60,6 +60,14 @@ public class PerfilController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _service.DeleteAsync(id);
+        if (!result.Success) return BadRequest(result.Message);
+        return NoContent();
+    }
+
+    [HttpPatch("{id}/ativo")]
+    public async Task<IActionResult> AlterarAtivo(int id, [FromQuery] bool ativo, [FromQuery] string usuario)
+    {
+        var result = await _service.AlterarAtivoAsync(id, ativo, usuario);
         if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }

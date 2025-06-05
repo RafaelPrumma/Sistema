@@ -4,7 +4,7 @@ using Sistema.CORE.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class UsuarioService : IUsuarioService
+    public class UsuarioService : IUsuarioService
 {
     private readonly IUnitOfWork _uow;
 
@@ -16,6 +16,9 @@ public class UsuarioService : IUsuarioService
     public Task<IEnumerable<Usuario>> GetAllAsync() => _uow.Usuarios.GetAllAsync();
 
     public Task<Usuario?> GetByIdAsync(int id) => _uow.Usuarios.GetByIdAsync(id);
+
+    public Task<IEnumerable<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo)
+        => _uow.Usuarios.GetFilteredAsync(inicio, fim, perfilId, ativo);
 
     public async Task<OperationResult<Usuario>> AddAsync(Usuario usuario)
     {
@@ -93,5 +96,25 @@ public class UsuarioService : IUsuarioService
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Usuário removido");
+    }
+
+    public async Task<OperationResult> AlterarAtivoAsync(int id, bool ativo, string usuario)
+    {
+        var obj = await _uow.Usuarios.GetByIdAsync(id);
+        if (obj is null) return new OperationResult(false, "Usuário não encontrado");
+        obj.Ativo = ativo;
+        obj.UsuarioAlteracao = usuario;
+        await _uow.Usuarios.UpdateAsync(obj);
+        await _uow.Logs.AddAsync(new Log
+        {
+            Entidade = nameof(Usuario),
+            Operacao = ativo ? "Ativar" : "Desativar",
+            Sucesso = true,
+            Mensagem = ativo ? "Usuário ativado" : "Usuário desativado",
+            Tipo = LogTipo.Informacao,
+            Usuario = usuario
+        });
+        await _uow.CommitAsync();
+        return new OperationResult(true, "Operação concluída");
     }
 }

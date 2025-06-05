@@ -4,7 +4,7 @@ using Sistema.CORE.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class PerfilService : IPerfilService
+    public class PerfilService : IPerfilService
 {
     private readonly IUnitOfWork _uow;
 
@@ -16,6 +16,8 @@ public class PerfilService : IPerfilService
     public Task<IEnumerable<Perfil>> GetAllAsync() => _uow.Perfis.GetAllAsync();
 
     public Task<Perfil?> GetByIdAsync(int id) => _uow.Perfis.GetByIdAsync(id);
+
+    public Task<IEnumerable<Perfil>> GetFilteredAsync(bool? ativo) => _uow.Perfis.GetFilteredAsync(ativo);
 
     public async Task<OperationResult<Perfil>> AddAsync(Perfil perfil)
     {
@@ -93,5 +95,34 @@ public class PerfilService : IPerfilService
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Perfil removido");
+    }
+
+    public async Task<OperationResult> AlterarAtivoAsync(int id, bool ativo, string usuario)
+    {
+        var perfil = await _uow.Perfis.GetByIdAsync(id);
+        if (perfil is null) return new OperationResult(false, "Perfil não encontrado");
+        if (!ativo)
+        {
+            var hasUsers = await _uow.Usuarios.ExistsActiveByPerfilAsync(id);
+            if (hasUsers)
+            {
+                return new OperationResult(false, "Não é possível desativar, há usuários ativos");
+            }
+        }
+
+        perfil.Ativo = ativo;
+        perfil.UsuarioAlteracao = usuario;
+        await _uow.Perfis.UpdateAsync(perfil);
+        await _uow.Logs.AddAsync(new Log
+        {
+            Entidade = nameof(Perfil),
+            Operacao = ativo ? "Ativar" : "Desativar",
+            Sucesso = true,
+            Mensagem = ativo ? "Perfil ativado" : "Perfil desativado",
+            Tipo = LogTipo.Informacao,
+            Usuario = usuario
+        });
+        await _uow.CommitAsync();
+        return new OperationResult(true, "Operação concluída");
     }
 }

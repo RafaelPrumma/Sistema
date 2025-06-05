@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.INFRA.Data;
+using System.Linq;
 
 namespace Sistema.INFRA.Repositories;
 
@@ -30,6 +31,26 @@ public class UsuarioRepository : IUsuarioRepository
     public async Task<IEnumerable<Usuario>> GetAllAsync()
     {
         return await _context.Usuarios.AsNoTracking().ToListAsync();
+    }
+
+    public async Task<IEnumerable<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo)
+    {
+        var query = _context.Usuarios.AsQueryable();
+        if (inicio.HasValue)
+            query = query.Where(u => u.DataInclusao >= inicio.Value);
+        if (fim.HasValue)
+            query = query.Where(u => u.DataInclusao <= fim.Value);
+        if (perfilId.HasValue)
+            query = query.Where(u => u.PerfilId == perfilId.Value);
+        if (ativo.HasValue)
+            query = query.Where(u => u.Ativo == ativo.Value);
+
+        return await query.AsNoTracking().ToListAsync();
+    }
+
+    public async Task<bool> ExistsActiveByPerfilAsync(int perfilId)
+    {
+        return await _context.Usuarios.AnyAsync(u => u.PerfilId == perfilId && u.Ativo);
     }
 
     public async Task<Usuario?> GetByCpfAsync(string cpf)

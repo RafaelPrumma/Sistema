@@ -7,4 +7,5 @@ public class UsuarioDto
     public string Cpf { get; set; } = string.Empty;
     public int PerfilId { get; set; }
     public string? Senha { get; set; }
+    public bool Ativo { get; set; }
 }

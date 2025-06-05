@@ -8,6 +8,7 @@ public static class UserSeed
     {
         Id = 2,
         Nome = "Comercial",
-        UsuarioInclusao = "seed"
+        UsuarioInclusao = "seed",
+        Ativo = true
     };
 }

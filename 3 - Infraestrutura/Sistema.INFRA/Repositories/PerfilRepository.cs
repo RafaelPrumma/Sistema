@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.INFRA.Data;
+using System.Linq;
 
 namespace Sistema.INFRA.Repositories;
 
@@ -30,6 +31,16 @@ public class PerfilRepository : IPerfilRepository
     public async Task<IEnumerable<Perfil>> GetAllAsync()
     {
         return await _context.Perfis.ToListAsync();
+    }
+
+    public async Task<IEnumerable<Perfil>> GetFilteredAsync(bool? ativo)
+    {
+        var query = _context.Perfis.AsQueryable();
+        if (ativo.HasValue)
+        {
+            query = query.Where(p => p.Ativo == ativo.Value);
+        }
+        return await query.ToListAsync();
     }
 
     public async Task<Perfil?> GetByNameAsync(string nome)

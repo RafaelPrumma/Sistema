@@ -26,9 +26,12 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<UsuarioDto>> Get()
+    public async Task<IEnumerable<UsuarioDto>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim,
+        [FromQuery] int? perfilId, [FromQuery] bool? ativo)
     {
-        var usuarios = await _service.GetAllAsync();
+        IEnumerable<Usuario> usuarios = inicio.HasValue || fim.HasValue || perfilId.HasValue || ativo.HasValue
+            ? await _service.GetFilteredAsync(inicio, fim, perfilId, ativo)
+            : await _service.GetAllAsync();
         return _mapper.Map<IEnumerable<UsuarioDto>>(usuarios);
     }
 
@@ -71,6 +74,14 @@ public class UsuarioController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _service.DeleteAsync(id);
+        if (!result.Success) return BadRequest(result.Message);
+        return NoContent();
+    }
+
+    [HttpPatch("{id}/ativo")]
+    public async Task<IActionResult> AlterarAtivo(int id, [FromQuery] bool ativo, [FromQuery] string usuario)
+    {
+        var result = await _service.AlterarAtivoAsync(id, ativo, usuario);
         if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }
