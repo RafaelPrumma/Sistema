@@ -13,11 +13,11 @@ namespace Sistema.CORE.Services;
         _uow = uow;
     }
 
-    public Task<IEnumerable<Perfil>> GetAllAsync() => _uow.Perfis.GetAllAsync();
+    public Task<PagedResult<Perfil>> GetAllAsync(int page, int pageSize) => _uow.Perfis.GetAllAsync(page, pageSize);
 
     public Task<Perfil?> GetByIdAsync(int id) => _uow.Perfis.GetByIdAsync(id);
 
-    public Task<IEnumerable<Perfil>> GetFilteredAsync(bool? ativo) => _uow.Perfis.GetFilteredAsync(ativo);
+    public Task<PagedResult<Perfil>> GetFilteredAsync(bool? ativo, int page, int pageSize) => _uow.Perfis.GetFilteredAsync(ativo, page, pageSize);
 
     public async Task<OperationResult<Perfil>> AddAsync(Perfil perfil)
     {
@@ -124,5 +124,15 @@ namespace Sistema.CORE.Services;
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Operação concluída");
+    }
+
+    public Task<IEnumerable<PerfilFuncionalidade>> GetFuncionalidadesAsync(int perfilId)
+        => _uow.PerfilFuncionalidades.GetByPerfilIdAsync(perfilId);
+
+    public async Task<OperationResult> DefinirFuncionalidadesAsync(int perfilId, IEnumerable<PerfilFuncionalidade> funcoes)
+    {
+        await _uow.PerfilFuncionalidades.SetForPerfilAsync(perfilId, funcoes);
+        await _uow.CommitAsync();
+        return new OperationResult(true, "Funcionalidades atualizadas");
     }
 }

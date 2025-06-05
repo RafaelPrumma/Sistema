@@ -5,9 +5,9 @@ namespace Sistema.CORE.Services;
 
 public interface IUsuarioService
 {
-    Task<IEnumerable<Usuario>> GetAllAsync();
+    Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize);
     Task<Usuario?> GetByIdAsync(int id);
-    Task<IEnumerable<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo);
+    Task<PagedResult<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize);
     Task<OperationResult<Usuario>> AddAsync(Usuario usuario);
     Task<OperationResult> UpdateAsync(Usuario usuario);
     Task<OperationResult> DeleteAsync(int id);

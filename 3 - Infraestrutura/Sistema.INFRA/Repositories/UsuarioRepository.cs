@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
 using System.Linq;
 
@@ -28,12 +29,13 @@ public class UsuarioRepository : IUsuarioRepository
         _context.Usuarios.Remove(usuario);
     }
 
-    public async Task<IEnumerable<Usuario>> GetAllAsync()
+    public Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize)
     {
-        return await _context.Usuarios.AsNoTracking().ToListAsync();
+        var query = _context.Usuarios.AsNoTracking().OrderBy(u => u.Id);
+        return query.ToPagedResultAsync(page, pageSize);
     }
 
-    public async Task<IEnumerable<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo)
+    public Task<PagedResult<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize)
     {
         var query = _context.Usuarios.AsQueryable();
         if (inicio.HasValue)
@@ -44,8 +46,8 @@ public class UsuarioRepository : IUsuarioRepository
             query = query.Where(u => u.PerfilId == perfilId.Value);
         if (ativo.HasValue)
             query = query.Where(u => u.Ativo == ativo.Value);
-
-        return await query.AsNoTracking().ToListAsync();
+        query = query.AsNoTracking().OrderBy(u => u.Id);
+        return query.ToPagedResultAsync(page, pageSize);
     }
 
     public async Task<bool> ExistsActiveByPerfilAsync(int perfilId)

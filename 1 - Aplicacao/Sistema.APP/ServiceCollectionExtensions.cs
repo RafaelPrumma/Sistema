@@ -12,6 +12,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IPerfilService, PerfilService>();
         services.AddScoped<IUsuarioService, UsuarioService>();
+        services.AddScoped<IFuncionalidadeService, FuncionalidadeService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
         services.AddAutoMapper(typeof(MappingProfile));

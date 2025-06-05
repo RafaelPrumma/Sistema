@@ -23,10 +23,13 @@ public class PerfilController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<PerfilDto>> Get([FromQuery] bool? ativo)
+    public async Task<PagedResult<PerfilDto>> Get([FromQuery] bool? ativo, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var perfis = ativo.HasValue ? await _service.GetFilteredAsync(ativo) : await _service.GetAllAsync();
-        return _mapper.Map<IEnumerable<PerfilDto>>(perfis);
+        var perfis = ativo.HasValue
+            ? await _service.GetFilteredAsync(ativo, page, pageSize)
+            : await _service.GetAllAsync(page, pageSize);
+        var items = _mapper.Map<IEnumerable<PerfilDto>>(perfis.Items);
+        return new PagedResult<PerfilDto>(items, perfis.TotalCount, perfis.Page, perfis.PageSize);
     }
 
     [HttpGet("{id}")]
@@ -68,6 +71,20 @@ public class PerfilController : ControllerBase
     public async Task<IActionResult> AlterarAtivo(int id, [FromQuery] bool ativo, [FromQuery] string usuario)
     {
         var result = await _service.AlterarAtivoAsync(id, ativo, usuario);
+        if (!result.Success) return BadRequest(result.Message);
+        return NoContent();
+    }
+
+    [HttpGet("{id}/funcionalidades")]
+    public async Task<IEnumerable<PerfilFuncionalidade>> GetFuncionalidades(int id)
+    {
+        return await _service.GetFuncionalidadesAsync(id);
+    }
+
+    [HttpPut("{id}/funcionalidades")]
+    public async Task<IActionResult> DefinirFuncionalidades(int id, IEnumerable<PerfilFuncionalidade> funcoes)
+    {
+        var result = await _service.DefinirFuncionalidadesAsync(id, funcoes);
         if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }

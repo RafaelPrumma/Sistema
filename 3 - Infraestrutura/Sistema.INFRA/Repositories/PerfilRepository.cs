@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
 using System.Linq;
 
@@ -28,19 +29,21 @@ public class PerfilRepository : IPerfilRepository
         _context.Perfis.Remove(perfil);
     }
 
-    public async Task<IEnumerable<Perfil>> GetAllAsync()
+    public Task<PagedResult<Perfil>> GetAllAsync(int page, int pageSize)
     {
-        return await _context.Perfis.ToListAsync();
+        var query = _context.Perfis.AsNoTracking().OrderBy(p => p.Id);
+        return query.ToPagedResultAsync(page, pageSize);
     }
 
-    public async Task<IEnumerable<Perfil>> GetFilteredAsync(bool? ativo)
+    public Task<PagedResult<Perfil>> GetFilteredAsync(bool? ativo, int page, int pageSize)
     {
         var query = _context.Perfis.AsQueryable();
         if (ativo.HasValue)
         {
             query = query.Where(p => p.Ativo == ativo.Value);
         }
-        return await query.ToListAsync();
+        query = query.AsNoTracking().OrderBy(p => p.Id);
+        return query.ToPagedResultAsync(page, pageSize);
     }
 
     public async Task<Perfil?> GetByNameAsync(string nome)

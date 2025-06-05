@@ -11,9 +11,18 @@ public class AppDbContext : DbContext
     {
     }
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PerfilFuncionalidade>()
+            .HasKey(pf => new { pf.PerfilId, pf.FuncionalidadeId });
+        base.OnModelCreating(modelBuilder);
+    }
+
     public DbSet<Perfil> Perfis => Set<Perfil>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Log> Logs => Set<Log>();
+    public DbSet<Funcionalidade> Funcionalidades => Set<Funcionalidade>();
+    public DbSet<PerfilFuncionalidade> PerfilFuncionalidades => Set<PerfilFuncionalidade>();
 
     public override int SaveChanges()
     {

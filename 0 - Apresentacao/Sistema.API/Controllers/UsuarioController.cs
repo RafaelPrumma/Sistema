@@ -26,13 +26,14 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<UsuarioDto>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim,
-        [FromQuery] int? perfilId, [FromQuery] bool? ativo)
+    public async Task<PagedResult<UsuarioDto>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim,
+        [FromQuery] int? perfilId, [FromQuery] bool? ativo, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        IEnumerable<Usuario> usuarios = inicio.HasValue || fim.HasValue || perfilId.HasValue || ativo.HasValue
-            ? await _service.GetFilteredAsync(inicio, fim, perfilId, ativo)
-            : await _service.GetAllAsync();
-        return _mapper.Map<IEnumerable<UsuarioDto>>(usuarios);
+        var usuarios = inicio.HasValue || fim.HasValue || perfilId.HasValue || ativo.HasValue
+            ? await _service.GetFilteredAsync(inicio, fim, perfilId, ativo, page, pageSize)
+            : await _service.GetAllAsync(page, pageSize);
+        var items = _mapper.Map<IEnumerable<UsuarioDto>>(usuarios.Items);
+        return new PagedResult<UsuarioDto>(items, usuarios.TotalCount, usuarios.Page, usuarios.PageSize);
     }
 
     [HttpGet("{id}")]

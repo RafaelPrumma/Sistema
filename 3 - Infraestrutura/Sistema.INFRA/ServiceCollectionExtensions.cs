@@ -15,6 +15,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<ILogRepository, LogRepository>();
+        services.AddScoped<IFuncionalidadeRepository, FuncionalidadeRepository>();
+        services.AddScoped<IPerfilFuncionalidadeRepository, PerfilFuncionalidadeRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;

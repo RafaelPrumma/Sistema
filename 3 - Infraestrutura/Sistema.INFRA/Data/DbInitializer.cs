@@ -15,6 +15,18 @@ public static class DbInitializer
             context.SaveChanges();
         }
 
+        if (!context.Funcionalidades.Any())
+        {
+            context.Funcionalidades.AddRange(FuncionalidadeSeed.Get());
+            context.SaveChanges();
+        }
+
+        if (!context.PerfilFuncionalidades.Any())
+        {
+            context.PerfilFuncionalidades.AddRange(PerfilFuncionalidadeSeed.Get());
+            context.SaveChanges();
+        }
+
         if (!context.Usuarios.Any())
         {
             context.Usuarios.AddRange(AdminUserSeed.Get(), ComercialUserSeed.Get());

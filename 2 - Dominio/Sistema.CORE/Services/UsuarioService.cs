@@ -13,12 +13,12 @@ namespace Sistema.CORE.Services;
         _uow = uow;
     }
 
-    public Task<IEnumerable<Usuario>> GetAllAsync() => _uow.Usuarios.GetAllAsync();
+    public Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize) => _uow.Usuarios.GetAllAsync(page, pageSize);
 
     public Task<Usuario?> GetByIdAsync(int id) => _uow.Usuarios.GetByIdAsync(id);
 
-    public Task<IEnumerable<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo)
-        => _uow.Usuarios.GetFilteredAsync(inicio, fim, perfilId, ativo);
+    public Task<PagedResult<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize)
+        => _uow.Usuarios.GetFilteredAsync(inicio, fim, perfilId, ativo, page, pageSize);
 
     public async Task<OperationResult<Usuario>> AddAsync(Usuario usuario)
     {
