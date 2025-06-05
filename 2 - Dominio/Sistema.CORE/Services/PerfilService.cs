@@ -27,7 +27,9 @@ public class PerfilService : IPerfilService
                 Entidade = nameof(Perfil),
                 Operacao = "Add",
                 Sucesso = false,
-                Mensagem = "Perfil já existe"
+                Mensagem = "Perfil já existe",
+                Tipo = LogTipo.Erro,
+                Usuario = perfil.UsuarioInclusao
             });
             return new OperationResult<Perfil>(false, "Perfil já existe");
         }
@@ -38,7 +40,9 @@ public class PerfilService : IPerfilService
             Entidade = nameof(Perfil),
             Operacao = "Add",
             Sucesso = true,
-            Mensagem = "Perfil criado"
+            Mensagem = "Perfil criado",
+            Tipo = LogTipo.Sucesso,
+            Usuario = perfil.UsuarioInclusao
         });
         await _uow.CommitAsync();
         return new OperationResult<Perfil>(true, "Perfil criado com sucesso", created);
@@ -54,7 +58,9 @@ public class PerfilService : IPerfilService
                 Entidade = nameof(Perfil),
                 Operacao = "Update",
                 Sucesso = false,
-                Mensagem = "Nome já utilizado"
+                Mensagem = "Nome já utilizado",
+                Tipo = LogTipo.Erro,
+                Usuario = perfil.UsuarioAlteracao ?? "system"
             });
             return new OperationResult(false, "Nome já utilizado");
         }
@@ -65,7 +71,9 @@ public class PerfilService : IPerfilService
             Entidade = nameof(Perfil),
             Operacao = "Update",
             Sucesso = true,
-            Mensagem = "Perfil atualizado"
+            Mensagem = "Perfil atualizado",
+            Tipo = LogTipo.Sucesso,
+            Usuario = perfil.UsuarioAlteracao ?? "system"
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Perfil atualizado com sucesso");
@@ -79,7 +87,9 @@ public class PerfilService : IPerfilService
             Entidade = nameof(Perfil),
             Operacao = "Delete",
             Sucesso = true,
-            Mensagem = "Perfil removido"
+            Mensagem = "Perfil removido",
+            Tipo = LogTipo.Sucesso,
+            Usuario = "system"
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Perfil removido");

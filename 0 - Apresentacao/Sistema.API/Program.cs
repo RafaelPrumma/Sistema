@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, lc) =>
     lc.WriteTo.Console()
-      .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day));
+      .WriteTo.File("log/log-.txt", rollingInterval: RollingInterval.Month));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

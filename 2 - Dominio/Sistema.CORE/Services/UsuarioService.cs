@@ -27,7 +27,9 @@ public class UsuarioService : IUsuarioService
                 Entidade = nameof(Usuario),
                 Operacao = "Add",
                 Sucesso = false,
-                Mensagem = "Usuário já existe"
+                Mensagem = "Usuário já existe",
+                Tipo = LogTipo.Erro,
+                Usuario = usuario.UsuarioInclusao
             });
             return new OperationResult<Usuario>(false, "Usuário já existe");
         }
@@ -38,7 +40,9 @@ public class UsuarioService : IUsuarioService
             Entidade = nameof(Usuario),
             Operacao = "Add",
             Sucesso = true,
-            Mensagem = "Usuário criado"
+            Mensagem = "Usuário criado",
+            Tipo = LogTipo.Sucesso,
+            Usuario = usuario.UsuarioInclusao
         });
         await _uow.CommitAsync();
         return new OperationResult<Usuario>(true, "Usuário criado com sucesso", created);
@@ -54,7 +58,9 @@ public class UsuarioService : IUsuarioService
                 Entidade = nameof(Usuario),
                 Operacao = "Update",
                 Sucesso = false,
-                Mensagem = "CPF já utilizado"
+                Mensagem = "CPF já utilizado",
+                Tipo = LogTipo.Erro,
+                Usuario = usuario.UsuarioAlteracao ?? "system"
             });
             return new OperationResult(false, "CPF já utilizado");
         }
@@ -65,7 +71,9 @@ public class UsuarioService : IUsuarioService
             Entidade = nameof(Usuario),
             Operacao = "Update",
             Sucesso = true,
-            Mensagem = "Usuário atualizado"
+            Mensagem = "Usuário atualizado",
+            Tipo = LogTipo.Sucesso,
+            Usuario = usuario.UsuarioAlteracao ?? "system"
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Usuário atualizado com sucesso");
@@ -79,7 +87,9 @@ public class UsuarioService : IUsuarioService
             Entidade = nameof(Usuario),
             Operacao = "Delete",
             Sucesso = true,
-            Mensagem = "Usuário removido"
+            Mensagem = "Usuário removido",
+            Tipo = LogTipo.Sucesso,
+            Usuario = "system"
         });
         await _uow.CommitAsync();
         return new OperationResult(true, "Usuário removido");
