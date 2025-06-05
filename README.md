@@ -30,8 +30,3 @@ Para compilar a solução:
 dotnet build Sistema.sln -c Release
 ```
 
-Para executar os testes automatizados:
-
-```bash
-dotnet test Sistema.sln -c Release
-```
