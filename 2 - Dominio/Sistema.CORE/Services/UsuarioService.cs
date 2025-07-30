@@ -31,6 +31,7 @@ public class UsuarioService : IUsuarioService
                 Tipo = LogTipo.Erro,
                 Usuario = usuario.UsuarioInclusao
             });
+            await _uow.CommitAsync();
             return new OperationResult<Usuario>(false, "Usuário já existe");
         }
 
@@ -62,6 +63,7 @@ public class UsuarioService : IUsuarioService
                 Tipo = LogTipo.Erro,
                 Usuario = usuario.UsuarioAlteracao ?? "system"
             });
+            await _uow.CommitAsync();
             return new OperationResult(false, "CPF já utilizado");
         }
 
