@@ -5,12 +5,12 @@ namespace Sistema.CORE.Interfaces;
 
 public interface IUsuarioRepository
 {
-    Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize);
-    Task<PagedResult<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize);
-    Task<Usuario?> GetByIdAsync(int id);
-    Task<Usuario?> GetByCpfAsync(string cpf);
-    Task<bool> ExistsActiveByPerfilAsync(int perfilId);
-    Task<Usuario> AddAsync(Usuario usuario);
-    Task UpdateAsync(Usuario usuario);
-    Task DeleteAsync(int id);
+    Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize);
+    Task<PagedResult<Usuario>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize);
+    Task<Usuario?> BuscarPorIdAsync(int id);
+    Task<Usuario?> BuscarPorCpfAsync(string cpf);
+    Task<bool> ExisteAtivoPorPerfilAsync(int perfilId);
+    Task<Usuario> AdicionarAsync(Usuario usuario);
+    Task AtualizarAsync(Usuario usuario);
+    Task RemoverAsync(int id);
 }

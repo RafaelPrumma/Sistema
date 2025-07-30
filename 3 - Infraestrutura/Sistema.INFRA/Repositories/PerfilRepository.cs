@@ -16,26 +16,26 @@ public class PerfilRepository : IPerfilRepository
         _context = context;
     }
 
-    public Task<Perfil> AddAsync(Perfil perfil)
+    public Task<Perfil> AdicionarAsync(Perfil perfil)
     {
         _context.Perfis.Add(perfil);
         return Task.FromResult(perfil);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task RemoverAsync(int id)
     {
         var perfil = await _context.Perfis.FindAsync(id);
         if (perfil is null) return;
         _context.Perfis.Remove(perfil);
     }
  
-    public Task<PagedResult<Perfil>> GetAllAsync(int page, int pageSize)
+    public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize)
     {
         var query = _context.Perfis.AsNoTracking().OrderBy(p => p.Id);
         return query.ToPagedResultAsync(page, pageSize);
     }
 
-    public Task<PagedResult<Perfil>> GetFilteredAsync(bool? ativo, int page, int pageSize)
+    public Task<PagedResult<Perfil>> BuscarFiltradosAsync(bool? ativo, int page, int pageSize)
     {
         var query = _context.Perfis.AsQueryable();
         if (ativo.HasValue)
@@ -46,17 +46,17 @@ public class PerfilRepository : IPerfilRepository
         return query.ToPagedResultAsync(page, pageSize); 
     }
 
-    public async Task<Perfil?> GetByNameAsync(string nome)
+    public async Task<Perfil?> BuscarPorNomeAsync(string nome)
     {
         return await _context.Perfis.FirstOrDefaultAsync(p => p.Nome == nome);
     } 
     
-    public async Task<Perfil?> GetByIdAsync(int id)
+    public async Task<Perfil?> BuscarPorIdAsync(int id)
     {
         return await _context.Perfis.FindAsync(id);
     }
 
-    public Task UpdateAsync(Perfil perfil)
+    public Task AtualizarAsync(Perfil perfil)
     {
         _context.Perfis.Update(perfil);
         return Task.CompletedTask;

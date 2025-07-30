@@ -15,13 +15,13 @@ public class LogRepository : ILogRepository
         _context = context;
     }
 
-    public Task AddAsync(Log log)
+    public Task AdicionarAsync(Log log)
     {
         _context.Logs.Add(log);
         return Task.CompletedTask;
     } 
 
-    public async Task<IEnumerable<Log>> GetFilteredAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo)
+    public async Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo)
     {
         var query = _context.Logs.AsQueryable();
         if (inicio.HasValue)

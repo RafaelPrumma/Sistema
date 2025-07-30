@@ -4,5 +4,5 @@ namespace Sistema.CORE.Interfaces;
 
 public interface ILogRepository
 {
-    Task AddAsync(Log log);
+    Task AdicionarAsync(Log log);
 }

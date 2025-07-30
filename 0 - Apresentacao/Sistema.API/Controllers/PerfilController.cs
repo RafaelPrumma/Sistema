@@ -22,14 +22,14 @@ public class PerfilController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<PerfilDto>> Get()
     {
-        var perfis = await _service.GetAllAsync();
+        var perfis = await _service.BuscarTodosAsync();
         return _mapper.Map<IEnumerable<PerfilDto>>(perfis);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<PerfilDto>> Get(int id)
     {
-        var perfil = await _service.GetByIdAsync(id);
+        var perfil = await _service.BuscarPorIdAsync(id);
         if (perfil is null) return NotFound();
         return _mapper.Map<PerfilDto>(perfil);
     }
@@ -38,7 +38,7 @@ public class PerfilController : ControllerBase
     public async Task<ActionResult<PerfilDto>> Post(PerfilDto dto)
     {
         var perfil = _mapper.Map<Perfil>(dto); 
-        var result = await _service.AddAsync(perfil);
+        var result = await _service.AdicionarAsync(perfil);
         if (!result.Success) return BadRequest(result.Message);
         return CreatedAtAction(nameof(Get), new { id = result.Data!.Id }, _mapper.Map<PerfilDto>(result.Data)); 
     }
@@ -48,7 +48,7 @@ public class PerfilController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         var perfil = _mapper.Map<Perfil>(dto); 
-        var result = await _service.UpdateAsync(perfil);
+        var result = await _service.AtualizarAsync(perfil);
         if (!result.Success) return BadRequest(result.Message); 
         return NoContent();
     }
@@ -56,7 +56,7 @@ public class PerfilController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     { 
-        var result = await _service.DeleteAsync(id);
+        var result = await _service.RemoverAsync(id);
         if (!result.Success) return BadRequest(result.Message); 
         return NoContent();
     }

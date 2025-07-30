@@ -13,16 +13,16 @@ public class UsuarioService : IUsuarioService
         _uow = uow;
     }
 
-    public Task<IEnumerable<Usuario>> GetAllAsync() => _uow.Usuarios.GetAllAsync();
+    public Task<IEnumerable<Usuario>> BuscarTodosAsync() => _uow.Usuarios.BuscarTodosAsync();
 
-    public Task<Usuario?> GetByIdAsync(int id) => _uow.Usuarios.GetByIdAsync(id);
+    public Task<Usuario?> BuscarPorIdAsync(int id) => _uow.Usuarios.BuscarPorIdAsync(id);
 
-    public async Task<OperationResult<Usuario>> AddAsync(Usuario usuario)
+    public async Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario)
     {
-        var existing = await _uow.Usuarios.GetByCpfAsync(usuario.Cpf);
+        var existing = await _uow.Usuarios.BuscarPorCpfAsync(usuario.Cpf);
         if (existing is not null)
         {
-            await _uow.Logs.AddAsync(new Log
+            await _uow.Logs.AdicionarAsync(new Log
             {
                 Entidade = nameof(Usuario),
                 Operacao = "Add",
@@ -31,12 +31,12 @@ public class UsuarioService : IUsuarioService
                 Tipo = LogTipo.Erro,
                 Usuario = usuario.UsuarioInclusao
             });
-            await _uow.CommitAsync();
+            await _uow.ConfirmarAsync();
             return new OperationResult<Usuario>(false, "Usuário já existe");
         }
 
-        var created = await _uow.Usuarios.AddAsync(usuario);
-        await _uow.Logs.AddAsync(new Log
+        var created = await _uow.Usuarios.AdicionarAsync(usuario);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Usuario),
             Operacao = "Add",
@@ -45,16 +45,16 @@ public class UsuarioService : IUsuarioService
             Tipo = LogTipo.Sucesso,
             Usuario = usuario.UsuarioInclusao
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult<Usuario>(true, "Usuário criado com sucesso", created);
     }
 
-    public async Task<OperationResult> UpdateAsync(Usuario usuario)
+    public async Task<OperationResult> AtualizarAsync(Usuario usuario)
     {
-        var existing = await _uow.Usuarios.GetByCpfAsync(usuario.Cpf);
+        var existing = await _uow.Usuarios.BuscarPorCpfAsync(usuario.Cpf);
         if (existing is not null && existing.Id != usuario.Id)
         {
-            await _uow.Logs.AddAsync(new Log
+            await _uow.Logs.AdicionarAsync(new Log
             {
                 Entidade = nameof(Usuario),
                 Operacao = "Update",
@@ -63,12 +63,12 @@ public class UsuarioService : IUsuarioService
                 Tipo = LogTipo.Erro,
                 Usuario = usuario.UsuarioAlteracao ?? "system"
             });
-            await _uow.CommitAsync();
+            await _uow.ConfirmarAsync();
             return new OperationResult(false, "CPF já utilizado");
         }
 
-        await _uow.Usuarios.UpdateAsync(usuario);
-        await _uow.Logs.AddAsync(new Log
+        await _uow.Usuarios.AtualizarAsync(usuario);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Usuario),
             Operacao = "Update",
@@ -77,14 +77,14 @@ public class UsuarioService : IUsuarioService
             Tipo = LogTipo.Sucesso,
             Usuario = usuario.UsuarioAlteracao ?? "system"
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Usuário atualizado com sucesso");
     }
 
-    public async Task<OperationResult> DeleteAsync(int id)
+    public async Task<OperationResult> RemoverAsync(int id)
     {
-        await _uow.Usuarios.DeleteAsync(id);
-        await _uow.Logs.AddAsync(new Log
+        await _uow.Usuarios.RemoverAsync(id);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Usuario),
             Operacao = "Delete",
@@ -93,7 +93,7 @@ public class UsuarioService : IUsuarioService
             Tipo = LogTipo.Sucesso,
             Usuario = "system"
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Usuário removido");
     }
 }

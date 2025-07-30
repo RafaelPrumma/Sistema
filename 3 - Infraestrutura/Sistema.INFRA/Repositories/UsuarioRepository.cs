@@ -16,26 +16,26 @@ public class UsuarioRepository : IUsuarioRepository
         _context = context;
     }
 
-    public Task<Usuario> AddAsync(Usuario usuario)
+    public Task<Usuario> AdicionarAsync(Usuario usuario)
     {
         _context.Usuarios.Add(usuario);
         return Task.FromResult(usuario);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task RemoverAsync(int id)
     {
         var usuario = await _context.Usuarios.FindAsync(id);
         if (usuario is null) return;
         _context.Usuarios.Remove(usuario);
     }
  
-    public Task<PagedResult<Usuario>> GetAllAsync(int page, int pageSize)
+    public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize)
     {
         var query = _context.Usuarios.AsNoTracking().OrderBy(u => u.Id);
         return query.ToPagedResultAsync(page, pageSize);
     }
 
-    public Task<PagedResult<Usuario>> GetFilteredAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize)
+    public Task<PagedResult<Usuario>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize)
     {
         var query = _context.Usuarios.AsQueryable();
         if (inicio.HasValue)
@@ -50,22 +50,22 @@ public class UsuarioRepository : IUsuarioRepository
         return query.ToPagedResultAsync(page, pageSize);
     }
 
-    public async Task<bool> ExistsActiveByPerfilAsync(int perfilId)
+    public async Task<bool> ExisteAtivoPorPerfilAsync(int perfilId)
     {
         return await _context.Usuarios.AnyAsync(u => u.PerfilId == perfilId && u.Ativo);
     }
 
-    public async Task<Usuario?> GetByCpfAsync(string cpf)
+    public async Task<Usuario?> BuscarPorCpfAsync(string cpf)
     {
         return await _context.Usuarios.FirstOrDefaultAsync(u => u.Cpf == cpf);
     }
 
-    public async Task<Usuario?> GetByIdAsync(int id)
+    public async Task<Usuario?> BuscarPorIdAsync(int id)
     {
         return await _context.Usuarios.FindAsync(id);
     }
 
-    public Task UpdateAsync(Usuario usuario)
+    public Task AtualizarAsync(Usuario usuario)
     {
         _context.Usuarios.Update(usuario);
         return Task.CompletedTask;

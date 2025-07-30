@@ -25,7 +25,7 @@ public class FuncionalidadeController : ControllerBase
     [HttpGet]
     public async Task<PagedResult<FuncionalidadeDto>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var result = await _service.GetPagedAsync(page, pageSize);
+        var result = await _service.BuscarPaginadasAsync(page, pageSize);
         var items = _mapper.Map<IEnumerable<FuncionalidadeDto>>(result.Items);
         return new PagedResult<FuncionalidadeDto>(items, result.TotalCount, result.Page, result.PageSize);
     }
@@ -33,7 +33,7 @@ public class FuncionalidadeController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<FuncionalidadeDto>> Get(int id)
     {
-        var obj = await _service.GetByIdAsync(id);
+        var obj = await _service.BuscarPorIdAsync(id);
         if (obj is null) return NotFound();
         return _mapper.Map<FuncionalidadeDto>(obj);
     }
@@ -42,7 +42,7 @@ public class FuncionalidadeController : ControllerBase
     public async Task<ActionResult<FuncionalidadeDto>> Post(FuncionalidadeDto dto)
     {
         var entity = _mapper.Map<Funcionalidade>(dto);
-        var result = await _service.AddAsync(entity);
+        var result = await _service.AdicionarAsync(entity);
         return CreatedAtAction(nameof(Get), new { id = result.Data!.Id }, _mapper.Map<FuncionalidadeDto>(result.Data));
     }
 
@@ -51,14 +51,14 @@ public class FuncionalidadeController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         var entity = _mapper.Map<Funcionalidade>(dto);
-        await _service.UpdateAsync(entity);
+        await _service.AtualizarAsync(entity);
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        await _service.DeleteAsync(id);
+        await _service.RemoverAsync(id);
         return NoContent();
     }
 }

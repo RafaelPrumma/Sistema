@@ -5,9 +5,9 @@ namespace Sistema.CORE.Services;
 
 public interface IUsuarioService
 {
-    Task<IEnumerable<Usuario>> GetAllAsync();
-    Task<Usuario?> GetByIdAsync(int id);
-    Task<OperationResult<Usuario>> AddAsync(Usuario usuario);
-    Task<OperationResult> UpdateAsync(Usuario usuario);
-    Task<OperationResult> DeleteAsync(int id);
+    Task<IEnumerable<Usuario>> BuscarTodosAsync();
+    Task<Usuario?> BuscarPorIdAsync(int id);
+    Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario);
+    Task<OperationResult> AtualizarAsync(Usuario usuario);
+    Task<OperationResult> RemoverAsync(int id);
 }

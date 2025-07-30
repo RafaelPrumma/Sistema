@@ -13,16 +13,16 @@ public class PerfilService : IPerfilService
         _uow = uow;
     }
 
-    public Task<IEnumerable<Perfil>> GetAllAsync() => _uow.Perfis.GetAllAsync();
+    public Task<IEnumerable<Perfil>> BuscarTodosAsync() => _uow.Perfis.BuscarTodosAsync();
 
-    public Task<Perfil?> GetByIdAsync(int id) => _uow.Perfis.GetByIdAsync(id);
+    public Task<Perfil?> BuscarPorIdAsync(int id) => _uow.Perfis.BuscarPorIdAsync(id);
 
-    public async Task<OperationResult<Perfil>> AddAsync(Perfil perfil)
+    public async Task<OperationResult<Perfil>> AdicionarAsync(Perfil perfil)
     {
-        var existing = await _uow.Perfis.GetByNameAsync(perfil.Nome);
+        var existing = await _uow.Perfis.BuscarPorNomeAsync(perfil.Nome);
         if (existing is not null)
         {
-            await _uow.Logs.AddAsync(new Log
+            await _uow.Logs.AdicionarAsync(new Log
             {
                 Entidade = nameof(Perfil),
                 Operacao = "Add",
@@ -31,12 +31,12 @@ public class PerfilService : IPerfilService
                 Tipo = LogTipo.Erro,
                 Usuario = perfil.UsuarioInclusao
             });
-            await _uow.CommitAsync();
+            await _uow.ConfirmarAsync();
             return new OperationResult<Perfil>(false, "Perfil já existe");
         }
 
-        var created = await _uow.Perfis.AddAsync(perfil);
-        await _uow.Logs.AddAsync(new Log
+        var created = await _uow.Perfis.AdicionarAsync(perfil);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Perfil),
             Operacao = "Add",
@@ -45,16 +45,16 @@ public class PerfilService : IPerfilService
             Tipo = LogTipo.Sucesso,
             Usuario = perfil.UsuarioInclusao
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult<Perfil>(true, "Perfil criado com sucesso", created);
     }
 
-    public async Task<OperationResult> UpdateAsync(Perfil perfil)
+    public async Task<OperationResult> AtualizarAsync(Perfil perfil)
     {
-        var existing = await _uow.Perfis.GetByNameAsync(perfil.Nome);
+        var existing = await _uow.Perfis.BuscarPorNomeAsync(perfil.Nome);
         if (existing is not null && existing.Id != perfil.Id)
         {
-            await _uow.Logs.AddAsync(new Log
+            await _uow.Logs.AdicionarAsync(new Log
             {
                 Entidade = nameof(Perfil),
                 Operacao = "Update",
@@ -63,12 +63,12 @@ public class PerfilService : IPerfilService
                 Tipo = LogTipo.Erro,
                 Usuario = perfil.UsuarioAlteracao ?? "system"
             });
-            await _uow.CommitAsync();
+            await _uow.ConfirmarAsync();
             return new OperationResult(false, "Nome já utilizado");
         }
 
-        await _uow.Perfis.UpdateAsync(perfil);
-        await _uow.Logs.AddAsync(new Log
+        await _uow.Perfis.AtualizarAsync(perfil);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Perfil),
             Operacao = "Update",
@@ -77,14 +77,14 @@ public class PerfilService : IPerfilService
             Tipo = LogTipo.Sucesso,
             Usuario = perfil.UsuarioAlteracao ?? "system"
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Perfil atualizado com sucesso");
     }
 
-    public async Task<OperationResult> DeleteAsync(int id)
+    public async Task<OperationResult> RemoverAsync(int id)
     {
-        await _uow.Perfis.DeleteAsync(id);
-        await _uow.Logs.AddAsync(new Log
+        await _uow.Perfis.RemoverAsync(id);
+        await _uow.Logs.AdicionarAsync(new Log
         {
             Entidade = nameof(Perfil),
             Operacao = "Delete",
@@ -93,7 +93,7 @@ public class PerfilService : IPerfilService
             Tipo = LogTipo.Sucesso,
             Usuario = "system"
         });
-        await _uow.CommitAsync();
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Perfil removido");
     }
 }

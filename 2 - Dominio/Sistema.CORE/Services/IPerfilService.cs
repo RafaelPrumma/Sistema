@@ -5,9 +5,9 @@ using Sistema.CORE.Common;
 
 public interface IPerfilService
 {
-    Task<IEnumerable<Perfil>> GetAllAsync();
-    Task<Perfil?> GetByIdAsync(int id);
-    Task<OperationResult<Perfil>> AddAsync(Perfil perfil);
-    Task<OperationResult> UpdateAsync(Perfil perfil);
-    Task<OperationResult> DeleteAsync(int id);
+    Task<IEnumerable<Perfil>> BuscarTodosAsync();
+    Task<Perfil?> BuscarPorIdAsync(int id);
+    Task<OperationResult<Perfil>> AdicionarAsync(Perfil perfil);
+    Task<OperationResult> AtualizarAsync(Perfil perfil);
+    Task<OperationResult> RemoverAsync(int id);
 }

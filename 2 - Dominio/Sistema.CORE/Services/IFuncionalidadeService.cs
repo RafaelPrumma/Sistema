@@ -5,9 +5,9 @@ namespace Sistema.CORE.Services;
 
 public interface IFuncionalidadeService
 {
-    Task<PagedResult<Funcionalidade>> GetPagedAsync(int page, int pageSize);
-    Task<Funcionalidade?> GetByIdAsync(int id);
-    Task<OperationResult<Funcionalidade>> AddAsync(Funcionalidade func);
-    Task<OperationResult> UpdateAsync(Funcionalidade func);
-    Task<OperationResult> DeleteAsync(int id);
+    Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize);
+    Task<Funcionalidade?> BuscarPorIdAsync(int id);
+    Task<OperationResult<Funcionalidade>> AdicionarAsync(Funcionalidade func);
+    Task<OperationResult> AtualizarAsync(Funcionalidade func);
+    Task<OperationResult> RemoverAsync(int id);
 }
