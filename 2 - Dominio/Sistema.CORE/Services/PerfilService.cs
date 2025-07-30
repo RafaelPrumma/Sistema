@@ -31,6 +31,7 @@ public class PerfilService : IPerfilService
                 Tipo = LogTipo.Erro,
                 Usuario = perfil.UsuarioInclusao
             });
+            await _uow.CommitAsync();
             return new OperationResult<Perfil>(false, "Perfil já existe");
         }
 
@@ -62,6 +63,7 @@ public class PerfilService : IPerfilService
                 Tipo = LogTipo.Erro,
                 Usuario = perfil.UsuarioAlteracao ?? "system"
             });
+            await _uow.CommitAsync();
             return new OperationResult(false, "Nome já utilizado");
         }
 
