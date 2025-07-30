@@ -13,29 +13,29 @@ public class FuncionalidadeService : IFuncionalidadeService
         _uow = uow;
     }
 
-    public Task<PagedResult<Funcionalidade>> GetPagedAsync(int page, int pageSize)
-        => _uow.Funcionalidades.GetPagedAsync(page, pageSize);
+    public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize)
+        => _uow.Funcionalidades.BuscarPaginadasAsync(page, pageSize);
 
-    public Task<Funcionalidade?> GetByIdAsync(int id) => _uow.Funcionalidades.GetByIdAsync(id);
+    public Task<Funcionalidade?> BuscarPorIdAsync(int id) => _uow.Funcionalidades.BuscarPorIdAsync(id);
 
-    public async Task<OperationResult<Funcionalidade>> AddAsync(Funcionalidade func)
+    public async Task<OperationResult<Funcionalidade>> AdicionarAsync(Funcionalidade func)
     {
-        await _uow.Funcionalidades.AddAsync(func);
-        await _uow.CommitAsync();
+        await _uow.Funcionalidades.AdicionarAsync(func);
+        await _uow.ConfirmarAsync();
         return new OperationResult<Funcionalidade>(true, "Criado", func);
     }
 
-    public async Task<OperationResult> UpdateAsync(Funcionalidade func)
+    public async Task<OperationResult> AtualizarAsync(Funcionalidade func)
     {
-        await _uow.Funcionalidades.UpdateAsync(func);
-        await _uow.CommitAsync();
+        await _uow.Funcionalidades.AtualizarAsync(func);
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Atualizado");
     }
 
-    public async Task<OperationResult> DeleteAsync(int id)
+    public async Task<OperationResult> RemoverAsync(int id)
     {
-        await _uow.Funcionalidades.DeleteAsync(id);
-        await _uow.CommitAsync();
+        await _uow.Funcionalidades.RemoverAsync(id);
+        await _uow.ConfirmarAsync();
         return new OperationResult(true, "Removido");
     }
 }

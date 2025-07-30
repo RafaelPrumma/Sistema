@@ -20,7 +20,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<string>> Login(LoginDto dto)
     {
-        var token = await _authService.AuthenticateAsync(dto.Cpf, dto.Senha);
+        var token = await _authService.AutenticarAsync(dto.Cpf, dto.Senha);
         if (token is null) return Unauthorized();
         return Ok(token);
     }

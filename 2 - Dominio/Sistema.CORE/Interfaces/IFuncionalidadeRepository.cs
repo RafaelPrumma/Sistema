@@ -5,9 +5,9 @@ namespace Sistema.CORE.Interfaces;
 
 public interface IFuncionalidadeRepository
 {
-    Task<PagedResult<Funcionalidade>> GetPagedAsync(int page, int pageSize);
-    Task<Funcionalidade?> GetByIdAsync(int id);
-    Task<Funcionalidade> AddAsync(Funcionalidade func);
-    Task UpdateAsync(Funcionalidade func);
-    Task DeleteAsync(int id);
+    Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize);
+    Task<Funcionalidade?> BuscarPorIdAsync(int id);
+    Task<Funcionalidade> AdicionarAsync(Funcionalidade func);
+    Task AtualizarAsync(Funcionalidade func);
+    Task RemoverAsync(int id);
 }

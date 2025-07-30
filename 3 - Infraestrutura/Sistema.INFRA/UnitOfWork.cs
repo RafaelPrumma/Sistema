@@ -27,5 +27,5 @@ public class UnitOfWork : IUnitOfWork
         PerfilFuncionalidades = perfilFuncs; 
     }
 
-    public Task<int> CommitAsync() => _context.SaveChangesAsync();
+    public Task<int> ConfirmarAsync() => _context.SaveChangesAsync();
 }

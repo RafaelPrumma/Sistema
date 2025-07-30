@@ -14,7 +14,7 @@ public class PerfilFuncionalidadeRepository : IPerfilFuncionalidadeRepository
         _context = context;
     }
 
-    public async Task<IEnumerable<PerfilFuncionalidade>> GetByPerfilIdAsync(int perfilId)
+    public async Task<IEnumerable<PerfilFuncionalidade>> BuscarPorPerfilIdAsync(int perfilId)
     {
         return await _context.PerfilFuncionalidades
             .Include(pf => pf.Funcionalidade)
@@ -23,7 +23,7 @@ public class PerfilFuncionalidadeRepository : IPerfilFuncionalidadeRepository
             .ToListAsync();
     }
 
-    public async Task SetForPerfilAsync(int perfilId, IEnumerable<PerfilFuncionalidade> funcs)
+    public async Task DefinirParaPerfilAsync(int perfilId, IEnumerable<PerfilFuncionalidade> funcs)
     {
         var existing = _context.PerfilFuncionalidades.Where(pf => pf.PerfilId == perfilId);
         _context.PerfilFuncionalidades.RemoveRange(existing);

@@ -4,5 +4,5 @@ namespace Sistema.CORE.Services;
 
 public interface IAuthService
 {
-    Task<string?> AuthenticateAsync(string cpf, string senha);
+    Task<string?> AutenticarAsync(string cpf, string senha);
 }

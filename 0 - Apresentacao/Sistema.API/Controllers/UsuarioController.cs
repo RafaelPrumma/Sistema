@@ -23,14 +23,14 @@ public class UsuarioController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<UsuarioDto>> Get()
     {
-        var usuarios = await _service.GetAllAsync();
+        var usuarios = await _service.BuscarTodosAsync();
         return _mapper.Map<IEnumerable<UsuarioDto>>(usuarios);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<UsuarioDto>> Get(int id)
     {
-        var usuario = await _service.GetByIdAsync(id);
+        var usuario = await _service.BuscarPorIdAsync(id);
         if (usuario is null) return NotFound();
         return _mapper.Map<UsuarioDto>(usuario);
     }
@@ -39,7 +39,7 @@ public class UsuarioController : ControllerBase
     public async Task<ActionResult<UsuarioDto>> Post(UsuarioDto dto)
     {
         var usuario = _mapper.Map<Usuario>(dto);
-        var result = await _service.AddAsync(usuario);
+        var result = await _service.AdicionarAsync(usuario);
         if (!result.Success) return BadRequest(result.Message);
         return CreatedAtAction(nameof(Get), new { id = result.Data!.Id }, _mapper.Map<UsuarioDto>(result.Data));
     }
@@ -49,7 +49,7 @@ public class UsuarioController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         var usuario = _mapper.Map<Usuario>(dto);
-        var result = await _service.UpdateAsync(usuario);
+        var result = await _service.AtualizarAsync(usuario);
         if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }
@@ -57,7 +57,7 @@ public class UsuarioController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var result = await _service.DeleteAsync(id);
+        var result = await _service.RemoverAsync(id);
         if (!result.Success) return BadRequest(result.Message);
         return NoContent();
     }
