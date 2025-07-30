@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<Perfil> Perfis => Set<Perfil>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Log> Logs => Set<Log>();
+    public DbSet<Funcionalidade> Funcionalidades => Set<Funcionalidade>();
+    public DbSet<PerfilFuncionalidade> PerfilFuncionalidades => Set<PerfilFuncionalidade>();
 
     public override int SaveChanges()
     {
