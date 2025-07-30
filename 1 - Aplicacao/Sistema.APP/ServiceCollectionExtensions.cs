@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IPerfilService, PerfilService>();
         services.AddScoped<IUsuarioService, UsuarioService>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddAutoMapper(typeof(MappingProfile));
         return services;
     }
