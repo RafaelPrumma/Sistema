@@ -25,7 +25,7 @@ public class AuthService : IAuthService
     public async Task<string?> AuthenticateAsync(string cpf, string senha)
     {
         var user = await _uow.Usuarios.GetByCpfAsync(cpf);
-        if (user is null) return null;
+        if (user is null || !user.Ativo) return null;
         var result = _hasher.VerifyHashedPassword(user, user.SenhaHash, senha);
         if (result == PasswordVerificationResult.Failed) return null;
 
