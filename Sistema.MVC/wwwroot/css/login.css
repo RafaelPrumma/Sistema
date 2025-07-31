@@ -1,0 +1,7 @@
+.login-container {
+    min-height: 100vh;
+}
+.login-left {
+    background-color: #f8d7da;
+    color: #721c24;
+}
