@@ -1,6 +1,6 @@
 # Sistema
 
-Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.
+Projeto de exemplo em .NET 9 utilizando arquitetura em camadas.
 
 ## Estrutura
 - **0 - Apresentacao**: `Sistema.API` - API ASP.NET Core com Swagger e Serilog. 
