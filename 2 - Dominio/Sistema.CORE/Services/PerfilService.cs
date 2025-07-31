@@ -13,7 +13,8 @@ public class PerfilService : IPerfilService
         _uow = uow;
     }
 
-    public Task<IEnumerable<Perfil>> BuscarTodosAsync() => _uow.Perfis.BuscarTodosAsync();
+public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize) =>
+    _uow.Perfis.BuscarTodosAsync(page, pageSize);
 
     public Task<Perfil?> BuscarPorIdAsync(int id) => _uow.Perfis.BuscarPorIdAsync(id);
 

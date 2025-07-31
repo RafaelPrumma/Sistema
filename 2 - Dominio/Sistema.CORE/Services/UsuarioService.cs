@@ -13,7 +13,8 @@ public class UsuarioService : IUsuarioService
         _uow = uow;
     }
 
-    public Task<IEnumerable<Usuario>> BuscarTodosAsync() => _uow.Usuarios.BuscarTodosAsync();
+public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize) =>
+    _uow.Usuarios.BuscarTodosAsync(page, pageSize);
 
     public Task<Usuario?> BuscarPorIdAsync(int id) => _uow.Usuarios.BuscarPorIdAsync(id);
 
