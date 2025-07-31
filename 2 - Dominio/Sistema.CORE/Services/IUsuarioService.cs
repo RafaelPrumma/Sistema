@@ -5,7 +5,7 @@ namespace Sistema.CORE.Services;
 
 public interface IUsuarioService
 {
-    Task<IEnumerable<Usuario>> BuscarTodosAsync();
+    Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize);
     Task<Usuario?> BuscarPorIdAsync(int id);
     Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario);
     Task<OperationResult> AtualizarAsync(Usuario usuario);

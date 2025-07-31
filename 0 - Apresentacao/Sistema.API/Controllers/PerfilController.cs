@@ -20,10 +20,10 @@ public class PerfilController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<PerfilDto>> Get()
+    public async Task<IEnumerable<PerfilDto>> Get(int page = 1, int pageSize = 10)
     {
-        var perfis = await _service.BuscarTodosAsync();
-        return _mapper.Map<IEnumerable<PerfilDto>>(perfis);
+        var result = await _service.BuscarTodosAsync(page, pageSize);
+        return _mapper.Map<IEnumerable<PerfilDto>>(result.Items);
     }
 
     [HttpGet("{id}")]

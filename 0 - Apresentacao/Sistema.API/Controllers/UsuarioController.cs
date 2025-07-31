@@ -21,10 +21,10 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<UsuarioDto>> Get()
+    public async Task<IEnumerable<UsuarioDto>> Get(int page = 1, int pageSize = 10)
     {
-        var usuarios = await _service.BuscarTodosAsync();
-        return _mapper.Map<IEnumerable<UsuarioDto>>(usuarios);
+        var result = await _service.BuscarTodosAsync(page, pageSize);
+        return _mapper.Map<IEnumerable<UsuarioDto>>(result.Items);
     }
 
     [HttpGet("{id}")]
