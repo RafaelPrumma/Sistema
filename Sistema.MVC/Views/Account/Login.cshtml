@@ -1,25 +1,49 @@
 @model Sistema.MVC.Models.LoginViewModel
 @{
+    Layout = null;
     ViewData["Title"] = "Login";
 }
 
-<h1 class="display-4">@ViewData["Title"]</h1>
-
-<div asp-validation-summary="ModelOnly" class="text-danger"></div>
-<form asp-action="Login" method="post">
-    <div class="mb-3">
-        <label asp-for="Cpf" class="form-label"></label>
-        <input asp-for="Cpf" class="form-control" />
-        <span asp-validation-for="Cpf" class="text-danger"></span>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Sistema</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="login-container d-flex">
+        <div class="login-left d-flex flex-column justify-content-center align-items-center w-50 p-5">
+            <h2 class="mb-3">Bem-vindo</h2>
+            <p class="text-center">Para entrar, insira seu usuário e senha.</p>
+        </div>
+        <div class="login-right d-flex justify-content-center align-items-center w-50 p-5">
+            <div class="login-form w-100" style="max-width: 330px;">
+                <h2 class="mb-4 text-center">@ViewData["Title"]</h2>
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <form asp-action="Login" method="post">
+                    <div class="mb-3">
+                        <label asp-for="Cpf" class="form-label"></label>
+                        <input asp-for="Cpf" class="form-control" />
+                        <span asp-validation-for="Cpf" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Senha" class="form-label"></label>
+                        <input asp-for="Senha" class="form-control" />
+                        <span asp-validation-for="Senha" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                </form>
+            </div>
+        </div>
     </div>
-    <div class="mb-3">
-        <label asp-for="Senha" class="form-label"></label>
-        <input asp-for="Senha" class="form-control" />
-        <span asp-validation-for="Senha" class="text-danger"></span>
-    </div>
-    <button type="submit" class="btn btn-primary">Entrar</button>
-</form>
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+</body>
+</html>
