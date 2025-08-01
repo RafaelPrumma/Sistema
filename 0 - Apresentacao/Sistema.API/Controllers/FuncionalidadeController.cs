@@ -3,6 +3,7 @@ using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services;
+using Sistema.CORE.Interfaces;
 using Sistema.CORE.Common;
 using Microsoft.AspNetCore.Authorization;
 

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
-using Sistema.CORE.Services;
+using Sistema.CORE.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Sistema.API.Controllers;

@@ -1,5 +1,6 @@
 using Sistema.CORE.Common;
-using Sistema.CORE.Entities; 
+using Sistema.CORE.Entities;
+using Sistema.CORE.Interfaces;
 
 namespace Sistema.CORE.Services;
 
