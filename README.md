@@ -4,14 +4,14 @@ Projeto de exemplo em .NET 9 utilizando arquitetura em camadas.
 
 ## Estrutura
 - **0 - Apresentacao**: `Sistema.API` - API ASP.NET Core com Swagger e Serilog. 
-- **1 - Aplicacao**: `Sistema.APP` - interfaces de serviços, perfis do AutoMapper e registro de dependências.
+- **1 - Aplicacao**: `Sistema.APP` - perfis do AutoMapper e registro de dependências.
 - **2 - Dominio**: `Sistema.CORE` - entidades e implementações dos serviços que definem as regras de negócio.
 - **3 - Infraestrutura**: `Sistema.INFRA` - Entity Framework Core, repositórios, Unit of Work e seeds.
 
 ### Organização de pastas
 - `2 - Dominio/Sistema.CORE/Entities` contém todas as entidades do domínio. 
-- `2 - Dominio/Sistema.CORE/Services` possui as implementações dos serviços.
-- `1 - Aplicacao/Sistema.APP/Services` contém apenas as interfaces dos serviços.
+- `2 - Dominio/Sistema.CORE/Services` possui as implementações dos serviços e suas interfaces em `Services/Interfaces`.
+- `3 - Infraestrutura/Sistema.INFRA/Repositories` abriga os repositórios e suas interfaces em `Repositories/Interfaces`.
 - `1 - Aplicacao/Sistema.APP/DTOs` concentra os DTOs utilizados pela API.
 
 ## Funcionalidades
