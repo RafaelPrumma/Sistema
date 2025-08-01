@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.CORE.Interfaces;
 
 public interface IAuthService
 {

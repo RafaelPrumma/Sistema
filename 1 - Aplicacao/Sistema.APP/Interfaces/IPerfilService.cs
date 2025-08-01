@@ -1,4 +1,4 @@
-namespace Sistema.CORE.Services;
+namespace Sistema.CORE.Interfaces;
 
 using Sistema.CORE.Entities;
 using Sistema.CORE.Common;

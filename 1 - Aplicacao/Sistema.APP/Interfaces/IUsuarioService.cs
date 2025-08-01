@@ -1,7 +1,7 @@
 using Sistema.CORE.Entities;
 using Sistema.CORE.Common;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.CORE.Interfaces;
 
 public interface IUsuarioService
 {

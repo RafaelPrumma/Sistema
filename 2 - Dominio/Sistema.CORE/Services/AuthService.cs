@@ -4,8 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Entities; 
 
 namespace Sistema.CORE.Services;
 

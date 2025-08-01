@@ -1,7 +1,7 @@
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.CORE.Interfaces;
 
 public interface IFuncionalidadeService
 {
