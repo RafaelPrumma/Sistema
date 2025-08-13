@@ -25,7 +25,10 @@ public class TemaService : ITemaService
         else
         {
             existing.ModoEscuro = tema.ModoEscuro;
-            existing.CorPrimaria = tema.CorPrimaria;
+            existing.CorHeader = tema.CorHeader;
+            existing.CorBarraEsquerda = tema.CorBarraEsquerda;
+            existing.CorBarraDireita = tema.CorBarraDireita;
+            existing.CorFooter = tema.CorFooter;
             existing.UsuarioAlteracao = tema.UsuarioAlteracao;
             await _uow.Temas.AtualizarAsync(existing);
         }
