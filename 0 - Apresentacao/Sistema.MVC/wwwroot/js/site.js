@@ -18,3 +18,22 @@ function showWarning(message) {
 function showInfo(message) {
     iziToast.info({ title: 'Info', message });
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('temaBtn');
+    var sidebar = document.getElementById('temaSidebar');
+    if (btn && sidebar) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            sidebar.classList.add('show');
+        });
+        document.addEventListener('click', function (e) {
+            if (!sidebar.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+                sidebar.classList.remove('show');
+            }
+        });
+    }
+    if (typeof AOS !== 'undefined') {
+        AOS.init();
+    }
+});

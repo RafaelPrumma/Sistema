@@ -11,7 +11,7 @@ public class UnitOfWork : IUnitOfWork
     public ILogRepository Logs { get; }
     public IFuncionalidadeRepository Funcionalidades { get; }
     public IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; }
-    public ILayoutRepository Layouts { get; }
+    public ITemaRepository Temas { get; }
 
     public UnitOfWork(AppDbContext context,
                       IPerfilRepository perfis,
@@ -19,7 +19,7 @@ public class UnitOfWork : IUnitOfWork
                       ILogRepository logs,
                       IFuncionalidadeRepository funcionalidades,
                       IPerfilFuncionalidadeRepository perfilFuncs,
-                      ILayoutRepository layouts)
+                      ITemaRepository temas)
     {
         _context = context;
         Perfis = perfis;
@@ -27,7 +27,7 @@ public class UnitOfWork : IUnitOfWork
         Logs = logs;
         Funcionalidades = funcionalidades;
         PerfilFuncionalidades = perfilFuncs;
-        Layouts = layouts;
+        Temas = temas;
     }
 
     public Task<int> ConfirmarAsync() => _context.SaveChangesAsync();

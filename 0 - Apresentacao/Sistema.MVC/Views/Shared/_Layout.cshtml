@@ -1,10 +1,11 @@
 @using Microsoft.AspNetCore.Http
-@inject Sistema.CORE.Interfaces.ILayoutService LayoutService
+@inject Sistema.CORE.Interfaces.ITemaService TemaService
 @{
     var userId = 1; // Exemplo: recuperar usuário autenticado
-    var layout = await LayoutService.BuscarPorUsuarioIdAsync(userId);
-    var cor = layout?.CorPrimaria ?? "azul";
-    var modoEscuro = layout?.ModoEscuro ?? false;
+    var userName = "Usuário"; // Exemplo: nome do usuário autenticado
+    var tema = await TemaService.BuscarPorUsuarioIdAsync(userId);
+    var cor = tema?.CorPrimaria ?? "azul";
+    var modoEscuro = tema?.ModoEscuro ?? false;
     var bodyClass = modoEscuro ? "bg-dark text-white" : "bg-light text-dark";
     var navText = "text-white";
 }
@@ -20,12 +21,24 @@
     <link rel="stylesheet" href="~/Sistema.MVC.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/css/iziToast.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izimodal/css/iziModal.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" />
 </head>
 <body class="@bodyClass">
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar navbar-dark bg-@cor">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
+                <div class="dropdown ms-auto">
+                    <a class="nav-link dropdown-toggle text-white" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        @userName
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                        <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Alterar Senha</a></li>
+                        <li><a class="dropdown-item" href="#" id="temaBtn">Tema</a></li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><a class="dropdown-item" asp-controller="Account" asp-action="Logout">Sair</a></li>
+                    </ul>
+                </div>
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
@@ -48,7 +61,7 @@
                         }
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @navText" asp-controller="Layout" asp-action="Edit">Layout</a>
+                        <a class="nav-link @navText" asp-controller="Tema" asp-action="Edit">Tema</a>
                     </li>
                 </ul>
             </nav>
@@ -68,7 +81,35 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <div id="temaSidebar" class="tema-sidebar bg-light text-dark" data-aos="fade-left">
+        <form asp-controller="Tema" asp-action="Edit" method="post" class="p-3">
+            <h5>Preferências de Tema</h5>
+            <div class="mb-3">
+                <label class="form-label">Modo</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="ModoEscuro" value="false" @(modoEscuro ? "" : "checked") />
+                    <label class="form-check-label">Claro</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="ModoEscuro" value="true" @(modoEscuro ? "checked" : "") />
+                    <label class="form-check-label">Escuro</label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="CorPrimaria">Esquema de cores</label>
+                <select class="form-select" name="CorPrimaria" id="CorPrimaria">
+                    <option value="vermelho" selected="@(cor == "vermelho" ? "selected" : null)">Vermelho e Branco</option>
+                    <option value="roxo" selected="@(cor == "roxo" ? "selected" : null)">Roxo e Branco</option>
+                    <option value="verde" selected="@(cor == "verde" ? "selected" : null)">Verde e Branco</option>
+                    <option value="azul" selected="@(cor == "azul" ? "selected" : null)">Azul e Branco</option>
+                    <option value="laranja" selected="@(cor == "laranja" ? "selected" : null)">Laranja e Branco</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+        </form>
+    </div>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

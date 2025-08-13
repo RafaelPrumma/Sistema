@@ -5,36 +5,36 @@ using Sistema.MVC.Models;
 
 namespace Sistema.MVC.Controllers;
 
-public class LayoutController : Controller
+public class TemaController : Controller
 {
-    private readonly ILayoutService _layoutService;
+    private readonly ITemaService _temaService;
 
-    public LayoutController(ILayoutService layoutService)
+    public TemaController(ITemaService temaService)
     {
-        _layoutService = layoutService;
+        _temaService = temaService;
     }
 
     [HttpGet]
     public async Task<IActionResult> Edit()
     {
         int userId = 1; // Exemplo: obter ID do usuário autenticado
-        var layout = await _layoutService.BuscarPorUsuarioIdAsync(userId);
-        var model = new LayoutViewModel
+        var tema = await _temaService.BuscarPorUsuarioIdAsync(userId);
+        var model = new TemaViewModel
         {
-            ModoEscuro = layout?.ModoEscuro ?? false,
-            CorPrimaria = layout?.CorPrimaria ?? "azul"
+            ModoEscuro = tema?.ModoEscuro ?? false,
+            CorPrimaria = tema?.CorPrimaria ?? "azul"
         };
         return View(model);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Edit(LayoutViewModel model)
+    public async Task<IActionResult> Edit(TemaViewModel model)
     {
         if (!ModelState.IsValid)
             return View(model);
 
         int userId = 1; // Exemplo: obter ID do usuário autenticado
-        var layout = new Layout
+        var tema = new Tema
         {
             UsuarioId = userId,
             ModoEscuro = model.ModoEscuro,
@@ -42,7 +42,7 @@ public class LayoutController : Controller
             UsuarioInclusao = "system",
             UsuarioAlteracao = "system"
         };
-        await _layoutService.SalvarAsync(layout);
+        await _temaService.SalvarAsync(tema);
         return RedirectToAction("Index", "Home");
     }
 }

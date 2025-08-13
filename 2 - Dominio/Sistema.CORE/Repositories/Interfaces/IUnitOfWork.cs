@@ -7,6 +7,6 @@ public interface IUnitOfWork
     IFuncionalidadeRepository Funcionalidades { get; }
     IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; }
     ILogRepository Logs { get; }
-    ILayoutRepository Layouts { get; }
+    ITemaRepository Temas { get; }
     Task<int> ConfirmarAsync();
 }
