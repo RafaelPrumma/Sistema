@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Serilog;
-using AspNetCore.Scalar;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,7 +40,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseScalar();
+    app.UseSwaggerUI();
 }
 
 app.UseAuthentication();
