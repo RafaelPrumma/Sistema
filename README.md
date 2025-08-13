@@ -11,7 +11,8 @@ Projeto de exemplo em .NET 9 utilizando arquitetura em camadas.
 ### Organização de pastas
 - `2 - Dominio/Sistema.CORE/Entities` contém todas as entidades do domínio. 
 - `2 - Dominio/Sistema.CORE/Services` possui as implementações dos serviços e suas interfaces em `Services/Interfaces`.
-- `3 - Infraestrutura/Sistema.INFRA/Repositories` abriga os repositórios e suas interfaces em `Repositories/Interfaces`.
+- `3 - Infraestrutura/Sistema.INFRA/Repositories` contém as implementações dos repositórios.
+- `2 - Dominio/Sistema.CORE/Repositories/Interfaces` guarda apenas as interfaces dos repositórios.
 - `1 - Aplicacao/Sistema.APP/DTOs` concentra os DTOs utilizados pela API.
 
 ## Funcionalidades

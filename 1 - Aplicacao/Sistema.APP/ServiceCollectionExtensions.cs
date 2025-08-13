@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Sistema.APP.Profiles;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services;
+using Sistema.CORE.Interfaces;
 
 namespace Sistema.APP;
 
