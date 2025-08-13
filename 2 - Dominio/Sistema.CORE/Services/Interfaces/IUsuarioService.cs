@@ -7,6 +7,7 @@ public interface IUsuarioService
 {
     Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize);
     Task<Usuario?> BuscarPorIdAsync(int id);
+    Task<Usuario?> BuscarPorCpfAsync(string cpf);
     Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario);
     Task<OperationResult> AtualizarAsync(Usuario usuario);
     Task<OperationResult> RemoverAsync(int id);

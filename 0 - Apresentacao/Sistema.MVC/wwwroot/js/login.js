@@ -38,4 +38,66 @@ $(function () {
             showError('Falha na comunicação');
         }
     });
+
+    $('#registerLink').on('click', function (e) {
+        e.preventDefault();
+        $('#registerModal').iziModal({ title: 'Cadastro' });
+        $('#registerModal').iziModal('open');
+    });
+
+    $('#forgotLink').on('click', function (e) {
+        e.preventDefault();
+        $('#forgotModal').iziModal({ title: 'Recuperar senha' });
+        $('#forgotModal').iziModal('open');
+    });
+
+    $('#registerForm').on('submit', async function (e) {
+        e.preventDefault();
+        const data = {
+            nome: $('#RegNome').val(),
+            cpf: $('#RegCpf').val(),
+            email: $('#RegEmail').val(),
+            senha: $('#RegSenha').val()
+        };
+        try {
+            const response = await fetch('/Account/Register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                $('#registerModal').iziModal('close');
+                showSuccess('Cadastro realizado');
+            } else {
+                showError('Erro ao cadastrar');
+            }
+        } catch {
+            showError('Falha na comunicação');
+        }
+    });
+
+    $('#forgotForm').on('submit', async function (e) {
+        e.preventDefault();
+        const data = {
+            cpf: $('#RecCpf').val(),
+            email: $('#RecEmail').val()
+        };
+        try {
+            const response = await fetch('/Account/RecuperarSenha', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                $('#forgotModal').iziModal('close');
+                showSuccess('Email enviado');
+            } else if (response.status === 404) {
+                showError('Usuário não encontrado');
+            } else {
+                showError('Erro ao enviar email');
+            }
+        } catch {
+            showError('Falha na comunicação');
+        }
+    });
 });

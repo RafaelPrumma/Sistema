@@ -14,10 +14,6 @@
 
 
   <ItemGroup>
-    <ProjectReference Include="..\..\3 - Infraestrutura\Sistema.INFRA\Sistema.INFRA.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
