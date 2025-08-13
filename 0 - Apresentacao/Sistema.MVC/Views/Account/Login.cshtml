@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/css/iziToast.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izimodal/css/iziModal.min.css" />
 </head>
 <body>
     <div class="container-fluid login-container">
@@ -25,7 +27,7 @@
                 <div class="w-100" style="max-width: 330px;">
                     <h2 class="mb-4 text-center">@ViewData["Title"]</h2>
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                    <form asp-action="Login" method="post">
+                    <form asp-action="Login" method="post" id="loginForm">
                         <div class="mb-3">
                             <label asp-for="Cpf" class="form-label"></label>
                             <input asp-for="Cpf" class="form-control" />
@@ -44,8 +46,13 @@
     </div>
 
     <script src="~/lib/jquery/dist/jquery.js"></script>
+    <div id="loadingModal"></div>
+
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/login.js" asp-append-version="true"></script>
     @await Html.PartialAsync("_ValidationScriptsPartial")
 </body>
 </html>
