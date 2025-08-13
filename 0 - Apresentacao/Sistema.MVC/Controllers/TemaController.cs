@@ -22,7 +22,10 @@ public class TemaController : Controller
         var model = new TemaViewModel
         {
             ModoEscuro = tema?.ModoEscuro ?? false,
-            CorPrimaria = tema?.CorPrimaria ?? "azul"
+            CorHeader = tema?.CorHeader ?? "#0d6efd",
+            CorBarraEsquerda = tema?.CorBarraEsquerda ?? "#0d6efd",
+            CorBarraDireita = tema?.CorBarraDireita ?? "#f8f9fa",
+            CorFooter = tema?.CorFooter ?? "#0d6efd"
         };
         return View(model);
     }
@@ -38,7 +41,10 @@ public class TemaController : Controller
         {
             UsuarioId = userId,
             ModoEscuro = model.ModoEscuro,
-            CorPrimaria = model.CorPrimaria,
+            CorHeader = model.CorHeader,
+            CorBarraEsquerda = model.CorBarraEsquerda,
+            CorBarraDireita = model.CorBarraDireita,
+            CorFooter = model.CorFooter,
             UsuarioInclusao = "system",
             UsuarioAlteracao = "system"
         };

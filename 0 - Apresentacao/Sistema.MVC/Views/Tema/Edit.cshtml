@@ -16,14 +16,20 @@
         </div>
     </div>
     <div class="mb-3">
-        <label class="form-label" for="CorPrimaria">Esquema de cores</label>
-        <select class="form-select" asp-for="CorPrimaria">
-            <option value="vermelho">Vermelho e Branco</option>
-            <option value="roxo">Roxo e Branco</option>
-            <option value="verde">Verde e Branco</option>
-            <option value="azul">Azul e Branco</option>
-            <option value="laranja">Laranja e Branco</option>
-        </select>
+        <label class="form-label" for="CorHeader">Cor do Header</label>
+        <input type="color" class="form-control form-control-color" asp-for="CorHeader" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="CorBarraEsquerda">Barra Lateral Esquerda</label>
+        <input type="color" class="form-control form-control-color" asp-for="CorBarraEsquerda" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="CorBarraDireita">Barra Lateral Direita</label>
+        <input type="color" class="form-control form-control-color" asp-for="CorBarraDireita" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="CorFooter">Rodapé</label>
+        <input type="color" class="form-control form-control-color" asp-for="CorFooter" />
     </div>
     <button type="submit" class="btn btn-primary">Salvar</button>
 </form>

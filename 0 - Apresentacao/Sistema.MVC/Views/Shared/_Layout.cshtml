@@ -1,13 +1,37 @@
 @using Microsoft.AspNetCore.Http
+@using System.Globalization
 @inject Sistema.CORE.Interfaces.ITemaService TemaService
 @{
     var userId = 1; // Exemplo: recuperar usuário autenticado
     var userName = "Usuário"; // Exemplo: nome do usuário autenticado
     var tema = await TemaService.BuscarPorUsuarioIdAsync(userId);
-    var cor = tema?.CorPrimaria ?? "azul";
-    var modoEscuro = tema?.ModoEscuro ?? false;
-    var bodyClass = modoEscuro ? "bg-dark text-white" : "bg-light text-dark";
-    var navText = "text-white";
+    string headerColor = tema?.CorHeader ?? "#0d6efd";
+    string leftColor = tema?.CorBarraEsquerda ?? "#0d6efd";
+    string rightColor = tema?.CorBarraDireita ?? "#f8f9fa";
+    string footerColor = tema?.CorFooter ?? "#0d6efd";
+    bool modoEscuro = tema?.ModoEscuro ?? false;
+    string bodyClass = modoEscuro ? "bg-dark text-white" : "bg-light text-dark";
+
+    string GetTextClass(string hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "text-dark";
+        hex = hex.TrimStart('#');
+        if (hex.Length == 6)
+        {
+            var r = int.Parse(hex[..2], NumberStyles.HexNumber);
+            var g = int.Parse(hex[2..4], NumberStyles.HexNumber);
+            var b = int.Parse(hex[4..6], NumberStyles.HexNumber);
+            var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return lum > 0.5 ? "text-dark" : "text-white";
+        }
+        return "text-dark";
+    }
+
+    string headerText = GetTextClass(headerColor);
+    string leftText = GetTextClass(leftColor);
+    string rightText = GetTextClass(rightColor);
+    string footerText = GetTextClass(footerColor);
+    string headerNavbarClass = headerText == "text-white" ? "navbar-dark" : "navbar-light";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -25,11 +49,11 @@
 </head>
 <body class="@bodyClass">
     <div class="d-flex flex-column min-vh-100">
-        <header class="navbar navbar-dark bg-@cor">
+        <header class="navbar @headerNavbarClass" style="background-color:@headerColor">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
+                <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="dropdown ms-auto">
-                    <a class="nav-link dropdown-toggle text-white" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle @headerText" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         @userName
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
@@ -42,26 +66,26 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <nav class="sidebar bg-@cor">
+            <nav class="sidebar" style="background-color:@leftColor">
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link @navText" asp-controller="Home" asp-action="Index">Home</a>
+                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Index">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @navText" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy">Privacy</a>
                     </li>
                     <li class="nav-item">
                         @if (Context.Session.GetString("AuthToken") == null)
                         {
-                            <a class="nav-link @navText" asp-controller="Account" asp-action="Login">Login</a>
+                            <a class="nav-link @leftText" asp-controller="Account" asp-action="Login">Login</a>
                         }
                         else
                         {
-                            <a class="nav-link @navText" asp-controller="Account" asp-action="Logout">Logout</a>
+                            <a class="nav-link @leftText" asp-controller="Account" asp-action="Logout">Logout</a>
                         }
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @navText" asp-controller="Tema" asp-action="Edit">Tema</a>
+                        <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit">Tema</a>
                     </li>
                 </ul>
             </nav>
@@ -71,9 +95,9 @@
                 </main>
             </div>
         </div>
-        <footer class="footer bg-@cor @navText mt-auto">
+        <footer class="footer @footerText mt-auto" style="background-color:@footerColor">
             <div class="container">
-                &copy; 2025 - Sistema.MVC - <a class="@navText" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                &copy; 2025 - Sistema.MVC - <a class="@footerText" asp-controller="Home" asp-action="Privacy">Privacy</a>
             </div>
         </footer>
     </div>
@@ -83,7 +107,7 @@
     <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-    <div id="temaSidebar" class="tema-sidebar bg-light text-dark" data-aos="fade-left">
+    <div id="temaSidebar" class="tema-sidebar @rightText" style="background-color:@rightColor" data-aos="fade-left">
         <form asp-controller="Tema" asp-action="Edit" method="post" class="p-3">
             <h5>Preferências de Tema</h5>
             <div class="mb-3">
@@ -98,14 +122,20 @@
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label" for="CorPrimaria">Esquema de cores</label>
-                <select class="form-select" name="CorPrimaria" id="CorPrimaria">
-                    <option value="vermelho" selected="@(cor == "vermelho" ? "selected" : null)">Vermelho e Branco</option>
-                    <option value="roxo" selected="@(cor == "roxo" ? "selected" : null)">Roxo e Branco</option>
-                    <option value="verde" selected="@(cor == "verde" ? "selected" : null)">Verde e Branco</option>
-                    <option value="azul" selected="@(cor == "azul" ? "selected" : null)">Azul e Branco</option>
-                    <option value="laranja" selected="@(cor == "laranja" ? "selected" : null)">Laranja e Branco</option>
-                </select>
+                <label class="form-label" for="CorHeader">Cor do Header</label>
+                <input type="color" class="form-control form-control-color" name="CorHeader" id="CorHeader" value="@headerColor" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="CorBarraEsquerda">Barra Lateral Esquerda</label>
+                <input type="color" class="form-control form-control-color" name="CorBarraEsquerda" id="CorBarraEsquerda" value="@leftColor" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="CorBarraDireita">Barra Lateral Direita</label>
+                <input type="color" class="form-control form-control-color" name="CorBarraDireita" id="CorBarraDireita" value="@rightColor" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="CorFooter">Rodapé</label>
+                <input type="color" class="form-control form-control-color" name="CorFooter" id="CorFooter" value="@footerColor" />
             </div>
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
