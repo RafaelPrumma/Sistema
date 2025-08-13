@@ -1,11 +1,12 @@
+using Sistema.APP;
+using Sistema.INFRA;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddHttpClient("Api", c =>
-{
-    c.BaseAddress = new Uri(builder.Configuration["Api:BaseAddress"]!);
-});
+builder.Services.AddInfraestrutura();
+builder.Services.AddAplicacao();
 builder.Services.AddSession();
 
 var app = builder.Build();

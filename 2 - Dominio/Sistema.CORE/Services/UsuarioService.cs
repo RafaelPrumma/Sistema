@@ -13,10 +13,12 @@ public class UsuarioService : IUsuarioService
         _uow = uow;
     }
 
-public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize) =>
-    _uow.Usuarios.BuscarTodosAsync(page, pageSize);
+    public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize) =>
+        _uow.Usuarios.BuscarTodosAsync(page, pageSize);
 
     public Task<Usuario?> BuscarPorIdAsync(int id) => _uow.Usuarios.BuscarPorIdAsync(id);
+
+    public Task<Usuario?> BuscarPorCpfAsync(string cpf) => _uow.Usuarios.BuscarPorCpfAsync(cpf);
 
     public async Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario)
     {
