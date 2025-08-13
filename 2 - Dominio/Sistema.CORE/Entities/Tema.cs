@@ -1,6 +1,6 @@
 namespace Sistema.CORE.Entities;
 
-public class Layout : AuditableEntity
+public class Tema : AuditableEntity
 {
     public int Id { get; set; }
     public int UsuarioId { get; set; }
