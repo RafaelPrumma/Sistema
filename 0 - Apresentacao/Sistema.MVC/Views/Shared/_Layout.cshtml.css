@@ -54,3 +54,11 @@ button.accept-policy {
 .content {
   flex: 1;
 }
+
+.sidebar .nav-link {
+  color: #fff !important;
+}
+
+.footer a {
+  color: inherit !important;
+}

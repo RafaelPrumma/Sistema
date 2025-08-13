@@ -1,4 +1,13 @@
 @using Microsoft.AspNetCore.Http
+@inject Sistema.CORE.Interfaces.ILayoutService LayoutService
+@{
+    var userId = 1; // Exemplo: recuperar usuário autenticado
+    var layout = await LayoutService.BuscarPorUsuarioIdAsync(userId);
+    var cor = layout?.CorPrimaria ?? "azul";
+    var modoEscuro = layout?.ModoEscuro ?? false;
+    var bodyClass = modoEscuro ? "bg-dark text-white" : "bg-light text-dark";
+    var navText = "text-white";
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,31 +21,34 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/css/iziToast.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izimodal/css/iziModal.min.css" />
 </head>
-<body>
+<body class="@bodyClass">
     <div class="d-flex flex-column min-vh-100">
-        <header class="navbar navbar-light bg-white border-bottom box-shadow mb-3">
+        <header class="navbar navbar-dark bg-@cor">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <nav class="sidebar bg-light border-end">
+            <nav class="sidebar bg-@cor">
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link text-dark" asp-controller="Home" asp-action="Index">Home</a>
+                        <a class="nav-link @navText" asp-controller="Home" asp-action="Index">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-dark" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                        <a class="nav-link @navText" asp-controller="Home" asp-action="Privacy">Privacy</a>
                     </li>
                     <li class="nav-item">
                         @if (Context.Session.GetString("AuthToken") == null)
                         {
-                            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Login</a>
+                            <a class="nav-link @navText" asp-controller="Account" asp-action="Login">Login</a>
                         }
                         else
                         {
-                            <a class="nav-link text-dark" asp-controller="Account" asp-action="Logout">Logout</a>
+                            <a class="nav-link @navText" asp-controller="Account" asp-action="Logout">Logout</a>
                         }
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @navText" asp-controller="Layout" asp-action="Edit">Layout</a>
                     </li>
                 </ul>
             </nav>
@@ -46,9 +58,9 @@
                 </main>
             </div>
         </div>
-        <footer class="border-top footer text-muted mt-auto">
+        <footer class="footer bg-@cor @navText mt-auto">
             <div class="container">
-                &copy; 2025 - Sistema.MVC - <a asp-controller="Home" asp-action="Privacy">Privacy</a>
+                &copy; 2025 - Sistema.MVC - <a class="@navText" asp-controller="Home" asp-action="Privacy">Privacy</a>
             </div>
         </footer>
     </div>

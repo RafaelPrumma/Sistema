@@ -21,6 +21,12 @@ body {
   margin-bottom: 60px;
 }
 
+.bg-vermelho { background-color: #dc3545 !important; }
+.bg-roxo { background-color: #6f42c1 !important; }
+.bg-verde { background-color: #198754 !important; }
+.bg-azul { background-color: #0d6efd !important; }
+.bg-laranja { background-color: #fd7e14 !important; }
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;
