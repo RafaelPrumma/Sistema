@@ -23,11 +23,11 @@ public class AccountController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> Login(LoginViewModel model)
+    public async Task<IActionResult> Login([FromBody] LoginViewModel model)
     {
         if (!ModelState.IsValid)
         {
-            return View(model);
+            return BadRequest(ModelState);
         }
 
         try
@@ -38,7 +38,7 @@ public class AccountController : Controller
             {
                 var token = await response.Content.ReadAsStringAsync();
                 HttpContext.Session.SetString("AuthToken", token.Trim('"'));
-                return RedirectToAction("Index", "Home");
+                return Ok(new { success = true });
             }
         }
         catch (Exception ex)
@@ -46,8 +46,7 @@ public class AccountController : Controller
             _logger.LogError(ex, "Erro ao autenticar");
         }
 
-        ModelState.AddModelError(string.Empty, "Credenciais inválidas");
-        return View(model);
+        return Unauthorized(new { message = "Credenciais inválidas" });
     }
 
     [HttpGet]
