@@ -18,6 +18,12 @@ public class AppDbContext : DbContext
     public DbSet<PerfilFuncionalidade> PerfilFuncionalidades => Set<PerfilFuncionalidade>();
     public DbSet<Tema> Temas => Set<Tema>();
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
+
     public override int SaveChanges()
     {
         UpdateAuditFields();
