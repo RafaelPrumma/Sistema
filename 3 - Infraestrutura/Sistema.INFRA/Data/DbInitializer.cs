@@ -32,5 +32,11 @@ public static class DbInitializer
             context.Usuarios.AddRange(AdminUserSeed.Get(), ComercialUserSeed.Get());
             context.SaveChanges();
         }
-    }
+
+		if (!context.Configuracoes.Any())
+		{
+			context.Configuracoes.AddRange(ConfiguracaoSeed.Get());
+			context.SaveChanges();
+		}
+	}
 }
