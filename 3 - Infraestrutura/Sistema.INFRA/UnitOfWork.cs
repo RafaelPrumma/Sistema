@@ -12,6 +12,7 @@ public class UnitOfWork : IUnitOfWork
     public IFuncionalidadeRepository Funcionalidades { get; }
     public IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; }
     public ITemaRepository Temas { get; }
+    public IConfiguracaoRepository Configuracoes { get; }
 
     public UnitOfWork(AppDbContext context,
                       IPerfilRepository perfis,
@@ -19,7 +20,8 @@ public class UnitOfWork : IUnitOfWork
                       ILogRepository logs,
                       IFuncionalidadeRepository funcionalidades,
                       IPerfilFuncionalidadeRepository perfilFuncs,
-                      ITemaRepository temas)
+                      ITemaRepository temas,
+                      IConfiguracaoRepository configuracoes)
     {
         _context = context;
         Perfis = perfis;
@@ -28,6 +30,7 @@ public class UnitOfWork : IUnitOfWork
         Funcionalidades = funcionalidades;
         PerfilFuncionalidades = perfilFuncs;
         Temas = temas;
+        Configuracoes = configuracoes;
     }
 
     public Task<int> ConfirmarAsync() => _context.SaveChangesAsync();

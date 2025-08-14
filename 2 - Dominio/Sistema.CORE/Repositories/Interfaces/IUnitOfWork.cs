@@ -8,5 +8,6 @@ public interface IUnitOfWork
     IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; }
     ILogRepository Logs { get; }
     ITemaRepository Temas { get; }
+    IConfiguracaoRepository Configuracoes { get; }
     Task<int> ConfirmarAsync();
 }
