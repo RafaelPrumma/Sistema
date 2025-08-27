@@ -10,7 +10,6 @@ public static class ComercialUserSeed
     {
         var user = new Usuario
         {
-            Id = 2,
             Nome = "Allison",
             Cpf = "00000000001",
             PerfilId = 2,
