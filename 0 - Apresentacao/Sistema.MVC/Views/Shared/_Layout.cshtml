@@ -10,6 +10,9 @@
     string rightColor = tema?.CorBarraDireita ?? "#f8f9fa";
     string footerColor = tema?.CorFooter ?? "#0d6efd";
     bool modoEscuro = tema?.ModoEscuro ?? false;
+    bool headerFixo = tema?.HeaderFixo ?? false;
+    bool footerFixo = tema?.FooterFixo ?? false;
+    bool menuExpandido = tema?.MenuLateralExpandido ?? true;
     string bodyClass = modoEscuro ? "bg-dark text-white" : "bg-light text-dark";
 
     string GetTextClass(string hex)
@@ -32,6 +35,9 @@
     string rightText = GetTextClass(rightColor);
     string footerText = GetTextClass(footerColor);
     string headerNavbarClass = headerText == "text-white" ? "navbar-dark" : "navbar-light";
+    string sidebarCollapsedClass = menuExpandido ? string.Empty : "collapsed";
+    string headerFixedClass = headerFixo ? "fixed-top" : string.Empty;
+    string footerFixedClass = footerFixo ? "fixed-bottom" : string.Empty;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -43,53 +49,58 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/Sistema.MVC.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/css/iziToast.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" />
 </head>
-<body class="@bodyClass">
+<body class="@bodyClass @(headerFixo ? "pt-5" : string.Empty) @(footerFixo ? "pb-5" : string.Empty)">
     <div class="d-flex flex-column min-vh-100">
-        <header class="navbar @headerNavbarClass" style="background-color:@headerColor">
+        <header class="navbar @headerNavbarClass @headerFixedClass" style="background-color:@headerColor">
             <div class="container-fluid">
+                <button class="btn btn-link @headerText" type="button" id="menuToggle"><i class="bi bi-list"></i></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
-                <div class="dropdown ms-auto">
-                    <a class="nav-link dropdown-toggle @headerText" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        @userName
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                        <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Alterar Senha</a></li>
-                        <li><a class="dropdown-item" href="#" id="temaBtn">Tema</a></li>
-                        <li><hr class="dropdown-divider" /></li>
-                        <li><a class="dropdown-item" asp-controller="Account" asp-action="Logout">Sair</a></li>
-                    </ul>
+                <div class="ms-auto d-flex align-items-center">
+                    <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
+                    <div class="dropdown">
+                        <a class="nav-link dropdown-toggle @headerText" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @userName
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Alterar Senha</a></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="Logout">Sair</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <nav class="sidebar" style="background-color:@leftColor">
-                <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Index">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit">Tema</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Configuracao" asp-action="Index">Configurações</a>
-                    </li>
-                </ul>
-            </nav>
+            <aside class="sidebar @sidebarCollapsedClass" style="background-color:@leftColor">
+                <nav>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy"><i class="bi bi-shield-lock me-2"></i><span>Privacy</span></a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit"><i class="bi bi-palette me-2"></i><span>Tema</span></a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @leftText" asp-controller="Configuracao" asp-action="Index"><i class="bi bi-gear me-2"></i><span>Configurações</span></a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
             <div class="content flex-grow-1 p-3">
                 <main role="main" class="pb-3">
                     @RenderBody()
                 </main>
             </div>
         </div>
-        <footer class="footer @footerText mt-auto" style="background-color:@footerColor">
+        <footer class="footer @footerText @footerFixedClass @(footerFixo ? string.Empty : "mt-auto")" style="background-color:@footerColor">
             <div class="container">
                 &copy; 2025 - Sistema.MVC - <a class="@footerText" asp-controller="Home" asp-action="Privacy">Privacy</a>
             </div>
@@ -101,7 +112,7 @@
     <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-    <div id="temaSidebar" class="tema-sidebar @rightText" style="background-color:@rightColor" data-aos="fade-left">
+    <aside id="temaSidebar" class="tema-sidebar @rightText" style="background-color:@rightColor" data-aos="fade-left">
         <form asp-controller="Tema" asp-action="Edit" method="post" class="p-3">
             <h5>Preferências de Tema</h5>
             <div class="mb-3">
@@ -131,9 +142,21 @@
                 <label class="form-label" for="CorFooter">Rodapé</label>
                 <input type="color" class="form-control form-control-color" name="CorFooter" id="CorFooter" value="@footerColor" />
             </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="HeaderFixo" id="HeaderFixo" @(headerFixo ? "checked" : "") />
+                <label class="form-check-label" for="HeaderFixo">Header fixo</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" @(footerFixo ? "checked" : "") />
+                <label class="form-check-label" for="FooterFixo">Footer fixo</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" @(menuExpandido ? "checked" : "") />
+                <label class="form-check-label" for="MenuLateralExpandido">Menu expandido</label>
+            </div>
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
-    </div>
+    </aside>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -20,16 +20,27 @@ function showInfo(message) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    var btn = document.getElementById('temaBtn');
-    var sidebar = document.getElementById('temaSidebar');
-    if (btn && sidebar) {
-        btn.addEventListener('click', function (e) {
+    var temaToggle = document.getElementById('temaToggle');
+    var temaSidebar = document.getElementById('temaSidebar');
+    if (temaToggle && temaSidebar) {
+        temaToggle.addEventListener('click', function (e) {
             e.preventDefault();
-            sidebar.classList.add('show');
+            temaSidebar.classList.add('show');
         });
         document.addEventListener('click', function (e) {
-            if (!sidebar.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-                sidebar.classList.remove('show');
+            if (!temaSidebar.contains(e.target) && e.target !== temaToggle && !temaToggle.contains(e.target)) {
+                temaSidebar.classList.remove('show');
+            }
+        });
+    }
+    var menuToggle = document.getElementById('menuToggle');
+    var leftSidebar = document.querySelector('aside.sidebar');
+    var menuCheckbox = document.getElementById('MenuLateralExpandido');
+    if (menuToggle && leftSidebar) {
+        menuToggle.addEventListener('click', function () {
+            leftSidebar.classList.toggle('collapsed');
+            if (menuCheckbox) {
+                menuCheckbox.checked = !leftSidebar.classList.contains('collapsed');
             }
         });
     }
@@ -86,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var leftInput = document.getElementById('CorBarraEsquerda');
-    var leftEl = document.querySelector('nav.sidebar');
+    var leftEl = document.querySelector('aside.sidebar');
     if (leftInput && leftEl) {
         leftInput.addEventListener('input', function () {
             var textClass = applyBackground(leftEl, this.value);
@@ -116,6 +127,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 a.classList.remove('text-dark', 'text-white');
                 a.classList.add(textClass);
             });
+        });
+    }
+
+    var headerFix = document.getElementById('HeaderFixo');
+    if (headerFix && headerEl) {
+        headerFix.addEventListener('change', function () {
+            headerEl.classList.toggle('fixed-top', this.checked);
+            document.body.classList.toggle('pt-5', this.checked);
+        });
+    }
+
+    var footerFix = document.getElementById('FooterFixo');
+    if (footerFix && footerEl) {
+        footerFix.addEventListener('change', function () {
+            footerEl.classList.toggle('fixed-bottom', this.checked);
+            footerEl.classList.toggle('mt-auto', !this.checked);
+            document.body.classList.toggle('pb-5', this.checked);
+        });
+    }
+
+    if (menuCheckbox && leftSidebar) {
+        menuCheckbox.addEventListener('change', function () {
+            leftSidebar.classList.toggle('collapsed', !this.checked);
         });
     }
 });

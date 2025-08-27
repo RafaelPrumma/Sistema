@@ -9,6 +9,9 @@ public class Tema : AuditableEntity
     public string CorBarraEsquerda { get; set; } = "#0d6efd";
     public string CorBarraDireita { get; set; } = "#f8f9fa";
     public string CorFooter { get; set; } = "#0d6efd";
+    public bool HeaderFixo { get; set; } = false;
+    public bool FooterFixo { get; set; } = false;
+    public bool MenuLateralExpandido { get; set; } = true;
     public Usuario? Usuario { get; set; }
 }
 
