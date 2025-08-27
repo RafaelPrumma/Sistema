@@ -8,9 +8,9 @@ public static class FuncionalidadeSeed
     {
         return new List<Funcionalidade>
         {
-            new() { Id = 1, Nome = "Perfil", UsuarioInclusao = "seed" },
-            new() { Id = 2, Nome = "Usuario", UsuarioInclusao = "seed" },
-            new() { Id = 3, Nome = "Log", UsuarioInclusao = "seed" }
+            new() { Nome = "Perfil", UsuarioInclusao = "seed" },
+            new() { Nome = "Usuario", UsuarioInclusao = "seed" },
+            new() { Nome = "Log", UsuarioInclusao = "seed" }
         };
     }
 }

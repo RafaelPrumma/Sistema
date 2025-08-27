@@ -10,7 +10,6 @@ public static class AdminUserSeed
     {
         var user = new Usuario
         {
-            Id = 1,
             Nome = "Rafael",
             Cpf = "00000000000",
             PerfilId = 1,

@@ -6,7 +6,6 @@ public static class AdminSeed
 {
     public static Perfil Get() => new()
     {
-        Id = 1,
         Nome = "Admin",
         UsuarioInclusao = "seed",
         Ativo = true
