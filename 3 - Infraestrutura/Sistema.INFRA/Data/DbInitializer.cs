@@ -7,8 +7,6 @@ public static class DbInitializer
 {
     public static void Seed(AppDbContext context)
     {
-        context.Database.EnsureCreated();
-
         if (!context.Perfis.Any())
         {
             context.Perfis.AddRange(AdminSeed.Get(), UserSeed.Get());
