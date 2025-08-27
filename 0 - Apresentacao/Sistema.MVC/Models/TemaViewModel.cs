@@ -7,5 +7,8 @@ public class TemaViewModel
     public string CorBarraEsquerda { get; set; } = "#0d6efd";
     public string CorBarraDireita { get; set; } = "#f8f9fa";
     public string CorFooter { get; set; } = "#0d6efd";
+    public bool HeaderFixo { get; set; }
+    public bool FooterFixo { get; set; }
+    public bool MenuLateralExpandido { get; set; }
 }
 

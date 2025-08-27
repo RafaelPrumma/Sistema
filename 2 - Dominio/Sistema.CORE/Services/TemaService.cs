@@ -29,6 +29,9 @@ public class TemaService : ITemaService
             existing.CorBarraEsquerda = tema.CorBarraEsquerda;
             existing.CorBarraDireita = tema.CorBarraDireita;
             existing.CorFooter = tema.CorFooter;
+            existing.HeaderFixo = tema.HeaderFixo;
+            existing.FooterFixo = tema.FooterFixo;
+            existing.MenuLateralExpandido = tema.MenuLateralExpandido;
             existing.UsuarioAlteracao = tema.UsuarioAlteracao;
             await _uow.Temas.AtualizarAsync(existing);
         }

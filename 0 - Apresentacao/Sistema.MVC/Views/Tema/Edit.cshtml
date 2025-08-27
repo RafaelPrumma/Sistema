@@ -2,8 +2,10 @@
 @{
     ViewData["Title"] = "Tema";
 }
-<h2>Preferências de Tema</h2>
-<form asp-action="Edit" method="post">
+<div class="card">
+    <div class="card-body">
+        <h2 class="card-title">Preferências de Tema</h2>
+        <form asp-action="Edit" method="post">
     <div class="mb-3">
         <label class="form-label">Modo</label>
         <div class="form-check">
@@ -31,5 +33,19 @@
         <label class="form-label" for="CorFooter">Rodapé</label>
         <input type="color" class="form-control form-control-color" asp-for="CorFooter" />
     </div>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" asp-for="HeaderFixo" />
+        <label class="form-check-label" asp-for="HeaderFixo">Header fixo</label>
+    </div>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" asp-for="FooterFixo" />
+        <label class="form-check-label" asp-for="FooterFixo">Footer fixo</label>
+    </div>
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" asp-for="MenuLateralExpandido" />
+        <label class="form-check-label" asp-for="MenuLateralExpandido">Menu expandido</label>
+    </div>
     <button type="submit" class="btn btn-primary">Salvar</button>
-</form>
+        </form>
+    </div>
+</div>

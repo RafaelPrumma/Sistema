@@ -28,7 +28,10 @@ public class TemaController : Controller
             CorHeader = tema?.CorHeader ?? "#0d6efd",
             CorBarraEsquerda = tema?.CorBarraEsquerda ?? "#0d6efd",
             CorBarraDireita = tema?.CorBarraDireita ?? "#f8f9fa",
-            CorFooter = tema?.CorFooter ?? "#0d6efd"
+            CorFooter = tema?.CorFooter ?? "#0d6efd",
+            HeaderFixo = tema?.HeaderFixo ?? false,
+            FooterFixo = tema?.FooterFixo ?? false,
+            MenuLateralExpandido = tema?.MenuLateralExpandido ?? true
         };
         return View(model);
     }
@@ -51,6 +54,9 @@ public class TemaController : Controller
             CorBarraEsquerda = model.CorBarraEsquerda,
             CorBarraDireita = model.CorBarraDireita,
             CorFooter = model.CorFooter,
+            HeaderFixo = model.HeaderFixo,
+            FooterFixo = model.FooterFixo,
+            MenuLateralExpandido = model.MenuLateralExpandido,
             UsuarioInclusao = userName,
             UsuarioAlteracao = userName
         };
