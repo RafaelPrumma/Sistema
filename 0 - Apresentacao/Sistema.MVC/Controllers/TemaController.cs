@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.MVC.Models;
@@ -17,8 +18,10 @@ public class TemaController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit()
     {
-        int userId = 1; // Exemplo: obter ID do usuário autenticado
-        var tema = await _temaService.BuscarPorUsuarioIdAsync(userId);
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (userId is null)
+            return RedirectToAction("Login", "Account");
+        var tema = await _temaService.BuscarPorUsuarioIdAsync(userId.Value);
         var model = new TemaViewModel
         {
             ModoEscuro = tema?.ModoEscuro ?? false,
@@ -36,17 +39,20 @@ public class TemaController : Controller
         if (!ModelState.IsValid)
             return View(model);
 
-        int userId = 1; // Exemplo: obter ID do usuário autenticado
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (userId is null)
+            return RedirectToAction("Login", "Account");
+        var userName = HttpContext.Session.GetString("UserName") ?? "system";
         var tema = new Tema
         {
-            UsuarioId = userId,
+            UsuarioId = userId.Value,
             ModoEscuro = model.ModoEscuro,
             CorHeader = model.CorHeader,
             CorBarraEsquerda = model.CorBarraEsquerda,
             CorBarraDireita = model.CorBarraDireita,
             CorFooter = model.CorFooter,
-            UsuarioInclusao = "system",
-            UsuarioAlteracao = "system"
+            UsuarioInclusao = userName,
+            UsuarioAlteracao = userName
         };
         await _temaService.SalvarAsync(tema);
         return RedirectToAction("Index", "Home");
