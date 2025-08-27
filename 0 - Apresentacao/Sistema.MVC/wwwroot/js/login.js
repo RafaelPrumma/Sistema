@@ -22,7 +22,7 @@ $(function () {
 
             if (response.ok) {
                 showSuccess('Login realizado');
-                setTimeout(() => { window.location.href = '/'; }, 1500);
+                setTimeout(() => { window.location.href = '/Home'; }, 1500);
             } else if (response.status === 400) {
                 showWarning('Preencha os campos corretamente');
             } else {
