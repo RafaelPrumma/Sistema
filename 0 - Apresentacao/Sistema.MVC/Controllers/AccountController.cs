@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.MVC.Models;
@@ -33,14 +34,33 @@ public class AccountController : Controller
     }
 
     [HttpPost]
-    public IActionResult Login([FromBody] LoginViewModel model)
+    public async Task<IActionResult> Login([FromBody] LoginViewModel model)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
+        var usuario = await _usuarioService.BuscarPorCpfAsync(model.Cpf);
+        if (usuario is null)
+        {
+            return Unauthorized(new { message = "Credenciais inválidas" });
+        }
+
+        var result = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, model.Senha);
+        if (result != PasswordVerificationResult.Success)
+        {
+            return Unauthorized(new { message = "Credenciais inválidas" });
+        }
+
+        if (!usuario.Ativo)
+        {
+            return Unauthorized(new { message = "Usuário inativo" });
+        }
+
         HttpContext.Session.SetString("AuthToken", Guid.NewGuid().ToString());
+        HttpContext.Session.SetInt32("UserId", usuario.Id);
+        HttpContext.Session.SetString("UserName", usuario.Nome);
         return Ok(new { success = true });
     }
 
@@ -115,6 +135,8 @@ public class AccountController : Controller
     public IActionResult Logout()
     {
         HttpContext.Session.Remove("AuthToken");
+        HttpContext.Session.Remove("UserId");
+        HttpContext.Session.Remove("UserName");
         return RedirectToAction("Login");
     }
 }

@@ -2,9 +2,9 @@
 @using System.Globalization
 @inject Sistema.CORE.Interfaces.ITemaService TemaService
 @{
-    var userId = 1; // Exemplo: recuperar usuário autenticado
-    var userName = "Usuário"; // Exemplo: nome do usuário autenticado
-    var tema = await TemaService.BuscarPorUsuarioIdAsync(userId);
+    var userId = Context.Session.GetInt32("UserId") ?? 0;
+    var userName = Context.Session.GetString("UserName") ?? "Usuário";
+    var tema = userId > 0 ? await TemaService.BuscarPorUsuarioIdAsync(userId) : null;
     string headerColor = tema?.CorHeader ?? "#0d6efd";
     string leftColor = tema?.CorBarraEsquerda ?? "#0d6efd";
     string rightColor = tema?.CorBarraDireita ?? "#f8f9fa";

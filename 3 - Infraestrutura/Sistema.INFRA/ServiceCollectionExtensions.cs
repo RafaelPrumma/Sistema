@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sistema.CORE.Interfaces;
 using Sistema.INFRA.Data;
@@ -9,10 +10,10 @@ namespace Sistema.INFRA;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddInfraestrutura(this IServiceCollection services)
+    public static IServiceCollection AddInfraestrutura(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseInMemoryDatabase("SistemaDB"));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<ILogRepository, LogRepository>();
