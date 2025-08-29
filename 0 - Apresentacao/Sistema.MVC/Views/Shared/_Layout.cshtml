@@ -143,15 +143,18 @@
                 <input type="color" class="form-control form-control-color" name="CorFooter" id="CorFooter" value="@footerColor" />
             </div>
             <div class="form-check form-switch mb-2">
-                <input class="form-check-input" type="checkbox" name="HeaderFixo" id="HeaderFixo" @(headerFixo ? "checked" : "") />
+                <input type="hidden" name="HeaderFixo" value="false" />
+                <input class="form-check-input" type="checkbox" name="HeaderFixo" id="HeaderFixo" value="true" @(headerFixo ? "checked" : string.Empty) />
                 <label class="form-check-label" for="HeaderFixo">Header fixo</label>
             </div>
             <div class="form-check form-switch mb-2">
-                <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" @(footerFixo ? "checked" : "") />
+                <input type="hidden" name="FooterFixo" value="false" />
+                <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" value="true" @(footerFixo ? "checked" : string.Empty) />
                 <label class="form-check-label" for="FooterFixo">Footer fixo</label>
             </div>
             <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" @(menuExpandido ? "checked" : "") />
+                <input type="hidden" name="MenuLateralExpandido" value="false" />
+                <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" value="true" @(menuExpandido ? "checked" : string.Empty) />
                 <label class="form-check-label" for="MenuLateralExpandido">Menu expandido</label>
             </div>
             <button type="submit" class="btn btn-primary">Salvar</button>
