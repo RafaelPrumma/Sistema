@@ -7,10 +7,12 @@ namespace Sistema.CORE.Services;
 public class PerfilService : IPerfilService
 {
     private readonly IUnitOfWork _uow;
+    private readonly ILogService _log;
 
-    public PerfilService(IUnitOfWork uow)
+    public PerfilService(IUnitOfWork uow, ILogService log)
     {
         _uow = uow;
+        _log = log;
     }
 
 public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize) =>
@@ -23,29 +25,13 @@ public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize) =>
         var existing = await _uow.Perfis.BuscarPorNomeAsync(perfil.Nome);
         if (existing is not null)
         {
-            await _uow.Logs.AdicionarAsync(new Log
-            {
-                Entidade = nameof(Perfil),
-                Operacao = "Add",
-                Sucesso = false,
-                Mensagem = "Perfil já existe",
-                Tipo = LogTipo.Erro,
-                Usuario = perfil.UsuarioInclusao
-            });
+            await _log.RegistrarAsync(nameof(Perfil), "Add", false, "Perfil já existe", LogTipo.Erro, perfil.UsuarioInclusao);
             await _uow.ConfirmarAsync();
             return new OperationResult<Perfil>(false, "Perfil já existe");
         }
 
         var created = await _uow.Perfis.AdicionarAsync(perfil);
-        await _uow.Logs.AdicionarAsync(new Log
-        {
-            Entidade = nameof(Perfil),
-            Operacao = "Add",
-            Sucesso = true,
-            Mensagem = "Perfil criado",
-            Tipo = LogTipo.Sucesso,
-            Usuario = perfil.UsuarioInclusao
-        });
+        await _log.RegistrarAsync(nameof(Perfil), "Add", true, "Perfil criado", LogTipo.Sucesso, perfil.UsuarioInclusao);
         await _uow.ConfirmarAsync();
         return new OperationResult<Perfil>(true, "Perfil criado com sucesso", created);
     }
@@ -55,29 +41,13 @@ public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize) =>
         var existing = await _uow.Perfis.BuscarPorNomeAsync(perfil.Nome);
         if (existing is not null && existing.Id != perfil.Id)
         {
-            await _uow.Logs.AdicionarAsync(new Log
-            {
-                Entidade = nameof(Perfil),
-                Operacao = "Update",
-                Sucesso = false,
-                Mensagem = "Nome já utilizado",
-                Tipo = LogTipo.Erro,
-                Usuario = perfil.UsuarioAlteracao ?? "system"
-            });
+            await _log.RegistrarAsync(nameof(Perfil), "Update", false, "Nome já utilizado", LogTipo.Erro, perfil.UsuarioAlteracao ?? "system");
             await _uow.ConfirmarAsync();
             return new OperationResult(false, "Nome já utilizado");
         }
 
         await _uow.Perfis.AtualizarAsync(perfil);
-        await _uow.Logs.AdicionarAsync(new Log
-        {
-            Entidade = nameof(Perfil),
-            Operacao = "Update",
-            Sucesso = true,
-            Mensagem = "Perfil atualizado",
-            Tipo = LogTipo.Sucesso,
-            Usuario = perfil.UsuarioAlteracao ?? "system"
-        });
+        await _log.RegistrarAsync(nameof(Perfil), "Update", true, "Perfil atualizado", LogTipo.Sucesso, perfil.UsuarioAlteracao ?? "system");
         await _uow.ConfirmarAsync();
         return new OperationResult(true, "Perfil atualizado com sucesso");
     }
@@ -85,15 +55,7 @@ public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize) =>
     public async Task<OperationResult> RemoverAsync(int id)
     {
         await _uow.Perfis.RemoverAsync(id);
-        await _uow.Logs.AdicionarAsync(new Log
-        {
-            Entidade = nameof(Perfil),
-            Operacao = "Delete",
-            Sucesso = true,
-            Mensagem = "Perfil removido",
-            Tipo = LogTipo.Sucesso,
-            Usuario = "system"
-        });
+        await _log.RegistrarAsync(nameof(Perfil), "Delete", true, "Perfil removido", LogTipo.Sucesso, "system");
         await _uow.ConfirmarAsync();
         return new OperationResult(true, "Perfil removido");
     }
