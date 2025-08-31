@@ -21,6 +21,7 @@ public class LogController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<Log>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
     {
+
         return await _logs.BuscarFiltradosAsync(inicio, fim, tipo, cancellationToken);
     }
 }

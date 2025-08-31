@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
@@ -16,12 +18,12 @@ public class UsuarioService : IUsuarioService
         _log = log;
     }
 
-    public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize) =>
-        _uow.Usuarios.BuscarTodosAsync(page, pageSize);
+    public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+        _uow.Usuarios.BuscarTodosAsync(page, pageSize, cancellationToken);
 
-    public Task<Usuario?> BuscarPorIdAsync(int id) => _uow.Usuarios.BuscarPorIdAsync(id);
+    public Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorIdAsync(id, cancellationToken);
 
-    public Task<Usuario?> BuscarPorCpfAsync(string cpf) => _uow.Usuarios.BuscarPorCpfAsync(cpf);
+    public Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
 
     public async Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {

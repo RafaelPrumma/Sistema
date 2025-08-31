@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
@@ -16,10 +18,10 @@ public class FuncionalidadeService : IFuncionalidadeService
         _log = log;
     }
 
-    public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize)
-        => _uow.Funcionalidades.BuscarPaginadasAsync(page, pageSize);
+    public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+        => _uow.Funcionalidades.BuscarPaginadasAsync(page, pageSize, cancellationToken);
 
-    public Task<Funcionalidade?> BuscarPorIdAsync(int id) => _uow.Funcionalidades.BuscarPorIdAsync(id);
+    public Task<Funcionalidade?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Funcionalidades.BuscarPorIdAsync(id, cancellationToken);
 
     public async Task<OperationResult<Funcionalidade>> AdicionarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
     {

@@ -28,12 +28,13 @@ namespace Sistema.INFRA.Repositories
                 .Include(m => m.Remetente)
                 .Include(m => m.Destinatario)
                 .Include(m => m.MensagemPai)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
         }
 
         public IQueryable<Mensagem> Query()
         {
-            return _context.Mensagens.AsQueryable();
+            return _context.Mensagens.AsNoTracking();
         }
 
         public void Update(Mensagem mensagem)
