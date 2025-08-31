@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
-using Sistema.CORE.Interfaces;
 using System.Diagnostics;
 using System.Linq;
 

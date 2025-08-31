@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Users.Item.SendMail;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Services.Interfaces;
 using System.Threading;
 
 namespace Sistema.INFRA.Services;

@@ -1,6 +1,7 @@
 using System.Threading;
+using System.Threading.Tasks;
 
-namespace Sistema.CORE.Interfaces;
+namespace Sistema.CORE.Repositories.Interfaces;
 
 public interface IUnitOfWork
 {

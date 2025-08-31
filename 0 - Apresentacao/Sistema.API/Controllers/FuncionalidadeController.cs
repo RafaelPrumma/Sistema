@@ -1,11 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using Sistema.APP.DTOs;
+using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services;
-using Sistema.CORE.Interfaces;
-using Sistema.CORE.Common;
-using Microsoft.AspNetCore.Authorization;
+using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.API.Controllers;
 

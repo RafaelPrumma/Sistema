@@ -29,7 +29,7 @@ namespace Sistema.MVC.Controllers
                 Mensagens = result.Items.Select(m => _mapper.Map<Sistema.APP.DTOs.MensagemDto>(m)).ToList(),
                 Page = result.Page,
                 PageSize = result.PageSize,
-                TotalItems = result.TotalItems,
+                TotalItems = result.TotalCount,
                 RemetenteId = remetenteId,
                 PalavraChave = palavraChave,
                 Inicio = inicio,

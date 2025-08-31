@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
-using Sistema.CORE.Interfaces;
-using Sistema.CORE.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Sistema.CORE.Entities;
+using Sistema.CORE.Services.Interfaces;
 using System.Threading;
 
 namespace Sistema.API.Controllers;

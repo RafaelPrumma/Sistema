@@ -1,6 +1,6 @@
-using Sistema.CORE.Interfaces;
-using Sistema.INFRA.Data;
 using System.Threading;
+using Sistema.CORE.Repositories.Interfaces;
+using Sistema.INFRA.Data;
 
 namespace Sistema.INFRA;
 
