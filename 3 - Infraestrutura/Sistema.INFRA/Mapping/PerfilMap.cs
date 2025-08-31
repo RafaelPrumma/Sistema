@@ -10,7 +10,9 @@ public class PerfilMap : IEntityTypeConfiguration<Perfil>
     {
         builder.ToTable("Perfil");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Nome).IsRequired();
+        builder.Property(p => p.Nome).IsRequired().HasMaxLength(100);
         builder.Property(p => p.Ativo).HasDefaultValue(true);
+
+        builder.HasIndex(p => p.Nome).IsUnique();
     }
 }

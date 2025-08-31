@@ -29,7 +29,7 @@ namespace Sistema.INFRA.Mapping
                 .IsRequired(false);
 
             builder.Property(m => m.Assunto).HasMaxLength(200);
-            builder.Property(m => m.Corpo).IsRequired();
+            builder.Property(m => m.Corpo).IsRequired().HasMaxLength(2000);
         }
     }
 }

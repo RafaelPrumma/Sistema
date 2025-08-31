@@ -10,10 +10,12 @@ public class UsuarioMap : IEntityTypeConfiguration<Usuario>
     {
         builder.ToTable("Usuario");
         builder.HasKey(u => u.Id);
-        builder.Property(u => u.Nome).IsRequired();
-        builder.Property(u => u.Cpf).IsRequired();
-        builder.Property(u => u.SenhaHash).IsRequired();
+        builder.Property(u => u.Nome).IsRequired().HasMaxLength(100);
+        builder.Property(u => u.Cpf).IsRequired().HasMaxLength(11);
+        builder.Property(u => u.SenhaHash).IsRequired().HasMaxLength(255);
         builder.Property(u => u.Ativo).HasDefaultValue(true);
+
+        builder.HasIndex(u => u.Cpf).IsUnique();
 
         builder.HasOne(u => u.Perfil)
                .WithMany()
