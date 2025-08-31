@@ -49,7 +49,9 @@ public class PerfilRepository : IPerfilRepository
 
     public async Task<Perfil?> BuscarPorNomeAsync(string nome, CancellationToken cancellationToken = default)
     {
-        return await _context.Perfis.FirstOrDefaultAsync(p => p.Nome == nome, cancellationToken);
+        return await _context.Perfis
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Nome == nome, cancellationToken);
     }
 
     public async Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)

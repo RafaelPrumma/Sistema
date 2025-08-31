@@ -58,7 +58,9 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default)
     {
-        return await _context.Usuarios.FirstOrDefaultAsync(u => u.Cpf == cpf, cancellationToken);
+        return await _context.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Cpf == cpf, cancellationToken);
     }
 
     public async Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)

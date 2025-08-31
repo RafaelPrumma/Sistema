@@ -17,11 +17,13 @@ public class ConfiguracaoRepository : IConfiguracaoRepository
 
     public async Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
         await _context.Configuracoes
+            .AsNoTracking()
             .Where(c => c.Agrupamento == agrupamento && c.Ativo)
             .ToListAsync(cancellationToken);
 
     public async Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave, CancellationToken cancellationToken = default) =>
         await _context.Configuracoes
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Agrupamento == agrupamento && c.Chave == chave, cancellationToken);
 
     public async Task<Configuracao> AdicionarAsync(Configuracao config, CancellationToken cancellationToken = default)
