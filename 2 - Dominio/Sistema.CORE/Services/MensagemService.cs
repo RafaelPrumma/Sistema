@@ -1,10 +1,11 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.CORE.Services.Interfaces;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Sistema.CORE.Services
 {
@@ -17,7 +18,7 @@ namespace Sistema.CORE.Services
             _uow = uow;
         }
 
-        public Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null)
+        public Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default)
         {
             IQueryable<Mensagem> query = _uow.Mensagens.Query()
                 .Where(m => m.DestinatarioId == usuarioId);
@@ -38,7 +39,7 @@ namespace Sistema.CORE.Services
             return Task.FromResult(new PagedResult<Mensagem>(items, total, page, pageSize));
         }
 
-        public Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize)
+        public Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize, CancellationToken cancellationToken = default)
         {
             var query = _uow.Mensagens.Query()
                 .Where(m => m.RemetenteId == usuarioId)
@@ -48,9 +49,9 @@ namespace Sistema.CORE.Services
             return Task.FromResult(new PagedResult<Mensagem>(items, total, page, pageSize));
         }
 
-        public Task<Mensagem?> BuscarPorIdAsync(int id) => _uow.Mensagens.GetByIdAsync(id);
+        public Task<Mensagem?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Mensagens.GetByIdAsync(id, cancellationToken);
 
-        public async Task<OperationResult<int>> EnviarAsync(int? remetenteId, int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null)
+        public async Task<OperationResult<int>> EnviarAsync(int? remetenteId, int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null, CancellationToken cancellationToken = default)
         {
             var msg = new Mensagem
             {
@@ -61,14 +62,14 @@ namespace Sistema.CORE.Services
                 MensagemPaiId = mensagemPaiId,
                 Lida = false
             };
-            await _uow.Mensagens.AddAsync(msg);
-            await _uow.ConfirmarAsync();
+            await _uow.Mensagens.AddAsync(msg, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
             return new OperationResult<int>(true, string.Empty, msg.Id);
         }
 
-        public async Task<OperationResult> MarcarComoLidaAsync(int id, int usuarioId)
+        public async Task<OperationResult> MarcarComoLidaAsync(int id, int usuarioId, CancellationToken cancellationToken = default)
         {
-            var msg = await _uow.Mensagens.GetByIdAsync(id);
+            var msg = await _uow.Mensagens.GetByIdAsync(id, cancellationToken);
             if (msg == null || msg.DestinatarioId != usuarioId)
                 return new OperationResult(false, "Mensagem não encontrada");
             if (!msg.Lida)
@@ -76,7 +77,7 @@ namespace Sistema.CORE.Services
                 msg.Lida = true;
                 msg.DataLeitura = DateTime.UtcNow;
                 _uow.Mensagens.Update(msg);
-                await _uow.ConfirmarAsync();
+                await _uow.ConfirmarAsync(cancellationToken);
             }
             return new OperationResult(true, string.Empty);
         }

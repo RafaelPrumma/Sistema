@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using System.Threading;
 
 namespace Sistema.CORE.Services;
 
@@ -22,9 +23,9 @@ public class AuthService : IAuthService
         _config = config;
     }
 
-    public async Task<string?> AutenticarAsync(string cpf, string senha)
+    public async Task<string?> AutenticarAsync(string cpf, string senha, CancellationToken cancellationToken = default)
     {
-        var usuario = await _uow.Usuarios.BuscarPorCpfAsync(cpf);
+        var usuario = await _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
         if (usuario is null || !usuario.Ativo) return null;
         var resultado = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, senha);
         if (resultado == PasswordVerificationResult.Failed) return null;

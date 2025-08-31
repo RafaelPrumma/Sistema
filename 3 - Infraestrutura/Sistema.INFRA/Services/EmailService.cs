@@ -5,6 +5,7 @@ using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Users.Item.SendMail;
 using Sistema.CORE.Interfaces;
+using System.Threading;
 
 namespace Sistema.INFRA.Services;
 
@@ -19,7 +20,7 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task EnviarAsync(string destinatario, string assunto, string mensagem)
+    public async Task EnviarAsync(string destinatario, string assunto, string mensagem, CancellationToken cancellationToken = default)
     {
         var tenantId = _options.TenantId;
         var clientId = _options.ClientId;
@@ -57,7 +58,7 @@ public class EmailService : IEmailService
 
         try
         {
-            await graphClient.Users[sender].SendMail.PostAsync(request);
+            await graphClient.Users[sender].SendMail.PostAsync(request, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {

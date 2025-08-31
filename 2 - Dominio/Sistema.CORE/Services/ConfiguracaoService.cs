@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 
@@ -12,28 +14,28 @@ public class ConfiguracaoService : IConfiguracaoService
         _uow = uow;
     }
 
-    public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento) =>
-        _uow.Configuracoes.BuscarPorAgrupamentoAsync(agrupamento);
+    public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
+        _uow.Configuracoes.BuscarPorAgrupamentoAsync(agrupamento, cancellationToken);
 
-    public Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave) =>
-        _uow.Configuracoes.BuscarPorChaveAsync(agrupamento, chave);
+    public Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave, CancellationToken cancellationToken = default) =>
+        _uow.Configuracoes.BuscarPorChaveAsync(agrupamento, chave, cancellationToken);
 
-    public async Task<Configuracao> AdicionarAsync(Configuracao config)
+    public async Task<Configuracao> AdicionarAsync(Configuracao config, CancellationToken cancellationToken = default)
     {
-        var result = await _uow.Configuracoes.AdicionarAsync(config);
-        await _uow.ConfirmarAsync();
+        var result = await _uow.Configuracoes.AdicionarAsync(config, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
         return result;
     }
 
-    public async Task AtualizarAsync(Configuracao config)
+    public async Task AtualizarAsync(Configuracao config, CancellationToken cancellationToken = default)
     {
         await _uow.Configuracoes.AtualizarAsync(config);
-        await _uow.ConfirmarAsync();
+        await _uow.ConfirmarAsync(cancellationToken);
     }
 
-    public async Task RemoverAsync(int id)
+    public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        await _uow.Configuracoes.RemoverAsync(id);
-        await _uow.ConfirmarAsync();
+        await _uow.Configuracoes.RemoverAsync(id, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
     }
 }
