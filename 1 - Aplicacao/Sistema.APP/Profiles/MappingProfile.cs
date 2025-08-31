@@ -14,6 +14,10 @@ public class MappingProfile : Profile
             .ForMember(d => d.SenhaHash, o => o.MapFrom(s => s.SenhaHash))
             .ForMember(d => d.Ativo, o => o.MapFrom(s => s.Ativo))
             .ReverseMap();
-		CreateMap<Configuracao, ConfiguracaoDto>().ReverseMap();
-	}
+        CreateMap<Configuracao, ConfiguracaoDto>().ReverseMap();
+        CreateMap<Mensagem, MensagemDto>()
+            .ForMember(d => d.RemetenteNome, o => o.MapFrom(s => s.Remetente != null ? s.Remetente.Nome : "Sistema"))
+            .ForMember(d => d.DestinatarioNome, o => o.MapFrom(s => s.Destinatario.Nome));
+        CreateMap<NovaMensagemDto, Mensagem>();
+    }
 }

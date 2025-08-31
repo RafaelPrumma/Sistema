@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPerfilFuncionalidadeRepository, PerfilFuncionalidadeRepository>();
         services.AddScoped<ITemaRepository, TemaRepository>();
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
+        services.AddScoped<IMensagemRepository, MensagemRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEmailService, EmailService>();
  

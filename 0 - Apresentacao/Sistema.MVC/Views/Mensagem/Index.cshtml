@@ -1,0 +1,31 @@
+@model Sistema.MVC.Models.MensagemViewModel
+@{
+    ViewData["Title"] = "Caixa de Entrada";
+}
+<h2>Mensagens</h2>
+<form method="get">
+    <input type="text" name="palavraChave" placeholder="Buscar" value="@Model.PalavraChave" />
+    <button type="submit">Buscar</button>
+</form>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Assunto</th>
+            <th>Remetente</th>
+            <th>Data</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var m in Model.Mensagens)
+    {
+        <tr class="@(m.Lida ? "" : "fw-bold")">
+            <td>@m.Assunto</td>
+            <td>@m.RemetenteNome</td>
+            <td>@m.DataInclusao.ToLocalTime().ToString("g")</td>
+            <td><a href="@Url.Action("Detalhe", new { id = m.Id })">Abrir</a></td>
+        </tr>
+    }
+    </tbody>
+</table>
+<a href="@Url.Action("Nova")" class="btn btn-primary">Nova mensagem</a>

@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<PerfilFuncionalidade> PerfilFuncionalidades => Set<PerfilFuncionalidade>();
     public DbSet<Tema> Temas => Set<Tema>();
     public DbSet<Configuracao> Configuracoes => Set<Configuracao>();
+    public DbSet<Mensagem> Mensagens => Set<Mensagem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

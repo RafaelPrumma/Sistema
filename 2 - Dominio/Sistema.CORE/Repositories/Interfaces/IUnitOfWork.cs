@@ -9,5 +9,6 @@ public interface IUnitOfWork
     ILogRepository Logs { get; }
     ITemaRepository Temas { get; }
     IConfiguracaoRepository Configuracoes { get; }
+    IMensagemRepository Mensagens { get; }
     Task<int> ConfirmarAsync();
 }
