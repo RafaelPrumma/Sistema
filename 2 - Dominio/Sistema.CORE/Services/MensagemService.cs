@@ -19,9 +19,8 @@ namespace Sistema.CORE.Services
 
         public Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null)
         {
-            var query = _uow.Mensagens.Query()
-                .Where(m => m.DestinatarioId == usuarioId)
-                .OrderByDescending(m => m.DataInclusao);
+            IQueryable<Mensagem> query = _uow.Mensagens.Query()
+                .Where(m => m.DestinatarioId == usuarioId);
 
             if (remetenteId.HasValue)
                 query = query.Where(m => m.RemetenteId == remetenteId.Value);
@@ -31,6 +30,8 @@ namespace Sistema.CORE.Services
                 query = query.Where(m => m.DataInclusao >= inicio.Value);
             if (fim.HasValue)
                 query = query.Where(m => m.DataInclusao <= fim.Value);
+
+            query = query.OrderByDescending(m => m.DataInclusao);
 
             var total = query.Count();
             var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
@@ -62,14 +63,14 @@ namespace Sistema.CORE.Services
             };
             await _uow.Mensagens.AddAsync(msg);
             await _uow.ConfirmarAsync();
-            return OperationResult<int>.Success(msg.Id);
+            return new OperationResult<int>(true, string.Empty, msg.Id);
         }
 
         public async Task<OperationResult> MarcarComoLidaAsync(int id, int usuarioId)
         {
             var msg = await _uow.Mensagens.GetByIdAsync(id);
             if (msg == null || msg.DestinatarioId != usuarioId)
-                return OperationResult.Failure("Mensagem não encontrada");
+                return new OperationResult(false, "Mensagem não encontrada");
             if (!msg.Lida)
             {
                 msg.Lida = true;
@@ -77,7 +78,7 @@ namespace Sistema.CORE.Services
                 _uow.Mensagens.Update(msg);
                 await _uow.ConfirmarAsync();
             }
-            return OperationResult.Success();
+            return new OperationResult(true, string.Empty);
         }
     }
 }

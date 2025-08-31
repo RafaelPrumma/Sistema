@@ -10,9 +10,9 @@ public class LogMap : IEntityTypeConfiguration<Log>
     {
         builder.ToTable("Log");
         builder.HasKey(l => l.Id);
-        builder.Property(l => l.Entidade).IsRequired();
-        builder.Property(l => l.Operacao).IsRequired();
-        builder.Property(l => l.Mensagem).IsRequired();
-        builder.Property(l => l.Usuario).IsRequired();
+        builder.Property(l => l.Entidade).IsRequired().HasMaxLength(100);
+        builder.Property(l => l.Operacao).IsRequired().HasMaxLength(100);
+        builder.Property(l => l.Mensagem).IsRequired().HasMaxLength(2000);
+        builder.Property(l => l.Usuario).IsRequired().HasMaxLength(100);
     }
 }
