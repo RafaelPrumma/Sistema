@@ -1,7 +1,7 @@
-using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
-using Sistema.INFRA.Data;
 using Microsoft.EntityFrameworkCore;
+using Sistema.CORE.Entities;
+using Sistema.CORE.Repositories.Interfaces;
+using Sistema.INFRA.Data;
 using System.Linq;
 using System.Threading;
 

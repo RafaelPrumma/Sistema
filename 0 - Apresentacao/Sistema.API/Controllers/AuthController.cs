@@ -1,7 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
-using Sistema.CORE.Interfaces;
-using Microsoft.AspNetCore.Authorization;
+using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.API.Controllers;
 

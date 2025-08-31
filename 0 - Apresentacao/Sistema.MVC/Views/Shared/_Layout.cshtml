@@ -1,6 +1,6 @@
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
-@inject Sistema.CORE.Interfaces.ITemaService TemaService
+@inject Sistema.CORE.Services.Interfaces.ITemaService TemaService
 @{
     var userId = Context.Session.GetInt32("UserId") ?? 0;
     var userName = Context.Session.GetString("UserName") ?? "Usuário";

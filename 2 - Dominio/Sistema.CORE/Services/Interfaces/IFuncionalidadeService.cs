@@ -2,13 +2,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
-using System.Threading;
 
-namespace Sistema.CORE.Interfaces;
+namespace Sistema.CORE.Services.Interfaces;
 
 public interface IFuncionalidadeService
 {
-
     Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Funcionalidade?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);
 

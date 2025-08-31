@@ -22,13 +22,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseSession();
 
 app.UseAuthorization();
-
-app.MapStaticAssets();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -42,8 +41,7 @@ using (var scope = app.Services.CreateScope())
 
 app.MapControllerRoute(
         name: "default",
-        pattern: "{controller=Account}/{action=Login}/{id?}")
-        .WithStaticAssets();
+        pattern: "{controller=Account}/{action=Login}/{id?}");
 
 
 app.Run();

@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Repositories.Interfaces;
+using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 

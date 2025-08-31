@@ -1,11 +1,11 @@
 # Sistema
 
-Projeto de exemplo em .NET 9 utilizando arquitetura em camadas.
+Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.
 
 ## Estrutura
 - **0 - Apresentacao**:
   - `Sistema.API` - API ASP.NET Core com Swagger e Serilog.
-  - `Sistema.MVC` - frontend web MVC para autenticação, cadastro, recuperação de senha e edição de tema.
+  - `Sistema.MVC` - frontend web MVC para autenticação, cadastro, recuperação de senha, documentação e edição de tema.
 - **1 - Aplicacao**: `Sistema.APP` - perfis do AutoMapper e registro de dependências.
 - **2 - Dominio**: `Sistema.CORE` - entidades e implementações dos serviços que definem as regras de negócio.
 - **3 - Infraestrutura**: `Sistema.INFRA` - Entity Framework Core, repositórios, Unit of Work, serviços e seeds.
@@ -29,7 +29,7 @@ Projeto de exemplo em .NET 9 utilizando arquitetura em camadas.
 - Listagens retornam `PagedResult<T>` para suportar paginação via `page` e `pageSize`.
 - Perfis possuem funcionalidades com permissões de leitura e escrita gravadas em `PerfilFuncionalidades`.
 - Autenticação via JWT protege a API; obtenha um token em `/api/auth/login`.
-- Interface MVC permite login, registro, recuperação de senha e personalização de tema.
+- Interface MVC permite login, registro, recuperação de senha, consulta à documentação e personalização de tema.
 - `EmailService` envia mensagens SMTP para cadastro e recuperação de senha.
 
 Para compilar a solução:

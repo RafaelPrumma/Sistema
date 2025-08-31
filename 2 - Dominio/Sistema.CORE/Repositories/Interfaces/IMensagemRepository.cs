@@ -1,9 +1,9 @@
-using Sistema.CORE.Entities;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Sistema.CORE.Entities;
 
-namespace Sistema.CORE.Interfaces
+namespace Sistema.CORE.Repositories.Interfaces
 {
     public interface IMensagemRepository
     {

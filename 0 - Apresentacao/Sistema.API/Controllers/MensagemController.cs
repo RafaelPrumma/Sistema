@@ -25,7 +25,7 @@ namespace Sistema.API.Controllers
             var cancellationToken = HttpContext.RequestAborted;
             var result = await _mensagemService.BuscarCaixaEntradaAsync(usuarioId, page, pageSize, remetenteId, palavraChave, inicio, fim, cancellationToken);
             var dto = result.Items.Select(m => _mapper.Map<MensagemDto>(m));
-            return Ok(new { result.TotalItems, result.Page, result.PageSize, Items = dto });
+            return Ok(new { result.TotalCount, result.Page, result.PageSize, Items = dto });
         }
 
         [HttpGet("saida")]
@@ -34,7 +34,7 @@ namespace Sistema.API.Controllers
             var cancellationToken = HttpContext.RequestAborted;
             var result = await _mensagemService.BuscarCaixaSaidaAsync(usuarioId, page, pageSize, cancellationToken);
             var dto = result.Items.Select(m => _mapper.Map<MensagemDto>(m));
-            return Ok(new { result.TotalItems, result.Page, result.PageSize, Items = dto });
+            return Ok(new { result.TotalCount, result.Page, result.PageSize, Items = dto });
         }
 
         [HttpGet("{id}")]

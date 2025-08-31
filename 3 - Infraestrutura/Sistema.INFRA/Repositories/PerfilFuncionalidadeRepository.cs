@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
 using System.Threading;
 

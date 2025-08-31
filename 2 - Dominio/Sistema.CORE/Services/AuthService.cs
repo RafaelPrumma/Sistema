@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Repositories.Interfaces;
+using Sistema.CORE.Services.Interfaces;
 using System.Threading;
 
 namespace Sistema.CORE.Services;

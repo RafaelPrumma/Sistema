@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sistema.CORE.Interfaces;
+using Sistema.CORE.Repositories.Interfaces;
+using Sistema.CORE.Services.Interfaces;
 using Sistema.INFRA.Data;
 using Sistema.INFRA.Repositories;
 using Sistema.INFRA.Services;
