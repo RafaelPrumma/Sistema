@@ -1,5 +1,6 @@
 using Sistema.CORE.Interfaces;
 using Sistema.INFRA.Data;
+using System.Threading;
 
 namespace Sistema.INFRA;
 
@@ -36,5 +37,5 @@ public class UnitOfWork : IUnitOfWork
         Mensagens = mensagens;
     }
 
-    public Task<int> ConfirmarAsync() => _context.SaveChangesAsync();
+    public Task<int> ConfirmarAsync(CancellationToken cancellationToken = default) => _context.SaveChangesAsync(cancellationToken);
 }

@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace Sistema.CORE.Interfaces;
 
 public interface IUnitOfWork
@@ -10,5 +12,5 @@ public interface IUnitOfWork
     ITemaRepository Temas { get; }
     IConfiguracaoRepository Configuracoes { get; }
     IMensagemRepository Mensagens { get; }
-    Task<int> ConfirmarAsync();
+    Task<int> ConfirmarAsync(CancellationToken cancellationToken = default);
 }

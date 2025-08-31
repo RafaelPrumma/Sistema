@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.INFRA.Data;
+using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
@@ -14,13 +15,13 @@ public class TemaRepository : ITemaRepository
         _context = context;
     }
 
-    public async Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId) =>
-        await _context.Temas.FirstOrDefaultAsync(l => l.UsuarioId == usuarioId);
+    public async Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
+        await _context.Temas.FirstOrDefaultAsync(l => l.UsuarioId == usuarioId, cancellationToken);
 
-    public Task<Tema> AdicionarAsync(Tema tema)
+    public async Task<Tema> AdicionarAsync(Tema tema, CancellationToken cancellationToken = default)
     {
-        _context.Temas.Add(tema);
-        return Task.FromResult(tema);
+        await _context.Temas.AddAsync(tema, cancellationToken);
+        return tema;
     }
 
     public Task AtualizarAsync(Tema tema)

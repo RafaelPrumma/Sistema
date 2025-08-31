@@ -1,8 +1,9 @@
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
-using Sistema.INFRA.Data; 
+using Sistema.INFRA.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Linq; 
+using System.Linq;
+using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
@@ -15,13 +16,12 @@ public class LogRepository : ILogRepository
         _context = context;
     }
 
-    public Task AdicionarAsync(Log log)
+    public async Task AdicionarAsync(Log log, CancellationToken cancellationToken = default)
     {
-        _context.Logs.Add(log);
-        return Task.CompletedTask;
-    } 
+        await _context.Logs.AddAsync(log, cancellationToken);
+    }
 
-    public async Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo)
+    public async Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default)
     {
         var query = _context.Logs.AsQueryable();
         if (inicio.HasValue)
@@ -30,6 +30,6 @@ public class LogRepository : ILogRepository
             query = query.Where(l => l.DataOperacao <= fim.Value);
         if (tipo.HasValue)
             query = query.Where(l => l.Tipo == tipo.Value);
-        return await query.AsNoTracking().ToListAsync();
-    } 
+        return await query.AsNoTracking().ToListAsync(cancellationToken);
+    }
 }
