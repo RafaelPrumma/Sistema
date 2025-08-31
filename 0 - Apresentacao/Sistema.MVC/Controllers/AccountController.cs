@@ -86,7 +86,7 @@ public class AccountController : Controller
             var result = await _usuarioService.AdicionarAsync(usuario);
             if (result.Success)
             {
-                await _emailService.EnviarAsync(model.Email, "Bem-vindo", $"Sua senha é: {model.Senha}");
+                await _emailService.EnviarAsync(model.Email, "Bem-vindo", "Seu cadastro foi realizado com sucesso.");
                 return Ok(new { success = true });
             }
             return BadRequest(new { message = result.Message });
@@ -113,13 +113,16 @@ public class AccountController : Controller
             {
                 return NotFound(new { message = "Usuário não encontrado" });
             }
-            var novaSenha = Guid.NewGuid().ToString("N").Substring(0, 8);
-            usuario.SenhaHash = _hasher.HashPassword(usuario, novaSenha);
+
+            var token = Guid.NewGuid().ToString("N");
+            usuario.ResetToken = token;
+            usuario.ResetTokenExpiration = DateTime.UtcNow.AddHours(1);
             usuario.UsuarioAlteracao = "system";
             var result = await _usuarioService.AtualizarAsync(usuario);
             if (result.Success)
             {
-                await _emailService.EnviarAsync(model.Email, "Recuperação de Senha", $"Sua nova senha é: {novaSenha}");
+                var resetLink = Url.Action("ResetPassword", "Account", new { token }, Request.Scheme);
+                await _emailService.EnviarAsync(model.Email, "Recuperação de Senha", $"Clique no link para redefinir sua senha: {resetLink}");
                 return Ok(new { success = true });
             }
             return BadRequest(new { message = result.Message });
@@ -129,6 +132,45 @@ public class AccountController : Controller
             _logger.LogError(ex, "Erro ao recuperar senha");
             return StatusCode(500, new { message = "Erro ao recuperar senha" });
         }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ResetPassword(string token)
+    {
+        var usuario = await _usuarioService.BuscarPorResetTokenAsync(token);
+        if (usuario is null)
+        {
+            return BadRequest("Token inválido ou expirado");
+        }
+        var model = new ResetPasswordViewModel { Token = token };
+        return View(model);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+        var usuario = await _usuarioService.BuscarPorResetTokenAsync(model.Token);
+        if (usuario is null)
+        {
+            ModelState.AddModelError(string.Empty, "Token inválido ou expirado");
+            return View(model);
+        }
+
+        usuario.SenhaHash = _hasher.HashPassword(usuario, model.Senha);
+        usuario.ResetToken = null;
+        usuario.ResetTokenExpiration = null;
+        usuario.UsuarioAlteracao = "system";
+        var result = await _usuarioService.AtualizarAsync(usuario);
+        if (result.Success)
+        {
+            return RedirectToAction("Login");
+        }
+        ModelState.AddModelError(string.Empty, result.Message);
+        return View(model);
     }
 
     [HttpGet]

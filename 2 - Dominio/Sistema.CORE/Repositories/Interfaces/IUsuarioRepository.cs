@@ -10,6 +10,7 @@ public interface IUsuarioRepository
     Task<PagedResult<Usuario>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default);
+    Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default);
     Task<bool> ExisteAtivoPorPerfilAsync(int perfilId, CancellationToken cancellationToken = default);
     Task<Usuario> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default);
     Task AtualizarAsync(Usuario usuario);

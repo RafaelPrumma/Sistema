@@ -4,6 +4,7 @@ using Sistema.CORE.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
 using System.Linq;
+using System;
 using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
@@ -61,6 +62,13 @@ public class UsuarioRepository : IUsuarioRepository
         return await _context.Usuarios
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Cpf == cpf, cancellationToken);
+    }
+
+    public async Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default)
+    {
+        return await _context.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.ResetToken == token && u.ResetTokenExpiration > DateTime.UtcNow, cancellationToken);
     }
 
     public async Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)

@@ -14,6 +14,8 @@ public class UsuarioMap : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.Cpf).IsRequired().HasMaxLength(11);
         builder.Property(u => u.SenhaHash).IsRequired().HasMaxLength(255);
         builder.Property(u => u.Ativo).HasDefaultValue(true);
+        builder.Property(u => u.ResetToken).HasMaxLength(100);
+        builder.Property(u => u.ResetTokenExpiration);
 
         builder.HasIndex(u => u.Cpf).IsUnique();
 
