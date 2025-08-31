@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using System.Threading;
 
 namespace Sistema.CORE.Services;
 

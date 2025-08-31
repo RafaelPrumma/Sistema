@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using System.Threading;
 
 namespace Sistema.CORE.Services;
 
@@ -17,8 +18,12 @@ public class PerfilService : IPerfilService
         _log = log;
     }
 
+
+
+
     public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _uow.Perfis.BuscarTodosAsync(page, pageSize, cancellationToken);
+
 
     public Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Perfis.BuscarPorIdAsync(id, cancellationToken);
 
@@ -32,7 +37,7 @@ public class PerfilService : IPerfilService
             return new OperationResult<Perfil>(false, "Perfil já existe");
         }
 
-        var created = await _uow.Perfis.AdicionarAsync(perfil, cancellationToken);
+ync(perfil, cancellationToken);
         await _log.RegistrarAsync(nameof(Perfil), "Add", true, "Perfil criado", LogTipo.Sucesso, perfil.UsuarioInclusao, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
         return new OperationResult<Perfil>(true, "Perfil criado com sucesso", created);
