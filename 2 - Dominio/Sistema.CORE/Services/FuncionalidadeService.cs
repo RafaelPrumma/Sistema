@@ -1,6 +1,7 @@
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
+using System.Threading;
 
 namespace Sistema.CORE.Services;
 
@@ -20,27 +21,27 @@ public class FuncionalidadeService : IFuncionalidadeService
 
     public Task<Funcionalidade?> BuscarPorIdAsync(int id) => _uow.Funcionalidades.BuscarPorIdAsync(id);
 
-    public async Task<OperationResult<Funcionalidade>> AdicionarAsync(Funcionalidade func)
+    public async Task<OperationResult<Funcionalidade>> AdicionarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
     {
-        await _uow.Funcionalidades.AdicionarAsync(func);
-        await _log.RegistrarAsync(nameof(Funcionalidade), "Add", true, "Funcionalidade criada", LogTipo.Sucesso, func.UsuarioInclusao);
-        await _uow.ConfirmarAsync();
+        await _uow.Funcionalidades.AdicionarAsync(func, cancellationToken);
+        await _log.RegistrarAsync(nameof(Funcionalidade), "Add", true, "Funcionalidade criada", LogTipo.Sucesso, func.UsuarioInclusao, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
         return new OperationResult<Funcionalidade>(true, "Criado", func);
     }
 
-    public async Task<OperationResult> AtualizarAsync(Funcionalidade func)
+    public async Task<OperationResult> AtualizarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
     {
         await _uow.Funcionalidades.AtualizarAsync(func);
-        await _log.RegistrarAsync(nameof(Funcionalidade), "Update", true, "Funcionalidade atualizada", LogTipo.Sucesso, func.UsuarioAlteracao ?? "system");
-        await _uow.ConfirmarAsync();
+        await _log.RegistrarAsync(nameof(Funcionalidade), "Update", true, "Funcionalidade atualizada", LogTipo.Sucesso, func.UsuarioAlteracao ?? "system", cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
         return new OperationResult(true, "Atualizado");
     }
 
-    public async Task<OperationResult> RemoverAsync(int id)
+    public async Task<OperationResult> RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        await _uow.Funcionalidades.RemoverAsync(id);
-        await _log.RegistrarAsync(nameof(Funcionalidade), "Delete", true, "Funcionalidade removida", LogTipo.Sucesso, "system");
-        await _uow.ConfirmarAsync();
+        await _uow.Funcionalidades.RemoverAsync(id, cancellationToken);
+        await _log.RegistrarAsync(nameof(Funcionalidade), "Delete", true, "Funcionalidade removida", LogTipo.Sucesso, "system", cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
         return new OperationResult(true, "Removido");
     }
 }

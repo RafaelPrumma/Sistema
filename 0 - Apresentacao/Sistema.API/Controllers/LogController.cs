@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Interfaces;
 using Sistema.CORE.Entities;
 using Microsoft.AspNetCore.Authorization;
+using System.Threading;
 
 namespace Sistema.API.Controllers;
 
@@ -18,8 +19,8 @@ public class LogController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<Log>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo)
+    public async Task<IEnumerable<Log>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
     {
-        return await _logs.BuscarFiltradosAsync(inicio, fim, tipo);
+        return await _logs.BuscarFiltradosAsync(inicio, fim, tipo, cancellationToken);
     }
 }
