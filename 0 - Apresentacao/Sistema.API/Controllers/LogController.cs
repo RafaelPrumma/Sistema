@@ -10,9 +10,9 @@ namespace Sistema.API.Controllers;
 [Authorize]
 public class LogController : ControllerBase
 {
-    private readonly ILogRepository _logs;
+    private readonly ILogService _logs;
 
-    public LogController(ILogRepository logs)
+    public LogController(ILogService logs)
     {
         _logs = logs;
     }
