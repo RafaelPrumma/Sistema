@@ -9,4 +9,6 @@ public class Usuario : AuditableEntity
     public string SenhaHash { get; set; } = string.Empty;
     public int PerfilId { get; set; }
     public Perfil? Perfil { get; set; }
+    public string? ResetToken { get; set; }
+    public DateTime? ResetTokenExpiration { get; set; }
 }

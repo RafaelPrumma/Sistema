@@ -25,6 +25,8 @@ public class UsuarioService : IUsuarioService
 
     public Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
 
+    public Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorResetTokenAsync(token, cancellationToken);
+
     public async Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
         var existing = await _uow.Usuarios.BuscarPorCpfAsync(usuario.Cpf, cancellationToken);
