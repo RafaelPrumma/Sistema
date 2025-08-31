@@ -3,6 +3,7 @@ using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.INFRA.Data;
+using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
@@ -15,22 +16,22 @@ public class FuncionalidadeRepository : IFuncionalidadeRepository
         _context = context;
     }
 
-    public Task<Funcionalidade> AdicionarAsync(Funcionalidade func)
+    public async Task<Funcionalidade> AdicionarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
     {
-        _context.Funcionalidades.Add(func);
-        return Task.FromResult(func);
+        await _context.Funcionalidades.AddAsync(func, cancellationToken);
+        return func;
     }
 
-    public async Task RemoverAsync(int id)
+    public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        var obj = await _context.Funcionalidades.FindAsync(id);
+        var obj = await _context.Funcionalidades.FindAsync(new object?[] { id }, cancellationToken);
         if (obj is null) return;
         _context.Funcionalidades.Remove(obj);
     }
 
-    public async Task<Funcionalidade?> BuscarPorIdAsync(int id)
+    public async Task<Funcionalidade?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Funcionalidades.FindAsync(id);
+        return await _context.Funcionalidades.FindAsync(new object?[] { id }, cancellationToken);
     }
 
     public Task AtualizarAsync(Funcionalidade func)
@@ -39,9 +40,9 @@ public class FuncionalidadeRepository : IFuncionalidadeRepository
         return Task.CompletedTask;
     }
 
-    public async Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize)
+    public async Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var query = _context.Funcionalidades.AsNoTracking().OrderBy(f => f.Id);
-        return await query.ToPagedResultAsync(page, pageSize);
+        return await query.ToPagedResultAsync(page, pageSize, cancellationToken);
     }
 }
