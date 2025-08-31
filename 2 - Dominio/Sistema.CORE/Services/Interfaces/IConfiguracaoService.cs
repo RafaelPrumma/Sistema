@@ -1,12 +1,15 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Entities;
 
 namespace Sistema.CORE.Interfaces;
 
 public interface IConfiguracaoService
 {
-    Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento);
-    Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave);
-    Task<Configuracao> AdicionarAsync(Configuracao config);
-    Task AtualizarAsync(Configuracao config);
-    Task RemoverAsync(int id);
+    Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default);
+    Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave, CancellationToken cancellationToken = default);
+    Task<Configuracao> AdicionarAsync(Configuracao config, CancellationToken cancellationToken = default);
+    Task AtualizarAsync(Configuracao config, CancellationToken cancellationToken = default);
+    Task RemoverAsync(int id, CancellationToken cancellationToken = default);
 }

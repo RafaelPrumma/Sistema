@@ -20,7 +20,8 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<string>> Login(LoginDto dto)
     {
-        var token = await _authService.AutenticarAsync(dto.Cpf, dto.Senha);
+        var cancellationToken = HttpContext.RequestAborted;
+        var token = await _authService.AutenticarAsync(dto.Cpf, dto.Senha, cancellationToken);
         if (token is null) return Unauthorized();
         return Ok(token);
     }

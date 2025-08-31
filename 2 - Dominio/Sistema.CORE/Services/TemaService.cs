@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Interfaces;
 
@@ -12,15 +14,15 @@ public class TemaService : ITemaService
         _uow = uow;
     }
 
-    public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId) =>
-        _uow.Temas.BuscarPorUsuarioIdAsync(usuarioId);
+    public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
+        _uow.Temas.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);
 
-    public async Task SalvarAsync(Tema tema)
+    public async Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default)
     {
-        var existing = await _uow.Temas.BuscarPorUsuarioIdAsync(tema.UsuarioId);
+        var existing = await _uow.Temas.BuscarPorUsuarioIdAsync(tema.UsuarioId, cancellationToken);
         if (existing is null)
         {
-            await _uow.Temas.AdicionarAsync(tema);
+            await _uow.Temas.AdicionarAsync(tema, cancellationToken);
         }
         else
         {
@@ -35,7 +37,7 @@ public class TemaService : ITemaService
             existing.UsuarioAlteracao = tema.UsuarioAlteracao;
             await _uow.Temas.AtualizarAsync(existing);
         }
-        await _uow.ConfirmarAsync();
+        await _uow.ConfirmarAsync(cancellationToken);
     }
 }
 
