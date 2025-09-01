@@ -1,3 +1,6 @@
+@use 'variables' as *;
+@use 'mixins';
+
 html {
   font-size: 14px;
 }
@@ -7,6 +10,7 @@ html {
     font-size: 16px;
   }
 }
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
@@ -20,25 +24,11 @@ body {
   margin-bottom: 60px;
 }
 
-.bg-vermelho {
-  background-color: #dc3545 !important;
-}
-
-.bg-roxo {
-  background-color: #6f42c1 !important;
-}
-
-.bg-verde {
-  background-color: #198754 !important;
-}
-
-.bg-azul {
-  background-color: #0d6efd !important;
-}
-
-.bg-laranja {
-  background-color: #fd7e14 !important;
-}
+@include mixins.bg-color('vermelho', $vermelho);
+@include mixins.bg-color('roxo', $roxo);
+@include mixins.bg-color('verde', $verde);
+@include mixins.bg-color('azul', $azul);
+@include mixins.bg-color('laranja', $laranja);
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);

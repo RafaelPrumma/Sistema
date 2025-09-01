@@ -1,0 +1,3 @@
+@mixin bg-color($name, $color) {
+  .bg-#{$name} { background-color: $color !important; }
+}
