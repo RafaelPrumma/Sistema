@@ -11,8 +11,15 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+.btn:focus-visible, .btn:active:focus-visible, .btn-link.nav-link:focus-visible, .form-control:focus-visible, .form-check-input:focus-visible {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  outline: none;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #258cfb;
+  outline-offset: 2px;
 }
 
 html {
