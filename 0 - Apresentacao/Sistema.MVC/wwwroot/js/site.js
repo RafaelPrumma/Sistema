@@ -28,6 +28,19 @@ window.showInfo = function (message) {
 };
 
 document.addEventListener('DOMContentLoaded', function () {
+    var root = document.documentElement;
+    var savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        root.dataset.theme = savedTheme;
+        if (savedTheme === 'dark') {
+            document.body.classList.remove('bg-light', 'text-dark');
+            document.body.classList.add('bg-dark', 'text-white');
+        } else {
+            document.body.classList.remove('bg-dark', 'text-white');
+            document.body.classList.add('bg-light', 'text-dark');
+        }
+    }
+
     var temaToggle = document.getElementById('temaToggle');
     var temaSidebar = document.getElementById('temaSidebar');
     if (temaToggle && temaSidebar) {
@@ -56,7 +69,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('input[name="ModoEscuro"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
-            if (this.value === 'true') {
+            var theme = this.value === 'true' ? 'dark' : 'light';
+            root.dataset.theme = theme;
+            localStorage.setItem('theme', theme);
+            if (theme === 'dark') {
                 document.body.classList.remove('bg-light', 'text-dark');
                 document.body.classList.add('bg-dark', 'text-white');
             } else {
@@ -65,8 +81,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-
-    var root = document.documentElement;
 
     var headerInput = document.getElementById('CorHeader');
     if (headerInput) {

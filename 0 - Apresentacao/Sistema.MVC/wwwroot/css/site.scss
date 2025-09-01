@@ -9,6 +9,15 @@
   --footer-bg: #{v.$azul};
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --header-bg: #212529;
+    --sidebar-bg: #212529;
+    --rightbar-bg: #343a40;
+    --footer-bg: #212529;
+  }
+}
+
 .header-bg { background-color: var(--header-bg) !important; }
 .sidebar-bg { background-color: var(--sidebar-bg) !important; }
 .rightbar-bg { background-color: var(--rightbar-bg) !important; }
