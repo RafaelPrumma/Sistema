@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="~/Sistema.MVC.styles.css" asp-append-version="true" />
 </head>
 <body class="@bodyClass @(headerFixo ? "pt-5" : string.Empty) @(footerFixo ? "pb-5" : string.Empty)">
+    <a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
@@ -72,7 +73,7 @@
         </header>
         <div class="flex-grow-1 d-flex">
             <aside class="sidebar @sidebarCollapsedClass sidebar-bg">
-                <nav>
+                <nav aria-label="Menu principal">
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
@@ -96,7 +97,7 @@
                 </nav>
             </aside>
             <div class="content flex-grow-1 p-3">
-                <main role="main" class="pb-3">
+                <main id="main" role="main" class="pb-3">
                     @RenderBody()
                 </main>
             </div>
