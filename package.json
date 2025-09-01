@@ -4,14 +4,22 @@
   "description": "Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.",
   "main": "index.js",
   "scripts": {
-    "build-css": "sass --no-source-map \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.css\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "vite build",
+    "watch": "vite build --watch --mode development",
+    "dev": "vite",
+    "test": "echo \"No tests\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "sass": "^1.91.0"
+    "aos": "^2.3.4",
+    "bootstrap-icons": "^1.10.5",
+    "izimodal": "^1.6.0",
+    "izitoast": "^1.4.0",
+    "jquery": "^3.7.1",
+    "sass": "^1.91.0",
+    "vite": "^5.0.0"
   }
 }
