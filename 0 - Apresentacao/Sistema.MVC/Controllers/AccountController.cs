@@ -34,7 +34,7 @@ public class AccountController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> Login([FromBody] LoginViewModel model)
+    public async Task<IActionResult> Login([FromForm] LoginViewModel model)
     {
         if (!ModelState.IsValid)
         {
