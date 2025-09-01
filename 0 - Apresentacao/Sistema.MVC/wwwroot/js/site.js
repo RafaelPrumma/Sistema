@@ -57,14 +57,33 @@ document.addEventListener('DOMContentLoaded', function () {
     var menuToggle = document.getElementById('menuToggle');
     var leftSidebar = document.querySelector('aside.sidebar');
     var menuCheckbox = document.getElementById('MenuLateralExpandido');
+    var syncMenu = function () {
+        if (!leftSidebar) return;
+        if (window.innerWidth <= 768) {
+            leftSidebar.classList.add('collapsed');
+            if (menuCheckbox) {
+                menuCheckbox.checked = false;
+            }
+        } else if (menuCheckbox) {
+            leftSidebar.classList.toggle('collapsed', !menuCheckbox.checked);
+        } else {
+            leftSidebar.classList.remove('collapsed');
+        }
+    };
+
     if (menuToggle && leftSidebar) {
         menuToggle.addEventListener('click', function () {
             leftSidebar.classList.toggle('collapsed');
             if (menuCheckbox) {
                 menuCheckbox.checked = !leftSidebar.classList.contains('collapsed');
             }
+            syncMenu();
         });
     }
+
+    window.addEventListener('resize', syncMenu);
+    syncMenu();
+
     AOS.init();
 
     document.querySelectorAll('input[name="ModoEscuro"]').forEach(function (radio) {
@@ -131,8 +150,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (menuCheckbox && leftSidebar) {
-        menuCheckbox.addEventListener('change', function () {
-            leftSidebar.classList.toggle('collapsed', !this.checked);
-        });
+        menuCheckbox.addEventListener('change', syncMenu);
     }
 });
