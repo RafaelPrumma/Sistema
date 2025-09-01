@@ -40,7 +40,7 @@
     string footerFixedClass = footerFixo ? "fixed-bottom" : string.Empty;
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="--header-bg:@headerColor; --sidebar-bg:@leftColor; --rightbar-bg:@rightColor; --footer-bg:@footerColor;">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -52,7 +52,7 @@
 </head>
 <body class="@bodyClass @(headerFixo ? "pt-5" : string.Empty) @(footerFixo ? "pb-5" : string.Empty)">
     <div class="d-flex flex-column min-vh-100">
-        <header class="navbar @headerNavbarClass @headerFixedClass" style="background-color:@headerColor">
+        <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
                 <button class="btn btn-link @headerText" type="button" id="menuToggle"><i class="bi bi-list"></i></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
@@ -72,7 +72,7 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <aside class="sidebar @sidebarCollapsedClass" style="background-color:@leftColor">
+            <aside class="sidebar @sidebarCollapsedClass sidebar-bg">
                 <nav>
                     <ul class="nav flex-column">
                         <li class="nav-item">
@@ -102,15 +102,21 @@
                 </main>
             </div>
         </div>
-        <footer class="footer @footerText @footerFixedClass @(footerFixo ? string.Empty : "mt-auto")" style="background-color:@footerColor">
+        <footer class="footer @footerText @footerFixedClass @(footerFixo ? string.Empty : "mt-auto") footer-bg">
             <div class="container">
                 &copy; 2025 - Sistema.MVC - <a class="@footerText" asp-controller="Home" asp-action="Privacy">Privacy</a>
             </div>
         </footer>
     </div>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
-    <script src="~/dist/site.js" asp-append-version="true"></script>
-    <aside id="temaSidebar" class="tema-sidebar @rightText" style="background-color:@rightColor">
+
+    <script src="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
+
+
         <form asp-controller="Tema" asp-action="Edit" method="post" class="p-3">
             <h5>Preferências de Tema</h5>
             <div class="mb-3">

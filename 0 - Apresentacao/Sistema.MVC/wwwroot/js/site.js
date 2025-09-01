@@ -54,28 +54,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     AOS.init();
 
-    function getTextClass(hex) {
-        if (!hex) return 'text-dark';
-        hex = hex.replace('#', '');
-        if (hex.length === 6) {
-            var r = parseInt(hex.substring(0, 2), 16);
-            var g = parseInt(hex.substring(2, 4), 16);
-            var b = parseInt(hex.substring(4, 6), 16);
-            var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            return lum > 0.5 ? 'text-dark' : 'text-white';
-        }
-        return 'text-dark';
-    }
-
-    function applyBackground(element, color) {
-        if (!element) return;
-        element.style.backgroundColor = color;
-        var textClass = getTextClass(color);
-        element.classList.remove('text-dark', 'text-white');
-        element.classList.add(textClass);
-        return textClass;
-    }
-
     document.querySelectorAll('input[name="ModoEscuro"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
             if (this.value === 'true') {
@@ -88,53 +66,38 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    var root = document.documentElement;
+
     var headerInput = document.getElementById('CorHeader');
-    var headerEl = document.querySelector('header.navbar');
-    if (headerInput && headerEl) {
+    if (headerInput) {
         headerInput.addEventListener('input', function () {
-            var textClass = applyBackground(headerEl, this.value);
-            headerEl.classList.remove('navbar-dark', 'navbar-light');
-            headerEl.classList.add(textClass === 'text-white' ? 'navbar-dark' : 'navbar-light');
-            headerEl.querySelectorAll('.navbar-brand, #userMenu').forEach(function (el) {
-                el.classList.remove('text-dark', 'text-white');
-                el.classList.add(textClass);
-            });
+            root.style.setProperty('--header-bg', this.value);
         });
     }
 
     var leftInput = document.getElementById('CorBarraEsquerda');
-    var leftEl = document.querySelector('aside.sidebar');
-    if (leftInput && leftEl) {
+    if (leftInput) {
         leftInput.addEventListener('input', function () {
-            var textClass = applyBackground(leftEl, this.value);
-            leftEl.querySelectorAll('.nav-link').forEach(function (a) {
-                a.classList.remove('text-dark', 'text-white');
-                a.classList.add(textClass);
-            });
+            root.style.setProperty('--sidebar-bg', this.value);
         });
     }
 
     var rightInput = document.getElementById('CorBarraDireita');
-    var rightEl = document.getElementById('temaSidebar');
-    if (rightInput && rightEl) {
+    if (rightInput) {
         rightInput.addEventListener('input', function () {
-            var textClass = applyBackground(rightEl, this.value);
-            rightEl.classList.remove('text-dark', 'text-white');
-            rightEl.classList.add(textClass);
+            root.style.setProperty('--rightbar-bg', this.value);
         });
     }
 
     var footerInput = document.getElementById('CorFooter');
-    var footerEl = document.querySelector('footer.footer');
-    if (footerInput && footerEl) {
+    if (footerInput) {
         footerInput.addEventListener('input', function () {
-            var textClass = applyBackground(footerEl, this.value);
-            footerEl.querySelectorAll('a').forEach(function (a) {
-                a.classList.remove('text-dark', 'text-white');
-                a.classList.add(textClass);
-            });
+            root.style.setProperty('--footer-bg', this.value);
         });
     }
+
+    var headerEl = document.querySelector('header.navbar');
+    var footerEl = document.querySelector('footer.footer');
 
     var headerFix = document.getElementById('HeaderFixo');
     if (headerFix && headerEl) {

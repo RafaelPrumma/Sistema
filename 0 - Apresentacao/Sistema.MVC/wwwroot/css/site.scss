@@ -1,3 +1,15 @@
-@use 'sass/variables';
+@use 'sass/variables' as v;
 @use 'sass/mixins';
 @use 'sass/base';
+
+:root {
+  --header-bg: #{v.$azul};
+  --sidebar-bg: #{v.$azul};
+  --rightbar-bg: #f8f9fa;
+  --footer-bg: #{v.$azul};
+}
+
+.header-bg { background-color: var(--header-bg) !important; }
+.sidebar-bg { background-color: var(--sidebar-bg) !important; }
+.rightbar-bg { background-color: var(--rightbar-bg) !important; }
+.footer-bg { background-color: var(--footer-bg) !important; }

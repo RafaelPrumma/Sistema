@@ -118,3 +118,26 @@ body.bg-dark .card .form-label,
 body.bg-dark .card .card-title {
   color: #f8f9fa;
 }
+
+:root {
+  --header-bg: #0d6efd;
+  --sidebar-bg: #0d6efd;
+  --rightbar-bg: #f8f9fa;
+  --footer-bg: #0d6efd;
+}
+
+.header-bg {
+  background-color: var(--header-bg) !important;
+}
+
+.sidebar-bg {
+  background-color: var(--sidebar-bg) !important;
+}
+
+.rightbar-bg {
+  background-color: var(--rightbar-bg) !important;
+}
+
+.footer-bg {
+  background-color: var(--footer-bg) !important;
+}
