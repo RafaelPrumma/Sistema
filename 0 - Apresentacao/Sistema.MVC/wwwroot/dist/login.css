@@ -1,0 +1,14 @@
+.login-container {
+    min-height: 100vh;
+}
+
+.login-left {
+    background-color: #0058a3;
+    color: #fff;
+}
+
+/* Improve focus visibility for input fields */
+.form-control:focus {
+    border-color: #0058a3;
+    box-shadow: 0 0 0 0.2rem rgba(0, 88, 163, 0.25);
+}
