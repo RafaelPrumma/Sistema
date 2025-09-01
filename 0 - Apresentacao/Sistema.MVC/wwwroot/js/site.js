@@ -1,23 +1,31 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+import $ from 'jquery';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import 'izitoast/dist/css/iziToast.min.css';
+import 'izimodal/css/iziModal.min.css';
+import 'izimodal/js/iziModal.min.js';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
+import '../css/site.scss';
+import iziToast from 'izitoast';
 
-// Write your JavaScript code.
+window.$ = $;
+window.jQuery = $;
 
-function showSuccess(message) {
+window.showSuccess = function (message) {
     iziToast.success({ title: 'Sucesso', message });
-}
+};
 
-function showError(message) {
+window.showError = function (message) {
     iziToast.error({ title: 'Erro', message });
-}
+};
 
-function showWarning(message) {
+window.showWarning = function (message) {
     iziToast.warning({ title: 'Alerta', message });
-}
+};
 
-function showInfo(message) {
+window.showInfo = function (message) {
     iziToast.info({ title: 'Info', message });
-}
+};
 
 document.addEventListener('DOMContentLoaded', function () {
     var temaToggle = document.getElementById('temaToggle');
@@ -44,9 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    if (typeof AOS !== 'undefined') {
-        AOS.init();
-    }
+    AOS.init();
 
     function getTextClass(hex) {
         if (!hex) return 'text-dark';

@@ -11,10 +11,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Sistema</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/css/iziToast.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izimodal/css/iziModal.min.css" />
+    <link rel="stylesheet" href="~/dist/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/dist/login.css" asp-append-version="true" />
 </head>
 <body>
     <div class="container-fluid login-container">
@@ -49,14 +47,10 @@
         </div>
     </div>
 
-    <script src="~/lib/jquery/dist/jquery.js"></script>
     <div id="loadingModal"></div>
-
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    <script src="~/js/login.js" asp-append-version="true"></script>
+    <script src="~/dist/site.js" asp-append-version="true"></script>
+    <script src="~/dist/login.js" asp-append-version="true"></script>
     @await Html.PartialAsync("_ValidationScriptsPartial")
     <div id="registerModal" style="display:none">
         @await Html.PartialAsync("_RegisterPartial", new Sistema.MVC.Models.RegisterViewModel())

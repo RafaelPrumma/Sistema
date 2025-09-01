@@ -1,3 +1,5 @@
+import '../css/login.css';
+
 $(function () {
     $('#loginForm').on('submit', async function (e) {
         e.preventDefault();
