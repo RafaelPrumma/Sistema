@@ -27,129 +27,123 @@ window.showInfo = function (message) {
     iziToast.info({ title: 'Info', message });
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+$(function () {
     var root = document.documentElement;
     var savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
         root.dataset.theme = savedTheme;
         if (savedTheme === 'dark') {
-            document.body.classList.remove('bg-light', 'text-dark');
-            document.body.classList.add('bg-dark', 'text-white');
+            $('body').removeClass('bg-light text-dark').addClass('bg-dark text-white');
         } else {
-            document.body.classList.remove('bg-dark', 'text-white');
-            document.body.classList.add('bg-light', 'text-dark');
+            $('body').removeClass('bg-dark text-white').addClass('bg-light text-dark');
         }
     }
 
-    var temaToggle = document.getElementById('temaToggle');
-    var temaSidebar = document.getElementById('temaSidebar');
-    if (temaToggle && temaSidebar) {
-        temaToggle.addEventListener('click', function (e) {
+    var $temaToggle = $('#temaToggle');
+    var $temaSidebar = $('#temaSidebar');
+    if ($temaToggle.length && $temaSidebar.length) {
+        $temaToggle.on('click', function (e) {
             e.preventDefault();
-            temaSidebar.classList.add('show');
+            $temaSidebar.addClass('show');
         });
-        document.addEventListener('click', function (e) {
-            if (!temaSidebar.contains(e.target) && e.target !== temaToggle && !temaToggle.contains(e.target)) {
-                temaSidebar.classList.remove('show');
+        $(document).on('click', function (e) {
+            if (!$temaSidebar.is(e.target) && $temaSidebar.has(e.target).length === 0 && !$temaToggle.is(e.target) && $temaToggle.has(e.target).length === 0) {
+                $temaSidebar.removeClass('show');
             }
         });
     }
-    var menuToggle = document.getElementById('menuToggle');
-    var leftSidebar = document.querySelector('aside.sidebar');
-    var menuCheckbox = document.getElementById('MenuLateralExpandido');
+
+    var $menuToggle = $('#menuToggle');
+    var $leftSidebar = $('aside.sidebar');
+    var $menuCheckbox = $('#MenuLateralExpandido');
     var syncMenu = function () {
-        if (!leftSidebar) return;
+        if (!$leftSidebar.length) return;
         if (window.innerWidth <= 768) {
-            leftSidebar.classList.add('collapsed');
-            if (menuCheckbox) {
-                menuCheckbox.checked = false;
+            $leftSidebar.addClass('collapsed');
+            if ($menuCheckbox.length) {
+                $menuCheckbox.prop('checked', false);
             }
-        } else if (menuCheckbox) {
-            leftSidebar.classList.toggle('collapsed', !menuCheckbox.checked);
+        } else if ($menuCheckbox.length) {
+            $leftSidebar.toggleClass('collapsed', !$menuCheckbox.prop('checked'));
         } else {
-            leftSidebar.classList.remove('collapsed');
+            $leftSidebar.removeClass('collapsed');
         }
     };
 
-    if (menuToggle && leftSidebar) {
-        menuToggle.addEventListener('click', function () {
-            leftSidebar.classList.toggle('collapsed');
-            if (menuCheckbox) {
-                menuCheckbox.checked = !leftSidebar.classList.contains('collapsed');
+    if ($menuToggle.length && $leftSidebar.length) {
+        $menuToggle.on('click', function () {
+            $leftSidebar.toggleClass('collapsed');
+            if ($menuCheckbox.length) {
+                $menuCheckbox.prop('checked', !$leftSidebar.hasClass('collapsed'));
             }
             syncMenu();
         });
     }
 
-    window.addEventListener('resize', syncMenu);
+    $(window).on('resize', syncMenu);
     syncMenu();
 
     AOS.init();
 
-    document.querySelectorAll('input[name="ModoEscuro"]').forEach(function (radio) {
-        radio.addEventListener('change', function () {
-            var theme = this.value === 'true' ? 'dark' : 'light';
-            root.dataset.theme = theme;
-            localStorage.setItem('theme', theme);
-            if (theme === 'dark') {
-                document.body.classList.remove('bg-light', 'text-dark');
-                document.body.classList.add('bg-dark', 'text-white');
-            } else {
-                document.body.classList.remove('bg-dark', 'text-white');
-                document.body.classList.add('bg-light', 'text-dark');
-            }
-        });
+    $('input[name="ModoEscuro"]').on('change', function () {
+        var theme = $(this).val() === 'true' ? 'dark' : 'light';
+        root.dataset.theme = theme;
+        localStorage.setItem('theme', theme);
+        if (theme === 'dark') {
+            $('body').removeClass('bg-light text-dark').addClass('bg-dark text-white');
+        } else {
+            $('body').removeClass('bg-dark text-white').addClass('bg-light text-dark');
+        }
     });
 
-    var headerInput = document.getElementById('CorHeader');
-    if (headerInput) {
-        headerInput.addEventListener('input', function () {
-            root.style.setProperty('--header-bg', this.value);
+    var $headerInput = $('#CorHeader');
+    if ($headerInput.length) {
+        $headerInput.on('input', function () {
+            root.style.setProperty('--header-bg', $(this).val());
         });
     }
 
-    var leftInput = document.getElementById('CorBarraEsquerda');
-    if (leftInput) {
-        leftInput.addEventListener('input', function () {
-            root.style.setProperty('--sidebar-bg', this.value);
+    var $leftInput = $('#CorBarraEsquerda');
+    if ($leftInput.length) {
+        $leftInput.on('input', function () {
+            root.style.setProperty('--sidebar-bg', $(this).val());
         });
     }
 
-    var rightInput = document.getElementById('CorBarraDireita');
-    if (rightInput) {
-        rightInput.addEventListener('input', function () {
-            root.style.setProperty('--rightbar-bg', this.value);
+    var $rightInput = $('#CorBarraDireita');
+    if ($rightInput.length) {
+        $rightInput.on('input', function () {
+            root.style.setProperty('--rightbar-bg', $(this).val());
         });
     }
 
-    var footerInput = document.getElementById('CorFooter');
-    if (footerInput) {
-        footerInput.addEventListener('input', function () {
-            root.style.setProperty('--footer-bg', this.value);
+    var $footerInput = $('#CorFooter');
+    if ($footerInput.length) {
+        $footerInput.on('input', function () {
+            root.style.setProperty('--footer-bg', $(this).val());
         });
     }
 
-    var headerEl = document.querySelector('header.navbar');
-    var footerEl = document.querySelector('footer.footer');
+    var $headerEl = $('header.navbar');
+    var $footerEl = $('footer.footer');
 
-    var headerFix = document.getElementById('HeaderFixo');
-    if (headerFix && headerEl) {
-        headerFix.addEventListener('change', function () {
-            headerEl.classList.toggle('fixed-top', this.checked);
-            document.body.classList.toggle('pt-5', this.checked);
+    var $headerFix = $('#HeaderFixo');
+    if ($headerFix.length && $headerEl.length) {
+        $headerFix.on('change', function () {
+            $headerEl.toggleClass('fixed-top', this.checked);
+            $('body').toggleClass('pt-5', this.checked);
         });
     }
 
-    var footerFix = document.getElementById('FooterFixo');
-    if (footerFix && footerEl) {
-        footerFix.addEventListener('change', function () {
-            footerEl.classList.toggle('fixed-bottom', this.checked);
-            footerEl.classList.toggle('mt-auto', !this.checked);
-            document.body.classList.toggle('pb-5', this.checked);
+    var $footerFix = $('#FooterFixo');
+    if ($footerFix.length && $footerEl.length) {
+        $footerFix.on('change', function () {
+            $footerEl.toggleClass('fixed-bottom', this.checked).toggleClass('mt-auto', !this.checked);
+            $('body').toggleClass('pb-5', this.checked);
         });
     }
 
-    if (menuCheckbox && leftSidebar) {
-        menuCheckbox.addEventListener('change', syncMenu);
+    if ($menuCheckbox.length && $leftSidebar.length) {
+        $menuCheckbox.on('change', syncMenu);
     }
 });
