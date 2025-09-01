@@ -38,3 +38,14 @@ Para compilar a solução:
 dotnet build Sistema.sln -c Release
 ```
 
+
+## Estilos com Sass
+Os estilos do projeto foram organizados com [Sass](https://sass-lang.com/).
+- O arquivo principal `0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss` importa as parciais localizadas em `0 - Apresentacao/Sistema.MVC/wwwroot/css/sass/`.
+- Crie novos parciais com prefixo `_` (por exemplo, `_buttons.scss`) nessa pasta e adicione-os em `site.scss`.
+- Para compilar o SCSS em CSS execute:
+
+```bash
+npm install
+npm run build-css
+```

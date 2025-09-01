@@ -1,0 +1,17 @@
+{
+  "name": "sistema",
+  "version": "1.0.0",
+  "description": "Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.",
+  "main": "index.js",
+  "scripts": {
+    "build-css": "sass --no-source-map \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.css\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "sass": "^1.91.0"
+  }
+}
