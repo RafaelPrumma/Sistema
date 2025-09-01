@@ -28,12 +28,12 @@
                     <form asp-action="Login" method="post" id="loginForm">
                         <div class="mb-3">
                             <label asp-for="Cpf" class="form-label"></label>
-                            <input asp-for="Cpf" class="form-control" />
+                            <input asp-for="Cpf" class="form-control" placeholder="CPF" autocomplete="username" aria-label="CPF" />
                             <span asp-validation-for="Cpf" class="text-danger"></span>
                         </div>
                         <div class="mb-3">
                             <label asp-for="Senha" class="form-label"></label>
-                            <input asp-for="Senha" class="form-control" />
+                            <input asp-for="Senha" class="form-control" type="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha" />
                             <span asp-validation-for="Senha" class="text-danger"></span>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Entrar</button>
