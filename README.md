@@ -49,3 +49,8 @@ Os estilos do projeto foram organizados com [Sass](https://sass-lang.com/).
 npm install
 npm run build-css
 ```
+
+## Scripts com jQuery
+
+- `0 - Apresentacao/Sistema.MVC/wwwroot/js/site.js` agora utiliza jQuery para controlar menus, tema e outras interações.
+- A tag `<html>` do layout foi configurada com `lang="pt-BR"` para indicar o idioma da aplicação.
