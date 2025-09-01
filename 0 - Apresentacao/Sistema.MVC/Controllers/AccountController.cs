@@ -34,34 +34,37 @@ public class AccountController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> Login([FromForm] LoginViewModel model)
+    public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return View(model);
         }
 
         var usuario = await _usuarioService.BuscarPorCpfAsync(model.Cpf);
         if (usuario is null)
         {
-            return Unauthorized(new { message = "Credenciais inválidas" });
+            ModelState.AddModelError(string.Empty, "Credenciais inválidas");
+            return View(model);
         }
 
         var result = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, model.Senha);
         if (result != PasswordVerificationResult.Success)
         {
-            return Unauthorized(new { message = "Credenciais inválidas" });
+            ModelState.AddModelError(string.Empty, "Credenciais inválidas");
+            return View(model);
         }
 
         if (!usuario.Ativo)
         {
-            return Unauthorized(new { message = "Usuário inativo" });
+            ModelState.AddModelError(string.Empty, "Usuário inativo");
+            return View(model);
         }
 
         HttpContext.Session.SetString("AuthToken", Guid.NewGuid().ToString());
         HttpContext.Session.SetInt32("UserId", usuario.Id);
         HttpContext.Session.SetString("UserName", usuario.Nome);
-        return Ok(new { success = true });
+        return RedirectToAction("Index", "Home");
     }
 
     [HttpPost]
