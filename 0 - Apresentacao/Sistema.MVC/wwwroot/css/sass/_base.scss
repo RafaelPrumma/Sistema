@@ -27,10 +27,6 @@ html {
   min-height: 100%;
 }
 
-body {
-  margin-bottom: 60px;
-}
-
 @include mixins.bg-color('vermelho', $vermelho);
 @include mixins.bg-color('roxo', $roxo);
 @include mixins.bg-color('verde', $verde);
