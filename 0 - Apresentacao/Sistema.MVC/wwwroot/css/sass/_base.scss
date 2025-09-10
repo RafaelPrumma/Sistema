@@ -48,7 +48,6 @@ body {
 
 header.navbar,
 footer.footer {
-  position: relative;
   z-index: 1001;
 }
 
@@ -145,4 +144,31 @@ body.bg-dark .card {
 body.bg-dark .card .form-label,
 body.bg-dark .card .card-title {
   color: #f8f9fa;
+}
+
+body.bg-dark .form-control,
+body.bg-dark .form-select {
+  background-color: #2c2f33;
+  color: #f8f9fa;
+  border-color: #495057;
+}
+
+body.bg-dark .form-control::placeholder {
+  color: #adb5bd;
+}
+
+body.bg-dark .table {
+  color: #f8f9fa;
+}
+
+body.bg-dark .table thead th {
+  background-color: #2c2f33;
+}
+
+body.bg-dark .table tbody tr {
+  background-color: #343a40;
+}
+
+body.bg-dark .table tbody tr:nth-of-type(odd) {
+  background-color: #2c2f33;
 }
