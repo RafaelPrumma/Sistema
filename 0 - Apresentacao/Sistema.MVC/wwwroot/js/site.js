@@ -107,8 +107,29 @@ $(function () {
     var $sidebarToggle = $('#sidebarToggle');
     var $sidebar = $('#sidebar');
     if ($sidebarToggle.length && $sidebar.length) {
-        $sidebarToggle.on('click', function () {
-            $sidebar.toggleClass('collapsed');
+        var themeExpanded = $sidebar.data('expanded');
+
+        function applySidebarState() {
+            if ($(window).width() < 768) {
+                $sidebar.addClass('collapsed');
+            } else {
+                $sidebar.toggleClass('collapsed', !themeExpanded);
+            }
+        }
+
+        applySidebarState();
+        $(window).on('resize', applySidebarState);
+
+        $sidebarToggle.on('click', function (e) {
+            e.stopPropagation();
+            $sidebar.addClass('expanded').removeClass('collapsed');
+        });
+
+        $(document).on('click', function (e) {
+            if ($sidebar.hasClass('expanded') && !$sidebar.is(e.target) && $sidebar.has(e.target).length === 0 && !$sidebarToggle.is(e.target) && $sidebarToggle.has(e.target).length === 0) {
+                $sidebar.removeClass('expanded');
+                applySidebarState();
+            }
         });
     }
 

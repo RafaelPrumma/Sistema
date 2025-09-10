@@ -50,7 +50,7 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <button class="btn p-0 border-0 bg-transparent @headerText" type="button" id="sidebarToggle"><i class="bi bi-list @headerText"></i></button>
+                <button class="btn p-0 border-0 bg-transparent @headerText @(menuExpandido ? "d-md-none" : string.Empty)" type="button" id="sidebarToggle"><i class="bi bi-list @headerText"></i></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
@@ -68,7 +68,7 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <nav id="sidebar" class="sidebar sidebar-bg @leftText @(menuExpandido ? string.Empty : "collapsed")">
+            <nav id="sidebar" data-expanded="@(menuExpandido.ToString().ToLower())" class="sidebar sidebar-bg @leftText @(menuExpandido ? string.Empty : "collapsed")">
                 <ul class="nav flex-column">
                     <li class="nav-item">
                         <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
