@@ -30,12 +30,9 @@ window.showInfo = function (message) {
 $(function () {
     var root = document.documentElement;
     var savedTheme = localStorage.getItem('theme');
-    var theme = savedTheme || (root.dataset.theme || ($('body').hasClass('bg-dark') ? 'dark' : 'light'));
-    root.dataset.theme = theme;
+    var theme = savedTheme || (document.body.getAttribute('data-bs-theme') || 'light');
+    document.body.setAttribute('data-bs-theme', theme);
     root.style.colorScheme = theme;
-    $('body')
-        .toggleClass('bg-dark text-white', theme === 'dark')
-        .toggleClass('bg-light text-dark', theme === 'light');
 
     var $temaToggle = $('#temaToggle');
     var $temaSidebar = $('#temaSidebar');
@@ -51,46 +48,13 @@ $(function () {
         });
     }
 
-    var $menuToggle = $('#menuToggle');
-    var $leftSidebar = $('aside.sidebar');
-    var $menuCheckbox = $('#MenuLateralExpandido');
-    var syncMenu = function () {
-        if (!$leftSidebar.length) return;
-        if (window.innerWidth <= 768) {
-            $leftSidebar.addClass('collapsed');
-            if ($menuCheckbox.length) {
-                $menuCheckbox.prop('checked', false);
-            }
-        } else if ($menuCheckbox.length) {
-            $leftSidebar.toggleClass('collapsed', !$menuCheckbox.prop('checked'));
-        } else {
-            $leftSidebar.removeClass('collapsed');
-        }
-    };
-
-    if ($menuToggle.length && $leftSidebar.length) {
-        $menuToggle.on('click', function () {
-            $leftSidebar.toggleClass('collapsed');
-            if ($menuCheckbox.length) {
-                $menuCheckbox.prop('checked', !$leftSidebar.hasClass('collapsed'));
-            }
-            syncMenu();
-        });
-    }
-
-    $(window).on('resize', syncMenu);
-    syncMenu();
-
     AOS.init();
 
     $('input[name="ModoEscuro"]').on('change', function () {
         var theme = $(this).val() === 'true' ? 'dark' : 'light';
-        root.dataset.theme = theme;
+        document.body.setAttribute('data-bs-theme', theme);
         root.style.colorScheme = theme;
         localStorage.setItem('theme', theme);
-        $('body')
-            .toggleClass('bg-dark text-white', theme === 'dark')
-            .toggleClass('bg-light text-dark', theme === 'light');
     });
 
     var $headerInput = $('#CorHeader');
@@ -140,7 +104,4 @@ $(function () {
         });
     }
 
-    if ($menuCheckbox.length && $leftSidebar.length) {
-        $menuCheckbox.on('change', syncMenu);
-    }
 });

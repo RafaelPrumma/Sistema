@@ -1,0 +1,6 @@
+@model Sistema.MVC.Models.PageHeaderViewModel
+<h2>@Model.Title</h2>
+@if (!string.IsNullOrEmpty(Model.Description))
+{
+    <p class="text-muted small">@Model.Description</p>
+}

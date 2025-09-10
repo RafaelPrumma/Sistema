@@ -2,22 +2,24 @@
 @{
     ViewData["Title"] = "Configurações";
 }
-<h2>Configurações - @Model.Agrupamento</h2>
-<div class="card mb-3">
-    <div class="card-body">
-        <form method="get" class="row g-3 mb-3">
-            <div class="col-auto">
-                <input type="text" name="agrupamento" value="@Model.Agrupamento" class="form-control" placeholder="Agrupamento" />
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-secondary">Buscar</button>
-            </div>
-            <div class="col-auto">
-                <a class="btn btn-primary" asp-action="Create" asp-route-agrupamento="@Model.Agrupamento">Nova Configuração</a>
-            </div>
-        </form>
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Configurações",
+    Description = "Gerencie as configurações do sistema."
+})
+
+<form method="get" class="mb-3">
+    <div class="card">
+        <div class="card-body">
+            <input type="text" name="agrupamento" value="@Model.Agrupamento" class="form-control" placeholder="Agrupamento" />
+        </div>
+        <div class="card-footer text-end">
+            <button type="submit" class="btn btn-secondary">Buscar</button>
+            <a class="btn btn-primary" asp-action="Create" asp-route-agrupamento="@Model.Agrupamento">Nova Configuração</a>
+        </div>
     </div>
-</div>
+</form>
 <div class="card">
     <div class="card-body">
         <table class="table mb-0">

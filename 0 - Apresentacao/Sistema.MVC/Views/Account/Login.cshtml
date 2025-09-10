@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
 </head>
-<body>
+<body data-bs-theme="light">
     <div class="container-fluid login-container">
         <div class="row min-vh-100">
             <div class="col-md-6 login-left d-flex flex-column justify-content-center align-items-center text-center p-5">
@@ -26,14 +26,14 @@
                     <h2 class="mb-4 text-center">@ViewData["Title"]</h2>
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <form asp-action="Login" method="post" id="loginForm">
-                        <div class="mb-3">
-                            <label asp-for="Cpf" class="form-label"></label>
-                            <input asp-for="Cpf" class="form-control" placeholder="CPF" autocomplete="username" aria-label="CPF" />
+                        <div class="form-floating mb-3">
+                            <input asp-for="Cpf" class="form-control" autocomplete="username" aria-label="CPF" placeholder="CPF" />
+                            <label asp-for="Cpf"></label>
                             <span asp-validation-for="Cpf" class="text-danger"></span>
                         </div>
-                        <div class="mb-3">
-                            <label asp-for="Senha" class="form-label"></label>
-                            <input asp-for="Senha" class="form-control" type="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha" />
+                        <div class="form-floating mb-3">
+                            <input asp-for="Senha" class="form-control" type="password" autocomplete="current-password" aria-label="Senha" placeholder="Senha" />
+                            <label asp-for="Senha"></label>
                             <span asp-validation-for="Senha" class="text-danger"></span>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Entrar</button>
