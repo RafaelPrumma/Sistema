@@ -104,4 +104,12 @@ $(function () {
         });
     }
 
+    var $sidebarToggle = $('#sidebarToggle');
+    var $sidebar = $('#sidebar');
+    if ($sidebarToggle.length && $sidebar.length) {
+        $sidebarToggle.on('click', function () {
+            $sidebar.toggleClass('collapsed');
+        });
+    }
+
 });

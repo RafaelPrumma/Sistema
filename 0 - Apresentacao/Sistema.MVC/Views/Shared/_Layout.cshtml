@@ -50,7 +50,7 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <button class="btn btn-link @headerText" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas"><i class="bi bi-list"></i></button>
+                <button class="btn p-0 border-0 bg-transparent @headerText" type="button" id="sidebarToggle"><i class="bi bi-list @headerText"></i></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
@@ -68,6 +68,28 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
+            <nav id="sidebar" class="sidebar sidebar-bg @leftText @(menuExpandido ? string.Empty : "collapsed")">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy"><i class="bi bi-shield-lock me-2"></i><span>Privacy</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit"><i class="bi bi-palette me-2"></i><span>Tema</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Configuracao" asp-action="Index"><i class="bi bi-gear me-2"></i><span>Configurações</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Mensagem" asp-action="Index"><i class="bi bi-envelope me-2"></i><span>Mensagens</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText" asp-controller="Documentacao" asp-action="Index"><i class="bi bi-book me-2"></i><span>Documentação</span></a>
+                    </li>
+                </ul>
+            </nav>
             <div class="content flex-grow-1 p-3">
                 <main id="main" role="main" class="pb-3">
                     @RenderBody()
@@ -136,32 +158,6 @@
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
     </aside>
-    <div class="offcanvas offcanvas-start sidebar-bg" tabindex="-1" id="sidebarOffcanvas">
-        <div class="offcanvas-body">
-            <nav aria-label="Menu principal">
-                <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy"><i class="bi bi-shield-lock me-2"></i><span>Privacy</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit"><i class="bi bi-palette me-2"></i><span>Tema</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Configuracao" asp-action="Index"><i class="bi bi-gear me-2"></i><span>Configurações</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Mensagem" asp-action="Index"><i class="bi bi-envelope me-2"></i><span>Mensagens</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Documentacao" asp-action="Index"><i class="bi bi-book me-2"></i><span>Documentação</span></a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-    </div>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
