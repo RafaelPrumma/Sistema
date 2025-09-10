@@ -46,10 +46,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Sistema.MVC</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
-    <link rel="stylesheet" href="~/dist/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/Sistema.MVC.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="@bodyClass">
+<body class="@bodyClass @(headerFixo ? "pt-5" : string.Empty)">
     <a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">

@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="compilerconfig.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="compilerconfig.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\1 - Aplicacao\Sistema.APP\Sistema.APP.csproj" />
     <ProjectReference Include="..\..\3 - Infraestrutura\Sistema.INFRA\Sistema.INFRA.csproj" />
   </ItemGroup>
