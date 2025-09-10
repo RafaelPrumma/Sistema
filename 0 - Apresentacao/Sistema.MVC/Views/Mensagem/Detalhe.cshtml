@@ -2,12 +2,24 @@
 @{
     ViewData["Title"] = Model.Assunto;
 }
-<h2>@Model.Assunto</h2>
-<div>
-    <strong>De:</strong> @Model.RemetenteNome<br />
-    <strong>Para:</strong> @Model.DestinatarioNome<br />
-    <strong>Data:</strong> @Model.DataInclusao.ToLocalTime().ToString("g")
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.Assunto,
+    Description = "Detalhes da mensagem."
+})
+
+<div class="card">
+    <div class="card-body">
+        <div>
+            <strong>De:</strong> @Model.RemetenteNome<br />
+            <strong>Para:</strong> @Model.DestinatarioNome<br />
+            <strong>Data:</strong> @Model.DataInclusao.ToLocalTime().ToString("g")
+        </div>
+        <hr />
+        <div>@Model.Corpo</div>
+    </div>
+    <div class="card-footer text-end">
+        <a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-secondary">Responder</a>
+    </div>
 </div>
-<hr />
-<div>@Model.Corpo</div>
-<a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-secondary mt-3">Responder</a>

@@ -2,10 +2,16 @@
 @{
     ViewData["Title"] = "Tema";
 }
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Tema",
+    Description = "Personalize o sistema com suas preferências."
+})
+
 <div class="card">
+    <form asp-action="Edit" method="post">
     <div class="card-body">
-        <h2 class="card-title">Preferências de Tema</h2>
-        <form asp-action="Edit" method="post">
     <div class="mb-3">
         <label class="form-label">Modo</label>
         <div class="form-check">
@@ -17,21 +23,21 @@
             <label class="form-check-label">Escuro</label>
         </div>
     </div>
-    <div class="mb-3">
-        <label class="form-label" for="CorHeader">Cor do Header</label>
-        <input type="color" class="form-control form-control-color" asp-for="CorHeader" />
+    <div class="form-floating mb-3">
+        <input type="color" class="form-control form-control-color" asp-for="CorHeader" placeholder="Cor do Header" />
+        <label asp-for="CorHeader"></label>
     </div>
-    <div class="mb-3">
-        <label class="form-label" for="CorBarraEsquerda">Barra Lateral Esquerda</label>
-        <input type="color" class="form-control form-control-color" asp-for="CorBarraEsquerda" />
+    <div class="form-floating mb-3">
+        <input type="color" class="form-control form-control-color" asp-for="CorBarraEsquerda" placeholder="Barra Lateral Esquerda" />
+        <label asp-for="CorBarraEsquerda"></label>
     </div>
-    <div class="mb-3">
-        <label class="form-label" for="CorBarraDireita">Barra Lateral Direita</label>
-        <input type="color" class="form-control form-control-color" asp-for="CorBarraDireita" />
+    <div class="form-floating mb-3">
+        <input type="color" class="form-control form-control-color" asp-for="CorBarraDireita" placeholder="Barra Lateral Direita" />
+        <label asp-for="CorBarraDireita"></label>
     </div>
-    <div class="mb-3">
-        <label class="form-label" for="CorFooter">Rodapé</label>
-        <input type="color" class="form-control form-control-color" asp-for="CorFooter" />
+    <div class="form-floating mb-3">
+        <input type="color" class="form-control form-control-color" asp-for="CorFooter" placeholder="Rodapé" />
+        <label asp-for="CorFooter"></label>
     </div>
     <div class="form-check form-switch mb-2">
         <input class="form-check-input" type="checkbox" asp-for="HeaderFixo" />
@@ -45,7 +51,9 @@
         <input class="form-check-input" type="checkbox" asp-for="MenuLateralExpandido" />
         <label class="form-check-label" asp-for="MenuLateralExpandido">Menu expandido</label>
     </div>
-    <button type="submit" class="btn btn-primary">Salvar</button>
-        </form>
     </div>
+    <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary">Salvar</button>
+    </div>
+    </form>
 </div>

@@ -2,41 +2,49 @@
 @{
     ViewData["Title"] = "Editar Configuração";
 }
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Configurações",
+    Description = "Atualize as configurações do sistema."
+})
+
 <div class="card">
-    <div class="card-body">
-        <h2 class="card-title">@ViewData["Title"]</h2>
-        <form asp-action="Edit" method="post">
+    <form asp-action="Edit" method="post">
     <input type="hidden" asp-for="Id" />
-    <div class="mb-3">
-        <label asp-for="Agrupamento" class="form-label"></label>
-        <input asp-for="Agrupamento" class="form-control" />
+    <div class="card-body">
+    <div class="form-floating mb-3">
+        <input asp-for="Agrupamento" class="form-control" placeholder="Agrupamento" />
+        <label asp-for="Agrupamento"></label>
         <span asp-validation-for="Agrupamento" class="text-danger"></span>
     </div>
-    <div class="mb-3">
-        <label asp-for="Chave" class="form-label"></label>
-        <input asp-for="Chave" class="form-control" />
+    <div class="form-floating mb-3">
+        <input asp-for="Chave" class="form-control" placeholder="Chave" />
+        <label asp-for="Chave"></label>
         <span asp-validation-for="Chave" class="text-danger"></span>
     </div>
-    <div class="mb-3">
-        <label asp-for="Valor" class="form-label"></label>
-        <input asp-for="Valor" class="form-control" />
+    <div class="form-floating mb-3">
+        <input asp-for="Valor" class="form-control" placeholder="Valor" />
+        <label asp-for="Valor"></label>
     </div>
-    <div class="mb-3">
-        <label asp-for="Tipo" class="form-label"></label>
+    <div class="form-floating mb-3">
         <select asp-for="Tipo" class="form-select" asp-items="Html.GetEnumSelectList<ConfiguracaoTipo>()"></select>
+        <label asp-for="Tipo"></label>
     </div>
-    <div class="mb-3">
-        <label asp-for="Descricao" class="form-label"></label>
-        <input asp-for="Descricao" class="form-control" />
+    <div class="form-floating mb-3">
+        <input asp-for="Descricao" class="form-control" placeholder="Descrição" />
+        <label asp-for="Descricao"></label>
     </div>
-    <div class="mb-3 form-check">
+    <div class="form-check mb-3">
         <input asp-for="Ativo" class="form-check-input" />
         <label asp-for="Ativo" class="form-check-label"></label>
     </div>
-    <button type="submit" class="btn btn-primary">Salvar</button>
-    <a asp-action="Index" asp-route-agrupamento="@Model.Agrupamento" class="btn btn-secondary">Cancelar</a>
-        </form>
     </div>
+    <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary">Salvar</button>
+        <a asp-action="Index" asp-route-agrupamento="@Model.Agrupamento" class="btn btn-secondary">Cancelar</a>
+    </div>
+    </form>
 </div>
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")

@@ -3,20 +3,32 @@
     var destinatarioId = ViewBag.DestinatarioId as int?;
     var mensagemPaiId = ViewBag.MensagemPaiId as int?;
 }
-<h2>Nova mensagem</h2>
-<form method="post">
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Mensagens",
+    Description = "Envie uma nova mensagem."
+})
+
+<div class="card">
+    <form method="post">
     <input type="hidden" name="mensagemPaiId" value="@mensagemPaiId" />
-    <div class="mb-3">
-        <label>Destinatário</label>
-        <input type="number" name="destinatarioId" class="form-control" value="@destinatarioId" required />
+    <div class="card-body">
+        <div class="mb-3">
+            <label>Destinatário</label>
+            <input type="number" name="destinatarioId" class="form-control" value="@destinatarioId" required />
+        </div>
+        <div class="mb-3">
+            <label>Assunto</label>
+            <input type="text" name="assunto" class="form-control" required />
+        </div>
+        <div class="mb-3">
+            <label>Corpo</label>
+            <textarea name="corpo" class="form-control" rows="5"></textarea>
+        </div>
     </div>
-    <div class="mb-3">
-        <label>Assunto</label>
-        <input type="text" name="assunto" class="form-control" required />
+    <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary">Enviar</button>
     </div>
-    <div class="mb-3">
-        <label>Corpo</label>
-        <textarea name="corpo" class="form-control" rows="5"></textarea>
-    </div>
-    <button type="submit" class="btn btn-primary">Enviar</button>
-</form>
+    </form>
+</div>
