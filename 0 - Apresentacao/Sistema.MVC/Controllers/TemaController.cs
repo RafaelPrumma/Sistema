@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
+using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
@@ -15,10 +16,42 @@ public class TemaController : Controller
         _temaService = temaService;
     }
 
+    private int? ObterUsuarioId()
+    {
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (userId.HasValue)
+            return userId.Value;
+
+        var claimId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(claimId, out var parsedId))
+        {
+            HttpContext.Session.SetInt32("UserId", parsedId);
+            return parsedId;
+        }
+
+        return null;
+    }
+
+    private string ObterUsuarioNome()
+    {
+        var userName = HttpContext.Session.GetString("UserName");
+        if (!string.IsNullOrWhiteSpace(userName))
+            return userName;
+
+        var claimName = User.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(claimName))
+        {
+            HttpContext.Session.SetString("UserName", claimName);
+            return claimName;
+        }
+
+        return "system";
+    }
+
     [HttpGet]
     public async Task<IActionResult> Edit()
     {
-        var userId = HttpContext.Session.GetInt32("UserId");
+        var userId = ObterUsuarioId();
         if (userId is null)
             return RedirectToAction("Login", "Account");
         var tema = await _temaService.BuscarPorUsuarioIdAsync(userId.Value);
@@ -42,10 +75,10 @@ public class TemaController : Controller
         if (!ModelState.IsValid)
             return View(model);
 
-        var userId = HttpContext.Session.GetInt32("UserId");
+        var userId = ObterUsuarioId();
         if (userId is null)
             return RedirectToAction("Login", "Account");
-        var userName = HttpContext.Session.GetString("UserName") ?? "system";
+        var userName = ObterUsuarioNome();
         var tema = new Tema
         {
             UsuarioId = userId.Value,

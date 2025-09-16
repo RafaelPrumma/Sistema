@@ -2,8 +2,21 @@
 @using System.Globalization
 @inject Sistema.CORE.Services.Interfaces.ITemaService TemaService
 @{
-    var userId = Context.Session.GetInt32("UserId") ?? 0;
-    var userName = Context.Session.GetString("UserName") ?? "Usuário";
+    var sessionUserId = Context.Session.GetInt32("UserId");
+    var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var userId = sessionUserId ?? (int.TryParse(claimUserId, out var parsedId) ? parsedId : 0);
+    if (sessionUserId is null && userId > 0)
+    {
+        Context.Session.SetInt32("UserId", userId);
+    }
+
+    var sessionUserName = Context.Session.GetString("UserName");
+    var claimUserName = User.Identity?.Name;
+    var userName = !string.IsNullOrWhiteSpace(sessionUserName) ? sessionUserName : (claimUserName ?? "Usuário");
+    if (sessionUserName is null && !string.IsNullOrWhiteSpace(claimUserName))
+    {
+        Context.Session.SetString("UserName", claimUserName);
+    }
     var tema = userId > 0 ? await TemaService.BuscarPorUsuarioIdAsync(userId) : null;
     string headerColor = tema?.CorHeader ?? "#0d6efd";
     string leftColor = tema?.CorBarraEsquerda ?? "#0d6efd";

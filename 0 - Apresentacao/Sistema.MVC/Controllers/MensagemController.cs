@@ -4,6 +4,8 @@ using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using AutoMapper;
 using System;
+using System.Linq;
+using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers
 {
@@ -18,10 +20,26 @@ namespace Sistema.MVC.Controllers
             _mapper = mapper;
         }
 
+        private int? ObterUsuarioId()
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId.HasValue)
+                return userId.Value;
+
+            var claimId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(claimId, out var parsedId))
+            {
+                HttpContext.Session.SetInt32("UserId", parsedId);
+                return parsedId;
+            }
+
+            return null;
+        }
+
         [HttpGet]
         public async Task<IActionResult> Index(int page = 1, int pageSize = 20, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null)
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
+            var userId = ObterUsuarioId();
             if (userId is null) return RedirectToAction("Login", "Account");
             var result = await _mensagemService.BuscarCaixaEntradaAsync(userId.Value, page, pageSize, remetenteId, palavraChave, inicio, fim);
             var model = new MensagemViewModel
@@ -49,20 +67,20 @@ namespace Sistema.MVC.Controllers
         [HttpPost]
         public async Task<IActionResult> Nova(int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null)
         {
-            var remetenteId = HttpContext.Session.GetInt32("UserId");
+            var remetenteId = ObterUsuarioId();
             if (remetenteId is null) return RedirectToAction("Login", "Account");
-            await _mensagemService.EnviarAsync(remetenteId, destinatarioId, assunto, corpo, mensagemPaiId);
+            await _mensagemService.EnviarAsync(remetenteId.Value, destinatarioId, assunto, corpo, mensagemPaiId);
             return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
         public async Task<IActionResult> Detalhe(int id)
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
+            var userId = ObterUsuarioId();
             if (userId is null) return RedirectToAction("Login", "Account");
             var msg = await _mensagemService.BuscarPorIdAsync(id);
             if (msg == null) return NotFound();
-            if (msg.DestinatarioId == userId) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
+            if (msg.DestinatarioId == userId.Value) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
             return View(_mapper.Map<Sistema.APP.DTOs.MensagemDto>(msg));
         }
     }
