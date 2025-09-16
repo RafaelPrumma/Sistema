@@ -5,6 +5,10 @@ using Sistema.CORE.Entities;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
@@ -64,6 +68,15 @@ public class AccountController : Controller
         HttpContext.Session.SetString("AuthToken", Guid.NewGuid().ToString());
         HttpContext.Session.SetInt32("UserId", usuario.Id);
         HttpContext.Session.SetString("UserName", usuario.Nome);
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new Claim(ClaimTypes.Name, usuario.Nome)
+        };
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity));
         return RedirectToAction("Index", "Home");
     }
 
@@ -177,11 +190,10 @@ public class AccountController : Controller
     }
 
     [HttpGet]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout()
     {
-        HttpContext.Session.Remove("AuthToken");
-        HttpContext.Session.Remove("UserId");
-        HttpContext.Session.Remove("UserName");
+        HttpContext.Session.Clear();
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login");
     }
 }
