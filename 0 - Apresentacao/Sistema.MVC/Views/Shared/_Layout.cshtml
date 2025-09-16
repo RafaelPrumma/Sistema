@@ -43,6 +43,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Sistema.MVC</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
+    <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
+    <link rel="stylesheet" href="~/lib/aos/aos.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body data-bs-theme="@(modoEscuro ? "dark" : "light")" class="@(headerFixo ? "pt-5" : string.Empty)">
@@ -103,10 +107,10 @@
         </footer>
     </div>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/izimodal/js/iziModal.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    <script src="~/lib/jquery/dist/jquery.js"></script>
+    <script src="~/lib/izitoast/js/iziToast.min.js"></script>
+    <script src="~/lib/izimodal/js/iziModal.min.js"></script>
+    <script src="~/lib/aos/aos.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
 

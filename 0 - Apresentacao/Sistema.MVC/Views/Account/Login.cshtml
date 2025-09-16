@@ -11,6 +11,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Sistema</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
+    <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
+    <link rel="stylesheet" href="~/lib/aos/aos.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
 </head>
@@ -49,6 +53,10 @@
 
     <div id="loadingModal"></div>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
+    <script src="~/lib/jquery/dist/jquery.js"></script>
+    <script src="~/lib/izitoast/js/iziToast.min.js"></script>
+    <script src="~/lib/izimodal/js/iziModal.min.js"></script>
+    <script src="~/lib/aos/aos.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/login.js" asp-append-version="true"></script>
     @await Html.PartialAsync("_ValidationScriptsPartial")
