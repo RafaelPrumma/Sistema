@@ -92,5 +92,12 @@ namespace Sistema.CORE.Services
             }
             return new OperationResult(true, string.Empty);
         }
+
+        public Task<int> ContarNaoLidasAsync(int usuarioId, CancellationToken cancellationToken = default)
+        {
+            var total = _uow.Mensagens.Query()
+                .Count(m => m.DestinatarioId == usuarioId && !m.Lida);
+            return Task.FromResult(total);
+        }
     }
 }

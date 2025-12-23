@@ -1,7 +1,8 @@
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
 @inject Sistema.CORE.Services.Interfaces.ITemaService TemaService
-@{
+@inject Sistema.CORE.Services.Interfaces.IMensagemService MensagemService
+@{ 
     var sessionUserId = Context.Session.GetInt32("UserId");
     var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
     var userId = sessionUserId ?? (int.TryParse(claimUserId, out var parsedId) ? parsedId : 0);
@@ -26,6 +27,7 @@
     bool headerFixo = tema?.HeaderFixo ?? false;
     bool footerFixo = tema?.FooterFixo ?? false;
     bool menuExpandido = tema?.MenuLateralExpandido ?? true;
+    var unreadMessages = userId > 0 ? await MensagemService.ContarNaoLidasAsync(userId) : 0;
     var userInitial = !string.IsNullOrWhiteSpace(userName)
         ? char.ToUpper(userName.Trim()[0], CultureInfo.CurrentCulture).ToString()
         : "U";
@@ -129,7 +131,10 @@
                     <li class="nav-item">
                         <a class="nav-link @leftText @IsActive("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
                             <i class="bi bi-envelope me-2"></i><span>Mensagens</span>
-                            <span class="badge bg-primary ms-auto">3</span>
+                            @if (unreadMessages > 0)
+                            {
+                                <span class="badge bg-primary ms-auto">@unreadMessages</span>
+                            }
                         </a>
                     </li>
                     <li class="nav-header text-uppercase small">Personalização</li>
