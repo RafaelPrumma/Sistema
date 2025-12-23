@@ -12,6 +12,7 @@ public static class ComercialUserSeed
         {
             Nome = "Allison",
             Cpf = "00000000001",
+            Email = "comercial@sistema.test",
             PerfilId = 2,
             UsuarioInclusao = "seed",
             Ativo = true
