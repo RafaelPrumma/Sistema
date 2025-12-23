@@ -94,6 +94,7 @@ public class AccountController : Controller
             {
                 Nome = model.Nome,
                 Cpf = model.Cpf,
+                Email = model.Email,
                 PerfilId = 2,
                 UsuarioInclusao = model.Cpf,
                 Ativo = true
@@ -125,7 +126,7 @@ public class AccountController : Controller
         try
         {
             var usuario = await _usuarioService.BuscarPorCpfAsync(model.Cpf);
-            if (usuario is null)
+            if (usuario is null || !string.Equals(usuario.Email, model.Email, StringComparison.OrdinalIgnoreCase))
             {
                 return NotFound(new { message = "Usuário não encontrado" });
             }

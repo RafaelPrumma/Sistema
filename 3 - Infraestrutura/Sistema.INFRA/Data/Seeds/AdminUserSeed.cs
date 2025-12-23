@@ -12,6 +12,7 @@ public static class AdminUserSeed
         {
             Nome = "Rafael",
             Cpf = "00000000000",
+            Email = "admin@sistema.test",
             PerfilId = 1,
             UsuarioInclusao = "seed",
             Ativo = true
