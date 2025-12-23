@@ -127,11 +127,35 @@
         const $sidebar = $('#sidebar');
         if ($sidebarToggle.length && $sidebar.length) {
             const themeExpanded = $sidebar.data('expanded');
+            const $sidebarBackdrop = $('<div class="sidebar-backdrop" aria-hidden="true"></div>');
+
+            function attachBackdrop() {
+                if (!$sidebarBackdrop.parent().length) {
+                    $('body').append($sidebarBackdrop);
+                }
+            }
+
+            function showBackdrop() {
+                attachBackdrop();
+                $sidebarBackdrop.addClass('show');
+                $('body').addClass('sidebar-open');
+            }
+
+            function hideBackdrop() {
+                $sidebarBackdrop.removeClass('show');
+                $('body').removeClass('sidebar-open');
+            }
 
             function applySidebarState() {
-                if ($(window).width() < 768) {
+                const isMobile = $(window).width() < 768;
+                if (isMobile) {
                     $sidebar.addClass('collapsed');
+                    if (!$sidebar.hasClass('expanded')) {
+                        hideBackdrop();
+                    }
                 } else {
+                    hideBackdrop();
+                    $sidebar.removeClass('expanded');
                     $sidebar.toggleClass('collapsed', !themeExpanded);
                 }
             }
@@ -141,7 +165,13 @@
 
             $sidebarToggle.on('click', function (e) {
                 e.stopPropagation();
-                $sidebar.addClass('expanded').removeClass('collapsed');
+                const isMobile = $(window).width() < 768;
+                if (isMobile) {
+                    $sidebar.addClass('expanded').removeClass('collapsed');
+                    showBackdrop();
+                } else {
+                    $sidebar.toggleClass('collapsed');
+                }
             });
 
             $(document).on('click', function (e) {
@@ -153,8 +183,23 @@
                     $sidebarToggle.has(e.target).length === 0
                 ) {
                     $sidebar.removeClass('expanded');
+                    hideBackdrop();
                     applySidebarState();
                 }
+            });
+
+            $(document).on('keydown', function (e) {
+                if (e.key === 'Escape' && $sidebar.hasClass('expanded')) {
+                    $sidebar.removeClass('expanded');
+                    hideBackdrop();
+                    applySidebarState();
+                }
+            });
+
+            $sidebarBackdrop.on('click', function () {
+                $sidebar.removeClass('expanded');
+                hideBackdrop();
+                applySidebarState();
             });
         }
     });

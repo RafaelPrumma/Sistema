@@ -26,6 +26,18 @@
     bool headerFixo = tema?.HeaderFixo ?? false;
     bool footerFixo = tema?.FooterFixo ?? false;
     bool menuExpandido = tema?.MenuLateralExpandido ?? true;
+    var userInitial = !string.IsNullOrWhiteSpace(userName)
+        ? char.ToUpper(userName.Trim()[0], CultureInfo.CurrentCulture).ToString()
+        : "U";
+
+    string IsActive(string controller, string? action = null)
+    {
+        var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+        var controllerMatch = string.Equals(controller, currentController, StringComparison.OrdinalIgnoreCase);
+        var actionMatch = action is null || string.Equals(action, currentAction, StringComparison.OrdinalIgnoreCase);
+        return controllerMatch && actionMatch ? "active" : string.Empty;
+    }
     string GetTextClass(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return "text-dark";
@@ -86,24 +98,55 @@
         </header>
         <div class="flex-grow-1 d-flex">
             <nav id="sidebar" data-expanded="@(menuExpandido.ToString().ToLower())" class="sidebar sidebar-bg @leftText @(menuExpandido ? string.Empty : "collapsed")">
+                <div class="sidebar-brand @leftText">
+                    <div class="sidebar-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
+                        <i class="bi bi-grid-1x2-fill"></i>
+                    </div>
+                    <div class="sidebar-brand-text">
+                        <small class="text-opacity-75 d-block">Painel</small>
+                        <span class="fw-semibold">Sistema.MVC</span>
+                    </div>
+                </div>
+                <div class="sidebar-user px-3 py-3 d-flex align-items-center @leftText">
+                    <div class="sidebar-avatar me-3">@userInitial</div>
+                    <div class="sidebar-user-text">
+                        <div class="fw-semibold text-truncate">@userName</div>
+                        <small class="text-opacity-75">Bem-vindo(a)</small>
+                    </div>
+                </div>
                 <ul class="nav flex-column">
+                    <li class="nav-header text-uppercase small">Principal</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-2"></i><span>Home</span></a>
+                        <a class="nav-link @leftText @IsActive("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
+                            <i class="bi bi-house me-2"></i><span>Home</span>
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Home" asp-action="Privacy"><i class="bi bi-shield-lock me-2"></i><span>Privacy</span></a>
+                        <a class="nav-link @leftText @IsActive("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
+                            <i class="bi bi-shield-lock me-2"></i><span>Privacy</span>
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Tema" asp-action="Edit"><i class="bi bi-palette me-2"></i><span>Tema</span></a>
+                        <a class="nav-link @leftText @IsActive("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
+                            <i class="bi bi-envelope me-2"></i><span>Mensagens</span>
+                            <span class="badge bg-primary ms-auto">3</span>
+                        </a>
+                    </li>
+                    <li class="nav-header text-uppercase small">Personalização</li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText @IsActive("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
+                            <i class="bi bi-palette me-2"></i><span>Tema</span>
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Configuracao" asp-action="Index"><i class="bi bi-gear me-2"></i><span>Configurações</span></a>
+                        <a class="nav-link @leftText @IsActive("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
+                            <i class="bi bi-gear me-2"></i><span>Configurações</span>
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Mensagem" asp-action="Index"><i class="bi bi-envelope me-2"></i><span>Mensagens</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText" asp-controller="Documentacao" asp-action="Index"><i class="bi bi-book me-2"></i><span>Documentação</span></a>
+                        <a class="nav-link @leftText @IsActive("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
+                            <i class="bi bi-book me-2"></i><span>Documentação</span>
+                        </a>
                     </li>
                 </ul>
             </nav>
