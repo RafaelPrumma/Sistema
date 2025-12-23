@@ -1,31 +1,21 @@
 @model Sistema.MVC.Models.MensagemViewModel
 @{
-    ViewData["Title"] = "Caixa de Entrada";
+    ViewData["Title"] = "Caixa de Saída";
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
     Title = "Mensagens",
-    Description = "Visualize e gerencie suas mensagens."
+    Description = "Visualize mensagens enviadas."
 })
 
-<form method="get" class="mb-3">
-    <div class="card">
-        <div class="card-body">
-            <input type="text" name="palavraChave" class="form-control" placeholder="Buscar" value="@Model.PalavraChave" />
-        </div>
-        <div class="card-footer text-end">
-            <button type="submit" class="btn btn-secondary">Buscar</button>
-        </div>
-    </div>
-</form>
 <div class="card">
     <div class="card-body p-0">
         <table class="table mb-0">
             <thead>
                 <tr>
                     <th>Assunto</th>
-                    <th>Remetente</th>
+                    <th>Destinatário</th>
                     <th>Data</th>
                     <th></th>
                 </tr>
@@ -33,9 +23,9 @@
             <tbody>
             @foreach (var m in Model.Mensagens)
             {
-                <tr class="@(m.Lida ? "" : "fw-bold")">
+                <tr>
                     <td>@m.Assunto</td>
-                    <td>@m.RemetenteNome</td>
+                    <td>@m.DestinatarioNome</td>
                     <td>@m.DataInclusao.ToLocalTime().ToString("g")</td>
                     <td><a href="@Url.Action("Detalhe", new { id = m.Id })">Abrir</a></td>
                 </tr>
@@ -44,7 +34,7 @@
         </table>
     </div>
     <div class="card-footer text-end">
-        <a href="@Url.Action("CaixaSaida")" class="btn btn-outline-secondary me-2">Caixa de saída</a>
+        <a href="@Url.Action("Index")" class="btn btn-outline-secondary me-2">Caixa de entrada</a>
         <a href="@Url.Action("Nova")" class="btn btn-primary">Nova mensagem</a>
     </div>
 </div>

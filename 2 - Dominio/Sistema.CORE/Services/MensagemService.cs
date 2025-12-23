@@ -53,6 +53,17 @@ namespace Sistema.CORE.Services
 
         public async Task<OperationResult<int>> EnviarAsync(int? remetenteId, int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null, CancellationToken cancellationToken = default)
         {
+            var destinatario = await _uow.Usuarios.BuscarPorIdAsync(destinatarioId, cancellationToken);
+            if (destinatario is null)
+                return new OperationResult<int>(false, "Destinatário não encontrado");
+
+            if (remetenteId.HasValue)
+            {
+                var remetente = await _uow.Usuarios.BuscarPorIdAsync(remetenteId.Value, cancellationToken);
+                if (remetente is null)
+                    return new OperationResult<int>(false, "Remetente não encontrado");
+            }
+
             var msg = new Mensagem
             {
                 RemetenteId = remetenteId,
