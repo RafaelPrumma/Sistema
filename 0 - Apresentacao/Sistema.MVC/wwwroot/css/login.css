@@ -7,6 +7,10 @@
     color: #fff;
 }
 
+.auth-modal-content {
+    padding: 1.5rem;
+}
+
 /* Improve focus visibility for input fields */
 .form-control:focus {
     border-color: #0058a3;

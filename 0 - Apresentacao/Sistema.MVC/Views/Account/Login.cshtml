@@ -61,10 +61,14 @@
     <script src="~/js/login.js" asp-append-version="true"></script>
     @await Html.PartialAsync("_ValidationScriptsPartial")
     <div id="registerModal" style="display:none">
-        @await Html.PartialAsync("_RegisterPartial", new Sistema.MVC.Models.RegisterViewModel())
+        <div class="auth-modal-content">
+            @await Html.PartialAsync("_RegisterPartial", new Sistema.MVC.Models.RegisterViewModel())
+        </div>
     </div>
     <div id="forgotModal" style="display:none">
-        @await Html.PartialAsync("_ForgotPasswordPartial", new Sistema.MVC.Models.ForgotPasswordViewModel())
+        <div class="auth-modal-content">
+            @await Html.PartialAsync("_ForgotPasswordPartial", new Sistema.MVC.Models.ForgotPasswordViewModel())
+        </div>
     </div>
 </body>
 </html>
