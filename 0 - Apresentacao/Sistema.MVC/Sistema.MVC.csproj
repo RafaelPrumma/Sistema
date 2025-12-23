@@ -15,6 +15,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\1 - Aplicacao\Sistema.APP\Sistema.APP.csproj" />
     <ProjectReference Include="..\..\3 - Infraestrutura\Sistema.INFRA\Sistema.INFRA.csproj" />
   </ItemGroup>
