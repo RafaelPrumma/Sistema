@@ -66,7 +66,11 @@
         }
 
         if (window.AOS && typeof window.AOS.init === 'function') {
-            window.AOS.init();
+            window.AOS.init({
+                duration: 750,
+                easing: 'ease-out-quart',
+                once: true,
+            });
         }
 
         $('input[name="ModoEscuro"]').on('change', function () {
