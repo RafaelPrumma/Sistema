@@ -31,6 +31,24 @@ public class AccountController : Controller
         _logger = logger;
     }
 
+    private int? ObterUsuarioId()
+    {
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (userId.HasValue)
+        {
+            return userId.Value;
+        }
+
+        var claimId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(claimId, out var parsedId))
+        {
+            HttpContext.Session.SetInt32("UserId", parsedId);
+            return parsedId;
+        }
+
+        return null;
+    }
+
     [HttpGet]
     public IActionResult Login()
     {
@@ -188,6 +206,71 @@ public class AccountController : Controller
         }
         ModelState.AddModelError(string.Empty, result.Message);
         return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult ChangePassword()
+    {
+        if (ObterUsuarioId() is null)
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        return View(new ChangePasswordViewModel());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var usuarioId = ObterUsuarioId();
+        if (usuarioId is null)
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var usuario = await _usuarioService.BuscarPorIdAsync(usuarioId.Value);
+        if (usuario is null)
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            HttpContext.Session.Clear();
+            return RedirectToAction(nameof(Login));
+        }
+
+        var senhaAtualValida = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, model.SenhaAtual);
+        if (senhaAtualValida != PasswordVerificationResult.Success)
+        {
+            ModelState.AddModelError(nameof(model.SenhaAtual), "Senha atual incorreta");
+            return View(model);
+        }
+
+        var senhaIgualAtual = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, model.NovaSenha) == PasswordVerificationResult.Success;
+        if (senhaIgualAtual)
+        {
+            ModelState.AddModelError(nameof(model.NovaSenha), "A nova senha deve ser diferente da atual");
+            return View(model);
+        }
+
+        usuario.SenhaHash = _hasher.HashPassword(usuario, model.NovaSenha);
+        usuario.UsuarioAlteracao = usuario.Cpf;
+        usuario.ResetToken = null;
+        usuario.ResetTokenExpiration = null;
+
+        var result = await _usuarioService.AtualizarAsync(usuario);
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.Message);
+            return View(model);
+        }
+
+        ViewBag.Sucesso = "Senha alterada com sucesso.";
+        ModelState.Clear();
+        return View(new ChangePasswordViewModel());
     }
 
     [HttpGet]

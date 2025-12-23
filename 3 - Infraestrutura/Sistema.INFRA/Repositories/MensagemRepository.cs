@@ -34,7 +34,10 @@ namespace Sistema.INFRA.Repositories
 
         public IQueryable<Mensagem> Query()
         {
-            return _context.Mensagens.AsNoTracking();
+            return _context.Mensagens
+                .Include(m => m.Remetente)
+                .Include(m => m.Destinatario)
+                .AsNoTracking();
         }
 
         public void Update(Mensagem mensagem)

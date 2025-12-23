@@ -1,22 +1,26 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using AutoMapper;
 using System;
 using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Sistema.MVC.Controllers
 {
     public class MensagemController : Controller
     {
         private readonly IMensagemService _mensagemService;
+        private readonly IUsuarioService _usuarioService;
         private readonly IMapper _mapper;
 
-        public MensagemController(IMensagemService mensagemService, IMapper mapper)
+        public MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IMapper mapper)
         {
             _mensagemService = mensagemService;
+            _usuarioService = usuarioService;
             _mapper = mapper;
         }
 
@@ -34,6 +38,24 @@ namespace Sistema.MVC.Controllers
             }
 
             return null;
+        }
+
+        private async Task<NovaMensagemViewModel> CriarNovaMensagemViewModelAsync(int? destinatarioId, int? mensagemPaiId)
+        {
+            var usuarios = await _usuarioService.BuscarTodosAsync(1, 1000);
+            var remetenteId = ObterUsuarioId();
+            var destinatarios = usuarios.Items
+                .Where(u => !remetenteId.HasValue || u.Id != remetenteId.Value)
+                .OrderBy(u => u.Nome)
+                .Select(u => new SelectListItem($"{u.Nome} (#{u.Id})", u.Id.ToString()))
+                .ToList();
+
+            return new NovaMensagemViewModel
+            {
+                DestinatarioId = destinatarioId,
+                MensagemPaiId = mensagemPaiId,
+                Destinatarios = destinatarios
+            };
         }
 
         [HttpGet]
@@ -57,19 +79,35 @@ namespace Sistema.MVC.Controllers
         }
 
         [HttpGet]
-        public IActionResult Nova(int? mensagemPaiId = null, int? destinatarioId = null)
-        {
-            ViewBag.MensagemPaiId = mensagemPaiId;
-            ViewBag.DestinatarioId = destinatarioId;
-            return View();
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Nova(int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null)
+        public async Task<IActionResult> Nova(int? mensagemPaiId = null, int? destinatarioId = null)
         {
             var remetenteId = ObterUsuarioId();
             if (remetenteId is null) return RedirectToAction("Login", "Account");
-            await _mensagemService.EnviarAsync(remetenteId.Value, destinatarioId, assunto, corpo, mensagemPaiId);
+            var model = await CriarNovaMensagemViewModelAsync(destinatarioId, mensagemPaiId);
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Nova(NovaMensagemViewModel model)
+        {
+            var remetenteId = ObterUsuarioId();
+            if (remetenteId is null) return RedirectToAction("Login", "Account");
+
+            if (!ModelState.IsValid)
+            {
+                model.Destinatarios = (await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId)).Destinatarios;
+                return View(model);
+            }
+
+            var resultado = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+            if (!resultado.Success)
+            {
+                ModelState.AddModelError(string.Empty, resultado.Message);
+                model.Destinatarios = (await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId)).Destinatarios;
+                return View(model);
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -82,6 +120,22 @@ namespace Sistema.MVC.Controllers
             if (msg == null) return NotFound();
             if (msg.DestinatarioId == userId.Value) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
             return View(_mapper.Map<Sistema.APP.DTOs.MensagemDto>(msg));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> CaixaSaida(int page = 1, int pageSize = 20)
+        {
+            var userId = ObterUsuarioId();
+            if (userId is null) return RedirectToAction("Login", "Account");
+            var result = await _mensagemService.BuscarCaixaSaidaAsync(userId.Value, page, pageSize);
+            var model = new MensagemViewModel
+            {
+                Mensagens = result.Items.Select(m => _mapper.Map<Sistema.APP.DTOs.MensagemDto>(m)).ToList(),
+                Page = result.Page,
+                PageSize = result.PageSize,
+                TotalItems = result.TotalCount
+            };
+            return View(model);
         }
     }
 }

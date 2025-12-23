@@ -13,5 +13,6 @@ namespace Sistema.CORE.Services.Interfaces
         Task<Mensagem?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);
         Task<OperationResult<int>> EnviarAsync(int? remetenteId, int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null, CancellationToken cancellationToken = default);
         Task<OperationResult> MarcarComoLidaAsync(int id, int usuarioId, CancellationToken cancellationToken = default);
+        Task<int> ContarNaoLidasAsync(int usuarioId, CancellationToken cancellationToken = default);
     }
 }

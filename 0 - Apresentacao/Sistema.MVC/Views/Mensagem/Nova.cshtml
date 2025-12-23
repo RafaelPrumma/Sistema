@@ -1,7 +1,6 @@
+@model Sistema.MVC.Models.NovaMensagemViewModel
 @{
     ViewData["Title"] = "Nova Mensagem";
-    var destinatarioId = ViewBag.DestinatarioId as int?;
-    var mensagemPaiId = ViewBag.MensagemPaiId as int?;
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
@@ -11,24 +10,45 @@
 })
 
 <div class="card">
-    <form method="post">
-    <input type="hidden" name="mensagemPaiId" value="@mensagemPaiId" />
-    <div class="card-body">
-        <div class="mb-3">
-            <label>Destinatário</label>
-            <input type="number" name="destinatarioId" class="form-control" value="@destinatarioId" required />
+    <form asp-action="Nova" method="post">
+        @Html.AntiForgeryToken()
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <input asp-for="MensagemPaiId" type="hidden" />
+            <div class="mb-3">
+                <label asp-for="DestinatarioId" class="form-label"></label>
+                <select asp-for="DestinatarioId" class="form-select" asp-items="Model.Destinatarios">
+                    <option value="">Selecione um destinatário</option>
+                </select>
+                <span asp-validation-for="DestinatarioId" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Assunto" class="form-label"></label>
+                <input asp-for="Assunto" class="form-control" />
+                <span asp-validation-for="Assunto" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Corpo" class="form-label"></label>
+                <textarea asp-for="Corpo" class="form-control" rows="5"></textarea>
+                <span asp-validation-for="Corpo" class="text-danger"></span>
+            </div>
         </div>
-        <div class="mb-3">
-            <label>Assunto</label>
-            <input type="text" name="assunto" class="form-control" required />
+        <div class="card-footer d-flex justify-content-between">
+            <a class="btn btn-outline-secondary" href="@Url.Action("Index")">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Enviar</button>
         </div>
-        <div class="mb-3">
-            <label>Corpo</label>
-            <textarea name="corpo" class="form-control" rows="5"></textarea>
-        </div>
-    </div>
-    <div class="card-footer text-end">
-        <button type="submit" class="btn btn-primary">Enviar</button>
-    </div>
     </form>
 </div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        $(function () {
+            $('#DestinatarioId').select2({
+                placeholder: 'Selecione um destinatário',
+                width: '100%'
+            });
+        });
+    </script>
+}
