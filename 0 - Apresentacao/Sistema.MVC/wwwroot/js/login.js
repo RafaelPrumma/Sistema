@@ -10,9 +10,7 @@
     $(function () {
         const $modal = $('#loadingModal');
 
-        $('#loginForm').on('submit', async function (e) {
-            e.preventDefault();
-
+        $('#loginForm').on('submit', function () {
             if ($modal.length && typeof $modal.iziModal === 'function') {
                 $modal.iziModal({ title: 'Aguarde', subtitle: 'Autenticando...', close: false });
                 $modal.iziModal('open');
@@ -20,53 +18,6 @@
 
             if (window.showInfo) {
                 window.showInfo('Enviando dados');
-            }
-
-            const data = {
-                cpf: $('#Cpf').val(),
-                senha: $('#Senha').val()
-            };
-
-            try {
-                const response = await fetch('/Account/Login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if ($modal.length && typeof $modal.iziModal === 'function') {
-                    $modal.iziModal('close');
-                }
-
-                if (response.ok) {
-                    if (window.showSuccess) {
-                        window.showSuccess('Login realizado');
-                    }
-                    setTimeout(() => { window.location.href = '/Home/Index'; }, 1500);
-                } else if (response.status === 400) {
-                    if (window.showWarning) {
-                        window.showWarning('Preencha os campos corretamente');
-                    }
-                } else {
-                    let msg = 'Credenciais inválidas';
-                    try {
-                        const err = await response.json();
-                        if (err.message) msg = err.message;
-                    } catch (error) {
-                        console.debug('Não foi possível interpretar a resposta de erro.', error);
-                    }
-                    if (window.showError) {
-                        window.showError(msg);
-                    }
-                }
-            } catch (error) {
-                if ($modal.length && typeof $modal.iziModal === 'function') {
-                    $modal.iziModal('close');
-                }
-                if (window.showError) {
-                    window.showError('Falha na comunicação');
-                }
-                console.error('Erro ao enviar requisição de login.', error);
             }
         });
 
