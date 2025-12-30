@@ -45,6 +45,9 @@
         const $headerEl = $('header.navbar');
         const $footerEl = $('footer.footer');
 
+        let mmApi = null;
+        const expandedStateKey = 'mmenuExpandedState';
+
         const applyTheme = (theme) => {
             const computed = getComputedStyle(root);
             const mode = typeof theme?.modoEscuro === 'boolean'
@@ -88,9 +91,25 @@
             if (theme?.corBarraEsquerda) $('#CorBarraEsquerda').val(theme.corBarraEsquerda);
             if (theme?.corBarraDireita) $('#CorBarraDireita').val(theme.corBarraDireita);
             if (theme?.corFooter) $('#CorFooter').val(theme.corFooter);
+
+            if (typeof theme?.menuLateralExpandido === 'boolean') {
+                $('#MenuLateralExpandido').prop('checked', theme.menuLateralExpandido);
+                window.sessionStorage.setItem(expandedStateKey, theme.menuLateralExpandido ? 'open' : 'closed');
+
+                if (mmApi) {
+                    if (theme.menuLateralExpandido) {
+                        mmApi.open();
+                    } else {
+                        mmApi.close();
+                    }
+                }
+            }
         };
 
-        applyTheme({ modoEscuro: serverTheme === 'dark' });
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        const initialMenuExpanded = sidebarMenu?.dataset.menuExpanded === 'true';
+
+        applyTheme({ modoEscuro: serverTheme === 'dark', menuLateralExpandido: initialMenuExpanded });
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
@@ -120,12 +139,15 @@
             });
         }
 
-        const sidebarMenu = document.getElementById('sidebarMenu');
         if (sidebarMenu && window.Mmenu) {
             const homeUrl = sidebarMenu.dataset.homeUrl || '/';
             const configUrl = sidebarMenu.dataset.configUrl || '/Configuracao/Index';
             const themeUrl = sidebarMenu.dataset.themeUrl || '/Tema/Edit';
             const logoutUrl = sidebarMenu.dataset.logoutUrl || '/Account/Logout';
+
+            if (typeof initialMenuExpanded === 'boolean') {
+                window.sessionStorage.setItem(expandedStateKey, initialMenuExpanded ? 'open' : 'closed');
+            }
 
             const mmenu = new window.Mmenu('#sidebarMenu', {
                 iconPanels: {
@@ -148,11 +170,14 @@
                     }
                 ]
             }, {
-                offCanvas: false,
+                offCanvas: {
+                    use: true,
+                    position: 'left'
+                },
                 sidebar: {
                     expanded: {
                         use: true,
-                        initial: 'open'
+                        initial: initialMenuExpanded ? 'open' : 'closed'
                     }
                 },
                 iconbar: {
@@ -169,8 +194,9 @@
                 }
             });
 
-            const api = mmenu.API;
-            api.bind('setSelected:after', () => {
+            mmApi = mmenu.API;
+
+            mmApi.bind('setSelected:after', () => {
                 sidebarMenu.querySelectorAll('.mm-listitem__btn, .mm-listitem__text')
                     .forEach(el => el.classList.remove('hovering'));
             });
@@ -180,9 +206,11 @@
                 if (!(target instanceof HTMLElement)) return;
                 const listItem = target.closest('.mm-listitem');
                 if (listItem) {
-                    api.setSelected(listItem);
+                    mmApi.setSelected(listItem);
                 }
             });
+
+            applyTheme({ menuLateralExpandido: initialMenuExpanded });
         }
 
         $('input[name="ModoEscuro"]').on('change', function () {
@@ -231,6 +259,13 @@
             });
         }
 
+        const $menuExpandido = $('#MenuLateralExpandido');
+        if ($menuExpandido.length) {
+            $menuExpandido.on('change', function () {
+                applyTheme({ menuLateralExpandido: this.checked });
+            });
+        }
+
         const $temaForm = $('#temaSidebar form');
         if ($temaForm.length) {
             $temaForm.on('submit', function (e) {
@@ -262,7 +297,8 @@
                                 corBarraDireita: data.theme.corBarraDireita,
                                 corFooter: data.theme.corFooter,
                                 headerFixo: data.theme.headerFixo,
-                                footerFixo: data.theme.footerFixo
+                                footerFixo: data.theme.footerFixo,
+                                menuLateralExpandido: data.theme.menuLateralExpandido
                             });
                         }
 

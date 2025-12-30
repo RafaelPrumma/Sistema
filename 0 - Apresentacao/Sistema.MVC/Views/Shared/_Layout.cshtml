@@ -103,7 +103,8 @@
                  data-home-url="@Url.Action("Index", "Home")"
                  data-config-url="@Url.Action("Index", "Configuracao")"
                  data-theme-url="@Url.Action("Edit", "Tema")"
-                 data-logout-url="@Url.Action("Logout", "Account")">
+                 data-logout-url="@Url.Action("Logout", "Account")"
+                 data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()">
                 <ul class="nav flex-column">
                     <li class="menu-brand">
                         <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
@@ -232,7 +233,11 @@
                 <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" value="true" @(footerFixo ? "checked" : string.Empty) />
                 <label class="form-check-label" for="FooterFixo">Footer fixo</label>
             </div>
-            <input type="hidden" name="MenuLateralExpandido" value="true" />
+            <div class="form-check form-switch mb-2">
+                <input type="hidden" name="MenuLateralExpandido" value="false" />
+                <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" value="true" @(menuExpandido ? "checked" : string.Empty) />
+                <label class="form-check-label" for="MenuLateralExpandido">Menu lateral expandido</label>
+            </div>
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
     </aside>
