@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
@@ -18,7 +19,7 @@ namespace Sistema.CORE.Services
             _uow = uow;
         }
 
-        public Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default)
+        public async Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default)
         {
             IQueryable<Mensagem> query = _uow.Mensagens.Query()
                 .Where(m => m.DestinatarioId == usuarioId);
@@ -34,25 +35,37 @@ namespace Sistema.CORE.Services
 
             query = query.OrderByDescending(m => m.DataInclusao);
 
-            var total = query.Count();
-            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Task.FromResult(new PagedResult<Mensagem>(items, total, page, pageSize));
+            var total = await query.CountAsync(cancellationToken);
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Mensagem>(items, total, page, pageSize);
         }
 
-        public Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize, CancellationToken cancellationToken = default)
+        public async Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize, CancellationToken cancellationToken = default)
         {
             var query = _uow.Mensagens.Query()
                 .Where(m => m.RemetenteId == usuarioId)
                 .OrderByDescending(m => m.DataInclusao);
-            var total = query.Count();
-            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Task.FromResult(new PagedResult<Mensagem>(items, total, page, pageSize));
+            var total = await query.CountAsync(cancellationToken);
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Mensagem>(items, total, page, pageSize);
         }
 
         public Task<Mensagem?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Mensagens.GetByIdAsync(id, cancellationToken);
 
         public async Task<OperationResult<int>> EnviarAsync(int? remetenteId, int destinatarioId, string assunto, string corpo, int? mensagemPaiId = null, CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(assunto))
+                return new OperationResult<int>(false, "Assunto é obrigatório.");
+            if (assunto.Length > 200)
+                return new OperationResult<int>(false, "Assunto deve ter no máximo 200 caracteres.");
+            if (string.IsNullOrWhiteSpace(corpo))
+                return new OperationResult<int>(false, "Corpo da mensagem é obrigatório.");
+            if (corpo.Length > 5000)
+                return new OperationResult<int>(false, "Corpo da mensagem deve ter no máximo 5000 caracteres.");
+
+            var assuntoLimpo = assunto.Trim();
+            var corpoLimpo = corpo.Trim();
+
             var destinatario = await _uow.Usuarios.BuscarPorIdAsync(destinatarioId, cancellationToken);
             if (destinatario is null)
                 return new OperationResult<int>(false, "Destinatário não encontrado");
@@ -68,8 +81,8 @@ namespace Sistema.CORE.Services
             {
                 RemetenteId = remetenteId,
                 DestinatarioId = destinatarioId,
-                Assunto = assunto,
-                Corpo = corpo,
+                Assunto = assuntoLimpo,
+                Corpo = corpoLimpo,
                 MensagemPaiId = mensagemPaiId,
                 Lida = false
             };
@@ -93,11 +106,11 @@ namespace Sistema.CORE.Services
             return new OperationResult(true, string.Empty);
         }
 
-        public Task<int> ContarNaoLidasAsync(int usuarioId, CancellationToken cancellationToken = default)
+        public async Task<int> ContarNaoLidasAsync(int usuarioId, CancellationToken cancellationToken = default)
         {
-            var total = _uow.Mensagens.Query()
-                .Count(m => m.DestinatarioId == usuarioId && !m.Lida);
-            return Task.FromResult(total);
+            var total = await _uow.Mensagens.Query()
+                .CountAsync(m => m.DestinatarioId == usuarioId && !m.Lida, cancellationToken);
+            return total;
         }
     }
 }
