@@ -137,7 +137,6 @@ footer.footer {
 }
 
 .app-menu.mm-menu {
-  background-color: var(--sidebar-bg) !important;
   color: inherit;
   border-right: 1px solid rgba(0, 0, 0, 0.08);
 }
