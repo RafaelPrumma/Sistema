@@ -128,83 +128,45 @@
         }
 
         const $sidebarToggle = $('#sidebarToggle');
-        const $sidebar = $('#sidebar');
-        if ($sidebarToggle.length && $sidebar.length) {
-            const themeExpanded = $sidebar.data('expanded');
-            const $sidebarBackdrop = $('<div class="sidebar-backdrop" aria-hidden="true"></div>');
+        const sidebarSelector = '#sidebarMenu';
+        const sidebarElement = document.querySelector(sidebarSelector);
+        if ($sidebarToggle.length && sidebarElement && window.Mmenu) {
+            const themeExpanded = $(sidebarElement).data('expanded');
+            const menu = new window.Mmenu(sidebarSelector, {
+                extensions: ['border-none', 'shadow-page', 'pagedim-black', 'position-front'],
+                setSelected: true,
+                slidingSubmenus: true,
+                navbar: {
+                    title: 'Menu',
+                },
+                navbars: [{
+                    position: 'top',
+                    content: ['prev', 'title', 'close'],
+                }],
+            }, {
+                offCanvas: {
+                    position: 'left',
+                },
+            });
 
-            function attachBackdrop() {
-                if (!$sidebarBackdrop.parent().length) {
-                    $('body').append($sidebarBackdrop);
-                }
-            }
-
-            function showBackdrop() {
-                attachBackdrop();
-                $sidebarBackdrop.addClass('show');
-                $('body').addClass('sidebar-open');
-            }
-
-            function hideBackdrop() {
-                $sidebarBackdrop.removeClass('show');
-                $('body').removeClass('sidebar-open');
-            }
-
-            function applySidebarState() {
-                const isMobile = $(window).width() < 768;
-                if (isMobile) {
-                    $sidebar.addClass('collapsed');
-                    if (!$sidebar.hasClass('expanded')) {
-                        hideBackdrop();
-                    }
-                } else {
-                    hideBackdrop();
-                    $sidebar.removeClass('expanded');
-                    $sidebar.toggleClass('collapsed', !themeExpanded);
-                }
-            }
-
-            applySidebarState();
-            $(window).on('resize', applySidebarState);
+            const api = menu.API;
 
             $sidebarToggle.on('click', function (e) {
-                e.stopPropagation();
-                const isMobile = $(window).width() < 768;
-                if (isMobile) {
-                    $sidebar.addClass('expanded').removeClass('collapsed');
-                    showBackdrop();
-                } else {
-                    $sidebar.toggleClass('collapsed');
-                }
+                e.preventDefault();
+                api.open();
             });
 
-            $(document).on('click', function (e) {
-                if (
-                    $sidebar.hasClass('expanded') &&
-                    !$sidebar.is(e.target) &&
-                    $sidebar.has(e.target).length === 0 &&
-                    !$sidebarToggle.is(e.target) &&
-                    $sidebarToggle.has(e.target).length === 0
-                ) {
-                    $sidebar.removeClass('expanded');
-                    hideBackdrop();
-                    applySidebarState();
-                }
+            api.bind('open:after', function () {
+                $sidebarToggle.attr('aria-expanded', 'true');
             });
 
-            $(document).on('keydown', function (e) {
-                if (e.key === 'Escape' && $sidebar.hasClass('expanded')) {
-                    $sidebar.removeClass('expanded');
-                    hideBackdrop();
-                    applySidebarState();
-                }
+            api.bind('close:after', function () {
+                $sidebarToggle.attr('aria-expanded', 'false');
             });
 
-            $sidebarBackdrop.on('click', function () {
-                $sidebar.removeClass('expanded');
-                hideBackdrop();
-                applySidebarState();
-            });
+            if (themeExpanded && window.innerWidth >= 992) {
+                api.open();
+            }
         }
     });
 })();

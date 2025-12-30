@@ -74,6 +74,7 @@
     <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
     <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="~/lib/aos/aos.css" />
+    <link rel="stylesheet" href="~/lib/mmenu/mmenu.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body data-bs-theme="@(modoEscuro ? "dark" : "light")" class="@(headerFixo ? "pt-5" : string.Empty)">
@@ -81,7 +82,7 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <button class="btn p-0 border-0 bg-transparent @headerText @(menuExpandido ? "d-md-none" : string.Empty)" type="button" id="sidebarToggle"><i class="bi bi-list @headerText"></i></button>
+                <button class="btn p-0 border-0 bg-transparent @headerText" type="button" id="sidebarToggle" aria-controls="sidebarMenu" aria-expanded="false"><i class="bi bi-list @headerText"></i><span class="visually-hidden">Abrir menu</span></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
@@ -99,25 +100,25 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex">
-            <nav id="sidebar" data-expanded="@(menuExpandido.ToString().ToLower())" class="sidebar sidebar-bg @leftText @(menuExpandido ? string.Empty : "collapsed")">
-                <div class="sidebar-brand @leftText">
-                    <div class="sidebar-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
-                        <i class="bi bi-grid-1x2-fill"></i>
-                    </div>
-                    <div class="sidebar-brand-text">
-                        <small class="text-opacity-75 d-block">Painel</small>
-                        <span class="fw-semibold">Sistema.MVC</span>
-                    </div>
-                </div>
-                <div class="sidebar-user px-3 py-3 d-flex align-items-center @leftText">
-                    <div class="sidebar-avatar me-3">@userInitial</div>
-                    <div class="sidebar-user-text">
-                        <div class="fw-semibold text-truncate">@userName</div>
-                        <small class="text-opacity-75">Bem-vindo(a)</small>
-                    </div>
-                </div>
+            <nav id="sidebarMenu" data-expanded="@(menuExpandido.ToString().ToLower())" class="app-menu sidebar-bg @leftText" aria-label="Menu principal">
                 <ul class="nav flex-column">
-                    <li class="nav-header text-uppercase small">Principal</li>
+                    <li class="menu-brand">
+                        <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
+                            <i class="bi bi-grid-1x2-fill"></i>
+                        </div>
+                        <div class="menu-brand-text">
+                            <small class="text-opacity-75 d-block">Painel</small>
+                            <span class="fw-semibold">Sistema.MVC</span>
+                        </div>
+                    </li>
+                    <li class="menu-user d-flex align-items-center">
+                        <div class="menu-avatar me-3">@userInitial</div>
+                        <div class="menu-user-text">
+                            <div class="fw-semibold text-truncate">@userName</div>
+                            <small class="text-opacity-75">Bem-vindo(a)</small>
+                        </div>
+                    </li>
+                    <li class="nav-header text-uppercase small">Navegação</li>
                     <li class="nav-item">
                         <a class="nav-link @leftText @IsActive("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
                             <i class="bi bi-house me-2"></i><span>Home</span>
@@ -172,6 +173,7 @@
     <script src="~/lib/izitoast/js/iziToast.min.js"></script>
     <script src="~/lib/izimodal/js/iziModal.min.js"></script>
     <script src="~/lib/aos/aos.js"></script>
+    <script src="~/lib/mmenu/mmenu.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
 

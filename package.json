@@ -21,5 +21,8 @@
     "jquery": "^3.7.1",
     "sass": "^1.91.0",
     "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "mmenu-js": "^9.3.0"
   }
 }
