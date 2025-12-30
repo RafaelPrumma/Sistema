@@ -6,16 +6,11 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class TemaService : ITemaService
+public class TemaService(IUnitOfWork uow) : ITemaService
 {
-    private readonly IUnitOfWork _uow;
+    private readonly IUnitOfWork _uow = uow;
 
-    public TemaService(IUnitOfWork uow)
-    {
-        _uow = uow;
-    }
-
-    public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
+	public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
         _uow.Temas.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);
 
     public async Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default)

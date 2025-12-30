@@ -7,18 +7,12 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class FuncionalidadeService : IFuncionalidadeService
+public class FuncionalidadeService(IUnitOfWork uow, ILogService log) : IFuncionalidadeService
 {
-    private readonly IUnitOfWork _uow;
-    private readonly ILogService _log;
+    private readonly IUnitOfWork _uow = uow;
+    private readonly ILogService _log = log;
 
-    public FuncionalidadeService(IUnitOfWork uow, ILogService log)
-    {
-        _uow = uow;
-        _log = log;
-    }
-
-    public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+	public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default)
         => _uow.Funcionalidades.BuscarPaginadasAsync(page, pageSize, cancellationToken);
 
     public Task<Funcionalidade?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Funcionalidades.BuscarPorIdAsync(id, cancellationToken);

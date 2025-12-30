@@ -11,16 +11,11 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services
 {
-    public class MensagemService : IMensagemService
+    public class MensagemService(IUnitOfWork uow) : IMensagemService
     {
-        private readonly IUnitOfWork _uow;
+        private readonly IUnitOfWork _uow = uow;
 
-        public MensagemService(IUnitOfWork uow)
-        {
-            _uow = uow;
-        }
-
-        private static OperationResult<int> ValidarConteudo(string assunto, string corpo)
+		private static OperationResult<int> ValidarConteudo(string assunto, string corpo)
         {
             if (string.IsNullOrWhiteSpace(assunto))
                 return new OperationResult<int>(false, "Assunto é obrigatório.");

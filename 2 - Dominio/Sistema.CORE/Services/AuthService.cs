@@ -1,30 +1,22 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.CORE.Services.Interfaces;
-using System.Threading;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace Sistema.CORE.Services;
 
-public class AuthService : IAuthService
+public class AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthService
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IPasswordHasher<Usuario> _hasher;
-    private readonly IConfiguration _config;
+    private readonly IUnitOfWork _uow = uow;
+    private readonly IPasswordHasher<Usuario> _hasher = hasher;
+    private readonly IConfiguration _config = config;
 
-    public AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config)
-    {
-        _uow = uow;
-        _hasher = hasher;
-        _config = config;
-    }
-
-    public async Task<string?> AutenticarAsync(string cpf, string senha, CancellationToken cancellationToken = default)
+	public async Task<string?> AutenticarAsync(string cpf, string senha, CancellationToken cancellationToken = default)
     {
         var usuario = await _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
         if (usuario is null || !usuario.Ativo) return null;

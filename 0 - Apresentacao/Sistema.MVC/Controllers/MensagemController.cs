@@ -1,37 +1,23 @@
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
-using AutoMapper;
-using Sistema.CORE.Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace Sistema.MVC.Controllers
 {
-    public class MensagemController : Controller
+    public class MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IPerfilService perfilService, IMapper mapper) : Controller
     {
         private const string PerfilPrefixo = "perfil:";
         private const string UsuarioPrefixo = "usuario:";
 
-        private readonly IMensagemService _mensagemService;
-        private readonly IUsuarioService _usuarioService;
-        private readonly IPerfilService _perfilService;
-        private readonly IMapper _mapper;
+        private readonly IMensagemService _mensagemService = mensagemService;
+        private readonly IUsuarioService _usuarioService = usuarioService;
+        private readonly IPerfilService _perfilService = perfilService;
+        private readonly IMapper _mapper = mapper;
 
-        public MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IPerfilService perfilService, IMapper mapper)
-        {
-            _mensagemService = mensagemService;
-            _usuarioService = usuarioService;
-            _perfilService = perfilService;
-            _mapper = mapper;
-        }
-
-        private int? ObterUsuarioId()
+		private int? ObterUsuarioId()
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId.HasValue)
@@ -71,7 +57,7 @@ namespace Sistema.MVC.Controllers
 
             var destinatarios = usuarios.Items
                 .Where(u => !remetenteId.HasValue || u.Id != remetenteId.Value)
-                .OrderBy(u => gruposPerfis.ContainsKey(u.PerfilId) ? gruposPerfis[u.PerfilId].Name : string.Empty)
+                .OrderBy(u => gruposPerfis.TryGetValue(u.PerfilId, out SelectListGroup? value) ? value.Name : string.Empty)
                 .ThenBy(u => u.Nome)
                 .Select(u => new SelectListItem
                 {
@@ -87,7 +73,7 @@ namespace Sistema.MVC.Controllers
             {
                 MensagemPaiId = mensagemPaiId,
                 Assunto = assunto ?? string.Empty,
-                DestinatarioSelecionados = destinatariosSelecionados?.Distinct().ToList() ?? new List<string>(),
+                DestinatarioSelecionados = destinatariosSelecionados?.Distinct().ToList() ?? [],
                 Destinatarios = opcoesDestinatarios
             };
         }
@@ -100,7 +86,7 @@ namespace Sistema.MVC.Controllers
             var result = await _mensagemService.BuscarCaixaEntradaAsync(userId.Value, page, pageSize, remetenteId, palavraChave, inicio, fim);
             var model = new MensagemViewModel
             {
-                Mensagens = result.Items.Select(m => _mapper.Map<Sistema.APP.DTOs.MensagemDto>(m)).ToList(),
+                Mensagens = [.. result.Items.Select(m => _mapper.Map<APP.DTOs.MensagemDto>(m))],
                 Page = result.Page,
                 PageSize = result.PageSize,
                 TotalItems = result.TotalCount,
@@ -194,7 +180,7 @@ namespace Sistema.MVC.Controllers
                 }
             }
 
-            if (errosEnvio.Any())
+            if (errosEnvio.Count != 0)
             {
                 foreach (var erro in errosEnvio)
                 {
@@ -225,7 +211,7 @@ namespace Sistema.MVC.Controllers
             var conversa = await _mensagemService.BuscarConversaAsync(id, userId.Value, cancellationToken);
             if (conversa == null) return NotFound();
 
-            if (conversa.Respostas.Any())
+            if (conversa.Respostas.Count != 0)
             {
                 var naoLidas = EnumerarThread(conversa)
                     .Where(m => m.Id != id)
@@ -239,12 +225,12 @@ namespace Sistema.MVC.Controllers
                 }
             }
 
-            return View(_mapper.Map<Sistema.APP.DTOs.MensagemThreadDto>(conversa));
+            return View(_mapper.Map<APP.DTOs.MensagemThreadDto>(conversa));
         }
 
-        private static IEnumerable<Sistema.CORE.Entities.Mensagem> EnumerarThread(Sistema.CORE.Entities.Mensagem raiz)
+        private static IEnumerable<CORE.Entities.Mensagem> EnumerarThread(CORE.Entities.Mensagem raiz)
         {
-            var pilha = new Stack<Sistema.CORE.Entities.Mensagem>();
+            var pilha = new Stack<CORE.Entities.Mensagem>();
             pilha.Push(raiz);
             while (pilha.Count > 0)
             {
@@ -265,7 +251,7 @@ namespace Sistema.MVC.Controllers
             var result = await _mensagemService.BuscarCaixaSaidaAsync(userId.Value, page, pageSize);
             var model = new MensagemViewModel
             {
-                Mensagens = result.Items.Select(m => _mapper.Map<Sistema.APP.DTOs.MensagemDto>(m)).ToList(),
+                Mensagens = [.. result.Items.Select(m => _mapper.Map<APP.DTOs.MensagemDto>(m))],
                 Page = result.Page,
                 PageSize = result.PageSize,
                 TotalItems = result.TotalCount

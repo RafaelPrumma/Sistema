@@ -7,16 +7,11 @@ using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
-public class TemaController : Controller
+public class TemaController(ITemaService temaService) : Controller
 {
-    private readonly ITemaService _temaService;
+    private readonly ITemaService _temaService = temaService;
 
-    public TemaController(ITemaService temaService)
-    {
-        _temaService = temaService;
-    }
-
-    private int? ObterUsuarioId()
+	private int? ObterUsuarioId()
     {
         var userId = HttpContext.Session.GetInt32("UserId");
         if (userId.HasValue)

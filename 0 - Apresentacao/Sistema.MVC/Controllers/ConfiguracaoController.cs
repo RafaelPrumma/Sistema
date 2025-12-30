@@ -2,27 +2,21 @@ using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
-using System.Linq;
 
 namespace Sistema.MVC.Controllers;
 
-public class ConfiguracaoController : Controller
+public class ConfiguracaoController(IConfiguracaoService service) : Controller
 {
-    private readonly IConfiguracaoService _service;
+    private readonly IConfiguracaoService _service = service;
 
-    public ConfiguracaoController(IConfiguracaoService service)
-    {
-        _service = service;
-    }
-
-    [HttpGet]
+	[HttpGet]
     public async Task<IActionResult> Index(string agrupamento = "AzureAd")
     {
         var configs = await _service.BuscarPorAgrupamentoAsync(agrupamento);
         var model = new ConfiguracaoIndexViewModel
         {
             Agrupamento = agrupamento,
-            Configuracoes = configs.Select(c => new ConfiguracaoViewModel
+            Configuracoes = [.. configs.Select(c => new ConfiguracaoViewModel
             {
                 Id = c.Id,
                 Agrupamento = c.Agrupamento,
@@ -31,8 +25,8 @@ public class ConfiguracaoController : Controller
                 Tipo = c.Tipo,
                 Descricao = c.Descricao,
                 Ativo = c.Ativo
-            }).ToList()
-        };
+            })]
+		};
         return View(model);
     }
 

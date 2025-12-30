@@ -7,16 +7,11 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class ConfiguracaoService : IConfiguracaoService
+public class ConfiguracaoService(IUnitOfWork uow) : IConfiguracaoService
 {
-    private readonly IUnitOfWork _uow;
+    private readonly IUnitOfWork _uow = uow;
 
-    public ConfiguracaoService(IUnitOfWork uow)
-    {
-        _uow = uow;
-    }
-
-    public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
+	public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
         _uow.Configuracoes.BuscarPorAgrupamentoAsync(agrupamento, cancellationToken);
 
     public Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave, CancellationToken cancellationToken = default) =>

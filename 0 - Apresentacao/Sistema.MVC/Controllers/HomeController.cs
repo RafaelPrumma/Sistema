@@ -1,38 +1,20 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using System.Diagnostics;
-using System.Linq;
 
 namespace Sistema.MVC.Controllers
 {
-        public class HomeController : Controller
+        public class HomeController(ILogger<HomeController> logger, IUsuarioService usuarioService, IPerfilService perfilService, IFuncionalidadeService funcionalidadeService, IConfiguracaoService configuracaoService, IMensagemService mensagemService) : Controller
         {
-                private readonly ILogger<HomeController> _logger;
-                private readonly IUsuarioService _usuarioService;
-                private readonly IPerfilService _perfilService;
-                private readonly IFuncionalidadeService _funcionalidadeService;
-                private readonly IConfiguracaoService _configuracaoService;
-                private readonly IMensagemService _mensagemService;
+                private readonly ILogger<HomeController> _logger = logger;
+                private readonly IUsuarioService _usuarioService = usuarioService;
+                private readonly IPerfilService _perfilService = perfilService;
+                private readonly IFuncionalidadeService _funcionalidadeService = funcionalidadeService;
+                private readonly IConfiguracaoService _configuracaoService = configuracaoService;
+                private readonly IMensagemService _mensagemService = mensagemService;
 
-                public HomeController(
-                        ILogger<HomeController> logger,
-                        IUsuarioService usuarioService,
-                        IPerfilService perfilService,
-                        IFuncionalidadeService funcionalidadeService,
-                        IConfiguracaoService configuracaoService,
-                        IMensagemService mensagemService)
-                {
-                        _logger = logger;
-                        _usuarioService = usuarioService;
-                        _perfilService = perfilService;
-                        _funcionalidadeService = funcionalidadeService;
-                        _configuracaoService = configuracaoService;
-                        _mensagemService = mensagemService;
-                }
-
-                public async Task<IActionResult> Index()
+		public async Task<IActionResult> Index()
                 {
                         var model = new DashboardViewModel();
 

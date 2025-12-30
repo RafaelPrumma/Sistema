@@ -1,37 +1,22 @@
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
-using System;
-using System.Collections.Generic;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
-public class AccountController : Controller
+public class AccountController(IUsuarioService usuarioService, IPasswordHasher<Usuario> hasher, IEmailService emailService, ILogger<AccountController> logger) : Controller
 {
-    private readonly IUsuarioService _usuarioService;
-    private readonly IPasswordHasher<Usuario> _hasher;
-    private readonly IEmailService _emailService;
-    private readonly ILogger<AccountController> _logger;
+    private readonly IUsuarioService _usuarioService = usuarioService;
+    private readonly IPasswordHasher<Usuario> _hasher = hasher;
+    private readonly IEmailService _emailService = emailService;
+    private readonly ILogger<AccountController> _logger = logger;
 
-    public AccountController(
-        IUsuarioService usuarioService,
-        IPasswordHasher<Usuario> hasher,
-        IEmailService emailService,
-        ILogger<AccountController> logger)
-    {
-        _usuarioService = usuarioService;
-        _hasher = hasher;
-        _emailService = emailService;
-        _logger = logger;
-    }
-
-    private int? ObterUsuarioId()
+	private int? ObterUsuarioId()
     {
         var userId = HttpContext.Session.GetInt32("UserId");
         if (userId.HasValue)
@@ -88,8 +73,8 @@ public class AccountController : Controller
         HttpContext.Session.SetString("UserName", usuario.Nome);
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-            new Claim(ClaimTypes.Name, usuario.Nome)
+            new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new(ClaimTypes.Name, usuario.Nome)
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
@@ -225,14 +210,10 @@ public class AccountController : Controller
     {
         var usuarioId = ObterUsuarioId();
         if (usuarioId is null)
-        {
             return RedirectToAction(nameof(Login));
-        }
 
         if (!ModelState.IsValid)
-        {
             return View(model);
-        }
 
         var usuario = await _usuarioService.BuscarPorIdAsync(usuarioId.Value);
         if (usuario is null)

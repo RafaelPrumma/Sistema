@@ -7,18 +7,12 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class PerfilService : IPerfilService
+public class PerfilService(IUnitOfWork uow, ILogService log) : IPerfilService
 {
-    private readonly IUnitOfWork _uow;
-    private readonly ILogService _log;
+    private readonly IUnitOfWork _uow = uow;
+    private readonly ILogService _log = log;
 
-    public PerfilService(IUnitOfWork uow, ILogService log)
-    {
-        _uow = uow;
-        _log = log;
-    }
-
-    public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+	public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _uow.Perfis.BuscarTodosAsync(page, pageSize, cancellationToken);
 
     public Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) =>
