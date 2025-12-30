@@ -18,6 +18,10 @@ public class MappingProfile : Profile
         CreateMap<Mensagem, MensagemDto>()
             .ForMember(d => d.RemetenteNome, o => o.MapFrom(s => s.Remetente != null ? s.Remetente.Nome : "Sistema"))
             .ForMember(d => d.DestinatarioNome, o => o.MapFrom(s => s.Destinatario.Nome));
+        CreateMap<Mensagem, MensagemThreadDto>()
+            .ForMember(d => d.RemetenteNome, o => o.MapFrom(s => s.Remetente != null ? s.Remetente.Nome : "Sistema"))
+            .ForMember(d => d.DestinatarioNome, o => o.MapFrom(s => s.Destinatario.Nome))
+            .ForMember(d => d.Respostas, o => o.MapFrom(s => s.Respostas));
         CreateMap<NovaMensagemDto, Mensagem>();
     }
 }

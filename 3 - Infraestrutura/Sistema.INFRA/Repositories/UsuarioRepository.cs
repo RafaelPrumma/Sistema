@@ -76,6 +76,15 @@ public class UsuarioRepository : IUsuarioRepository
         return await _context.Usuarios.FindAsync(new object?[] { id }, cancellationToken);
     }
 
+    public async Task<List<Usuario>> BuscarPorPerfilAsync(int perfilId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Usuarios
+            .AsNoTracking()
+            .Where(u => u.PerfilId == perfilId && u.Ativo)
+            .OrderBy(u => u.Nome)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task AtualizarAsync(Usuario usuario)
     {
         _context.Usuarios.Update(usuario);

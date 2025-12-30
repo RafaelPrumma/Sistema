@@ -24,12 +24,12 @@ namespace Sistema.INFRA.Mapping
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(m => m.MensagemPai)
-                .WithMany()
+                .WithMany(m => m.Respostas)
                 .HasForeignKey(m => m.MensagemPaiId)
                 .IsRequired(false);
 
             builder.Property(m => m.Assunto).HasMaxLength(200);
-            builder.Property(m => m.Corpo).IsRequired().HasMaxLength(2000);
+            builder.Property(m => m.Corpo).IsRequired().HasMaxLength(5000);
         }
     }
 }

@@ -1,4 +1,4 @@
-@model Sistema.APP.DTOs.MensagemDto
+@model Sistema.APP.DTOs.MensagemThreadDto
 @{
     ViewData["Title"] = Model.Assunto;
 }
@@ -11,13 +11,7 @@
 
 <div class="card">
     <div class="card-body">
-        <div>
-            <strong>De:</strong> @Model.RemetenteNome<br />
-            <strong>Para:</strong> @Model.DestinatarioNome<br />
-            <strong>Data:</strong> @Model.DataInclusao.ToLocalTime().ToString("g")
-        </div>
-        <hr />
-        <div>@Model.Corpo</div>
+        @await Html.PartialAsync("_MensagemThread", Model)
     </div>
     <div class="card-footer text-end">
         <a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-secondary">Responder</a>

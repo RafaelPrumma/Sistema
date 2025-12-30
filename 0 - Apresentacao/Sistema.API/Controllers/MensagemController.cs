@@ -62,12 +62,30 @@ namespace Sistema.API.Controllers
             return Ok(_mapper.Map<MensagemDto>(msg));
         }
 
+        [HttpGet("{id}/conversa")]
+        public async Task<IActionResult> Conversa(int id)
+        {
+            var usuarioId = ObterUsuarioIdAutenticado();
+            if (usuarioId is null) return Unauthorized();
+            var cancellationToken = HttpContext.RequestAborted;
+            var conversa = await _mensagemService.BuscarConversaAsync(id, usuarioId.Value, cancellationToken);
+            if (conversa is null) return NotFound();
+            return Ok(_mapper.Map<MensagemThreadDto>(conversa));
+        }
+
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] NovaMensagemDto dto)
         {
             var usuarioId = ObterUsuarioIdAutenticado();
             if (usuarioId is null) return Unauthorized();
             var cancellationToken = HttpContext.RequestAborted;
+            if (dto.PerfilId.HasValue)
+            {
+                var resultadoGrupo = await _mensagemService.EnviarParaPerfilAsync(usuarioId, dto.PerfilId.Value, dto.Assunto, dto.Corpo, dto.MensagemPaiId, cancellationToken);
+                if (!resultadoGrupo.Success) return BadRequest(resultadoGrupo.Message);
+                return Created(string.Empty, resultadoGrupo.Data);
+            }
+
             var result = await _mensagemService.EnviarAsync(usuarioId, dto.DestinatarioId, dto.Assunto, dto.Corpo, dto.MensagemPaiId, cancellationToken);
             if (!result.Success) return BadRequest(result.Message);
             return CreatedAtAction(nameof(Get), new { id = result.Data }, result.Data);

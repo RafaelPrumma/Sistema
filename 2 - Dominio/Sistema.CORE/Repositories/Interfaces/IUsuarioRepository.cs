@@ -14,6 +14,7 @@ public interface IUsuarioRepository
     Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default);
     Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default);
     Task<bool> ExisteAtivoPorPerfilAsync(int perfilId, CancellationToken cancellationToken = default);
+    Task<List<Usuario>> BuscarPorPerfilAsync(int perfilId, CancellationToken cancellationToken = default);
     Task<Usuario> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default);
     Task AtualizarAsync(Usuario usuario);
     Task RemoverAsync(int id, CancellationToken cancellationToken = default);

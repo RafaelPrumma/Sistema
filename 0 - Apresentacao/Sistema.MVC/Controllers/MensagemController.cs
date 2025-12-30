@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using AutoMapper;
+using Sistema.CORE.Common;
 using System;
 using System.Linq;
 using System.Security.Claims;
@@ -15,12 +16,14 @@ namespace Sistema.MVC.Controllers
     {
         private readonly IMensagemService _mensagemService;
         private readonly IUsuarioService _usuarioService;
+        private readonly IPerfilService _perfilService;
         private readonly IMapper _mapper;
 
-        public MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IMapper mapper)
+        public MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IPerfilService perfilService, IMapper mapper)
         {
             _mensagemService = mensagemService;
             _usuarioService = usuarioService;
+            _perfilService = perfilService;
             _mapper = mapper;
         }
 
@@ -43,6 +46,7 @@ namespace Sistema.MVC.Controllers
         private async Task<NovaMensagemViewModel> CriarNovaMensagemViewModelAsync(int? destinatarioId, int? mensagemPaiId)
         {
             var usuarios = await _usuarioService.BuscarTodosAsync(1, 1000);
+            var perfis = await _perfilService.BuscarTodosAsync(1, 1000);
             var remetenteId = ObterUsuarioId();
             var destinatarios = usuarios.Items
                 .Where(u => !remetenteId.HasValue || u.Id != remetenteId.Value)
@@ -50,11 +54,17 @@ namespace Sistema.MVC.Controllers
                 .Select(u => new SelectListItem($"{u.Nome} (#{u.Id})", u.Id.ToString()))
                 .ToList();
 
+            var listaPerfis = perfis.Items
+                .OrderBy(p => p.Nome)
+                .Select(p => new SelectListItem(p.Nome, p.Id.ToString()))
+                .ToList();
+
             return new NovaMensagemViewModel
             {
                 DestinatarioId = destinatarioId,
                 MensagemPaiId = mensagemPaiId,
-                Destinatarios = destinatarios
+                Destinatarios = destinatarios,
+                Perfis = listaPerfis
             };
         }
 
@@ -96,15 +106,38 @@ namespace Sistema.MVC.Controllers
 
             if (!ModelState.IsValid)
             {
-                model.Destinatarios = (await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId)).Destinatarios;
+                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
+                model.Destinatarios = viewModel.Destinatarios;
+                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
-            var resultado = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
-            if (!resultado.Success)
+            if (!model.DestinatarioId.HasValue && !model.PerfilId.HasValue)
             {
-                ModelState.AddModelError(string.Empty, resultado.Message);
-                model.Destinatarios = (await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId)).Destinatarios;
+                ModelState.AddModelError(string.Empty, "Selecione um destinatário ou um setor.");
+                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
+                model.Destinatarios = viewModel.Destinatarios;
+                model.Perfis = viewModel.Perfis;
+                return View(model);
+            }
+
+            OperationResult resultadoEnvio;
+
+            if (model.PerfilId.HasValue)
+            {
+                resultadoEnvio = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, model.PerfilId.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+            }
+            else
+            {
+                resultadoEnvio = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+            }
+
+            if (!resultadoEnvio.Success)
+            {
+                ModelState.AddModelError(string.Empty, resultadoEnvio.Message);
+                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
+                model.Destinatarios = viewModel.Destinatarios;
+                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
@@ -116,10 +149,10 @@ namespace Sistema.MVC.Controllers
         {
             var userId = ObterUsuarioId();
             if (userId is null) return RedirectToAction("Login", "Account");
-            var msg = await _mensagemService.BuscarPorIdAsync(id);
-            if (msg == null) return NotFound();
-            if (msg.DestinatarioId == userId.Value) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
-            return View(_mapper.Map<Sistema.APP.DTOs.MensagemDto>(msg));
+            var conversa = await _mensagemService.BuscarConversaAsync(id, userId.Value);
+            if (conversa == null) return NotFound();
+            if (conversa.DestinatarioId == userId.Value) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
+            return View(_mapper.Map<Sistema.APP.DTOs.MensagemThreadDto>(conversa));
         }
 
         [HttpGet]
