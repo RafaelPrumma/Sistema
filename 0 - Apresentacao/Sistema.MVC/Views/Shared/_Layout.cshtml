@@ -99,6 +99,23 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex app-shell">
+            <div class="app-iconbar sidebar-bg @leftText" aria-label="Atalhos rápidos">
+                <a class="icon-link" asp-controller="Home" asp-action="Index" title="Início">
+                    <i class="bi bi-house"></i>
+                </a>
+                <a class="icon-link" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
+                    <i class="bi bi-envelope"></i>
+                </a>
+                <a class="icon-link" asp-controller="Configuracao" asp-action="Index" title="Configurações">
+                    <i class="bi bi-gear"></i>
+                </a>
+                <a class="icon-link" asp-controller="Tema" asp-action="Edit" title="Tema">
+                    <i class="bi bi-palette"></i>
+                </a>
+                <a class="icon-link" asp-controller="Account" asp-action="Logout" title="Sair">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+            </div>
             <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
                  data-home-url="@Url.Action("Index", "Home")"
                  data-config-url="@Url.Action("Index", "Configuracao")"

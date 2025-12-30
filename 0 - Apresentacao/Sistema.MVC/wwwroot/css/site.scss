@@ -7,6 +7,7 @@
   --sidebar-bg: #{v.$azul};
   --rightbar-bg: #f8f9fa;
   --footer-bg: #{v.$azul};
+  --iconbar-width: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,4 +62,15 @@
       margin-right: 0.5rem;
     }
   }
+}
+
+.app-shell {
+  width: 100%;
+  align-items: stretch;
+}
+
+.app-iconbar {
+  flex: 0 0 var(--iconbar-width);
+  max-width: var(--iconbar-width);
+  width: var(--iconbar-width);
 }

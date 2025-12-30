@@ -90,6 +90,7 @@ footer.footer {
   --sidebar-bg: #0d6efd;
   --rightbar-bg: #f8f9fa;
   --footer-bg: #0d6efd;
+  --iconbar-width: 64px;
   --sidebar-width: 260px;
 }
 
@@ -120,18 +121,21 @@ footer.footer {
 .app-shell {
   gap: 0;
   min-height: 0;
+  width: 100%;
+  align-items: stretch;
 }
 
 .app-shell .content {
   min-width: 0;
   overflow-x: auto;
+  flex: 1 1 0;
 }
 
 .app-menu {
   color: inherit;
-  flex: 0 0 var(--sidebar-width);
-  max-width: var(--sidebar-width);
-  width: var(--sidebar-width);
+  flex: 0 0 calc(var(--sidebar-width) - var(--iconbar-width));
+  max-width: calc(var(--sidebar-width) - var(--iconbar-width));
+  width: calc(var(--sidebar-width) - var(--iconbar-width));
   min-height: 100%;
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08);
 }
@@ -266,6 +270,54 @@ footer.footer {
 .app-menu .nav-link.active .badge {
   background-color: #fff;
   color: var(--bs-primary);
+}
+
+.app-iconbar {
+  flex: 0 0 var(--iconbar-width);
+  max-width: var(--iconbar-width);
+  width: var(--iconbar-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0.25rem;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08);
+}
+
+.app-iconbar .icon-link {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.app-iconbar .icon-link:hover,
+.app-iconbar .icon-link:focus-visible {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.app-iconbar .icon-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 991.98px) {
+  .app-iconbar {
+    display: none;
+  }
+
+  .app-menu {
+    flex-basis: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    width: var(--sidebar-width);
+  }
 }
 
 /*# sourceMappingURL=site.css.map */
