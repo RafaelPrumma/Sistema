@@ -16,24 +16,30 @@
             <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
             <input asp-for="MensagemPaiId" type="hidden" />
             <div class="mb-3">
-                <label asp-for="DestinatarioId" class="form-label"></label>
-                <select asp-for="DestinatarioId" class="form-select" asp-items="Model.Destinatarios">
-                    <option value="">Selecione um destinatário</option>
+                <label asp-for="DestinatarioSelecionados" class="form-label"></label>
+                <select asp-for="DestinatarioSelecionados" class="form-select" asp-items="Model.Destinatarios" multiple>
+                    <option value="">Selecione destinatários</option>
                 </select>
-                <span class="form-text">Preencha para enviar individualmente.</span>
+                <span asp-validation-for="DestinatarioSelecionados" class="text-danger"></span>
+                <span class="form-text">Escolha pessoas e/ou setores. Você pode selecionar mais de um.</span>
             </div>
-            <div class="mb-3">
-                <label asp-for="PerfilId" class="form-label"></label>
-                <select asp-for="PerfilId" class="form-select" asp-items="Model.Perfis">
-                    <option value="">Selecione um setor</option>
-                </select>
-                <span class="form-text">Selecione um setor para enviar a todos os usuários nele.</span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="Assunto" class="form-label"></label>
-                <input asp-for="Assunto" class="form-control" />
-                <span asp-validation-for="Assunto" class="text-danger"></span>
-            </div>
+            @if (Model.ExibirCampoAssunto)
+            {
+                <div class="mb-3">
+                    <label asp-for="Assunto" class="form-label"></label>
+                    <input asp-for="Assunto" class="form-control" />
+                    <span asp-validation-for="Assunto" class="text-danger"></span>
+                </div>
+            }
+            else
+            {
+                <input asp-for="Assunto" type="hidden" />
+                <div class="mb-3">
+                    <label class="form-label">Assunto da conversa</label>
+                    <input class="form-control" value="@Model.Assunto" readonly />
+                    <span class="form-text">Respostas mantêm o assunto da mensagem inicial.</span>
+                </div>
+            }
             <div class="mb-3">
                 <label asp-for="Corpo" class="form-label"></label>
                 <textarea asp-for="Corpo" class="form-control" rows="5"></textarea>
@@ -52,9 +58,10 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(function () {
-            $('#DestinatarioId').select2({
-                placeholder: 'Selecione um destinatário',
-                width: '100%'
+            $('#DestinatarioSelecionados').select2({
+                placeholder: 'Selecione destinatários',
+                width: '100%',
+                closeOnSelect: false
             });
         });
     </script>

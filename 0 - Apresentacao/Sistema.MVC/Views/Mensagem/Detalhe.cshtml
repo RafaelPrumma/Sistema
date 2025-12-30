@@ -10,10 +10,11 @@
 })
 
 <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <a href="@Url.Action("Index")" class="btn btn-outline-secondary btn-sm">&larr; Voltar</a>
+        <a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-primary btn-sm">Responder à mensagem inicial</a>
+    </div>
     <div class="card-body">
         @await Html.PartialAsync("_MensagemThread", Model)
-    </div>
-    <div class="card-footer text-end">
-        <a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-secondary">Responder</a>
     </div>
 </div>

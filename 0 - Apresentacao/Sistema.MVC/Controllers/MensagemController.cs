@@ -15,6 +15,9 @@ namespace Sistema.MVC.Controllers
 {
     public class MensagemController : Controller
     {
+        private const string PerfilPrefixo = "perfil:";
+        private const string UsuarioPrefixo = "usuario:";
+
         private readonly IMensagemService _mensagemService;
         private readonly IUsuarioService _usuarioService;
         private readonly IPerfilService _perfilService;
@@ -44,28 +47,48 @@ namespace Sistema.MVC.Controllers
             return null;
         }
 
-        private async Task<NovaMensagemViewModel> CriarNovaMensagemViewModelAsync(int? destinatarioId, int? mensagemPaiId)
+        private async Task<NovaMensagemViewModel> CriarNovaMensagemViewModelAsync(int? mensagemPaiId, IEnumerable<string>? destinatariosSelecionados = null, string? assunto = null)
         {
             var usuarios = await _usuarioService.BuscarTodosAsync(1, 1000);
             var perfis = await _perfilService.BuscarTodosAsync(1, 1000);
             var remetenteId = ObterUsuarioId();
+
+            var gruposPerfis = perfis.Items
+                .OrderBy(p => p.Nome)
+                .ToDictionary(p => p.Id, p => new SelectListGroup { Name = p.Nome });
+
+            var opcoesDestinatarios = new List<SelectListItem>();
+
+            foreach (var perfil in perfis.Items.OrderBy(p => p.Nome))
+            {
+                opcoesDestinatarios.Add(new SelectListItem
+                {
+                    Text = $"Todos os {perfil.Nome}",
+                    Value = $"{PerfilPrefixo}{perfil.Id}",
+                    Group = gruposPerfis[perfil.Id]
+                });
+            }
+
             var destinatarios = usuarios.Items
                 .Where(u => !remetenteId.HasValue || u.Id != remetenteId.Value)
-                .OrderBy(u => u.Nome)
-                .Select(u => new SelectListItem($"{u.Nome} (#{u.Id})", u.Id.ToString()))
+                .OrderBy(u => gruposPerfis.ContainsKey(u.PerfilId) ? gruposPerfis[u.PerfilId].Name : string.Empty)
+                .ThenBy(u => u.Nome)
+                .Select(u => new SelectListItem
+                {
+                    Text = $"{u.Nome} (#{u.Id})",
+                    Value = $"{UsuarioPrefixo}{u.Id}",
+                    Group = gruposPerfis.TryGetValue(u.PerfilId, out var group) ? group : null
+                })
                 .ToList();
 
-            var listaPerfis = perfis.Items
-                .OrderBy(p => p.Nome)
-                .Select(p => new SelectListItem(p.Nome, p.Id.ToString()))
-                .ToList();
+            opcoesDestinatarios.AddRange(destinatarios);
 
             return new NovaMensagemViewModel
             {
-                DestinatarioId = destinatarioId,
                 MensagemPaiId = mensagemPaiId,
-                Destinatarios = destinatarios,
-                Perfis = listaPerfis
+                Assunto = assunto ?? string.Empty,
+                DestinatarioSelecionados = destinatariosSelecionados?.Distinct().ToList() ?? new List<string>(),
+                Destinatarios = opcoesDestinatarios
             };
         }
 
@@ -94,7 +117,28 @@ namespace Sistema.MVC.Controllers
         {
             var remetenteId = ObterUsuarioId();
             if (remetenteId is null) return RedirectToAction("Login", "Account");
-            var model = await CriarNovaMensagemViewModelAsync(destinatarioId, mensagemPaiId);
+            var destinatariosPreSelecionados = new List<string>();
+            string? assunto = null;
+
+            if (mensagemPaiId.HasValue)
+            {
+                var mensagemPai = await _mensagemService.BuscarPorIdAsync(mensagemPaiId.Value, HttpContext.RequestAborted);
+                if (mensagemPai != null)
+                {
+                    assunto = mensagemPai.Assunto;
+                    if (mensagemPai.RemetenteId.HasValue)
+                    {
+                        destinatariosPreSelecionados.Add($"{UsuarioPrefixo}{mensagemPai.RemetenteId.Value}");
+                    }
+                }
+            }
+
+            if (destinatarioId.HasValue)
+            {
+                destinatariosPreSelecionados.Add($"{UsuarioPrefixo}{destinatarioId.Value}");
+            }
+
+            var model = await CriarNovaMensagemViewModelAsync(mensagemPaiId, destinatariosPreSelecionados, assunto);
             return View(model);
         }
 
@@ -107,40 +151,58 @@ namespace Sistema.MVC.Controllers
 
             if (!ModelState.IsValid)
             {
-                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
+                var viewModel = await CriarNovaMensagemViewModelAsync(model.MensagemPaiId, model.DestinatarioSelecionados, model.Assunto);
                 model.Destinatarios = viewModel.Destinatarios;
-                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
-            if (!model.DestinatarioId.HasValue && !model.PerfilId.HasValue)
+            var errosEnvio = new List<string>();
+
+            foreach (var destinatario in model.DestinatarioSelecionados.Distinct())
             {
-                ModelState.AddModelError(string.Empty, "Selecione um destinatário ou um setor.");
-                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
+                if (destinatario.StartsWith(PerfilPrefixo, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!int.TryParse(destinatario.Replace(PerfilPrefixo, string.Empty), out var perfilId))
+                    {
+                        errosEnvio.Add($"Destino inválido: {destinatario}.");
+                        continue;
+                    }
+
+                    var resultadoPerfil = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, perfilId, model.Assunto, model.Corpo, model.MensagemPaiId);
+                    if (!resultadoPerfil.Success)
+                    {
+                        errosEnvio.Add(resultadoPerfil.Message);
+                    }
+                }
+                else if (destinatario.StartsWith(UsuarioPrefixo, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!int.TryParse(destinatario.Replace(UsuarioPrefixo, string.Empty), out var destinatarioId))
+                    {
+                        errosEnvio.Add($"Destino inválido: {destinatario}.");
+                        continue;
+                    }
+
+                    var resultadoDestinatario = await _mensagemService.EnviarAsync(remetenteId.Value, destinatarioId, model.Assunto, model.Corpo, model.MensagemPaiId);
+                    if (!resultadoDestinatario.Success)
+                    {
+                        errosEnvio.Add(resultadoDestinatario.Message);
+                    }
+                }
+                else
+                {
+                    errosEnvio.Add($"Destino não reconhecido: {destinatario}.");
+                }
+            }
+
+            if (errosEnvio.Any())
+            {
+                foreach (var erro in errosEnvio)
+                {
+                    ModelState.AddModelError(string.Empty, erro);
+                }
+
+                var viewModel = await CriarNovaMensagemViewModelAsync(model.MensagemPaiId, model.DestinatarioSelecionados, model.Assunto);
                 model.Destinatarios = viewModel.Destinatarios;
-                model.Perfis = viewModel.Perfis;
-                return View(model);
-            }
-
-            OperationResult resultadoEnvio;
-
-            if (model.PerfilId.HasValue)
-            {
-                var resultadoPerfil = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, model.PerfilId.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
-                resultadoEnvio = new OperationResult(resultadoPerfil.Success, resultadoPerfil.Message);
-            }
-            else
-            {
-                var resultadoDestinatario = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
-                resultadoEnvio = new OperationResult(resultadoDestinatario.Success, resultadoDestinatario.Message);
-            }
-
-            if (!resultadoEnvio.Success)
-            {
-                ModelState.AddModelError(string.Empty, resultadoEnvio.Message);
-                var viewModel = await CriarNovaMensagemViewModelAsync(model.DestinatarioId, model.MensagemPaiId);
-                model.Destinatarios = viewModel.Destinatarios;
-                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
