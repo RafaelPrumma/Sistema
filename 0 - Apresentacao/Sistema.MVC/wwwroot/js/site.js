@@ -130,8 +130,10 @@
         const $sidebarToggle = $('#sidebarToggle');
         const sidebarSelector = '#sidebarMenu';
         const sidebarElement = document.querySelector(sidebarSelector);
+        const desktopQuery = window.matchMedia('(min-width: 992px)');
+
         if ($sidebarToggle.length && sidebarElement && window.Mmenu) {
-            const themeExpanded = $(sidebarElement).data('expanded');
+            const themeExpanded = $(sidebarElement).data('expanded') !== false;
             const menu = new window.Mmenu(sidebarSelector, {
                 extensions: ['border-none', 'shadow-page', 'pagedim-black', 'position-front'],
                 setSelected: true,
@@ -147,26 +149,72 @@
                 offCanvas: {
                     position: 'left',
                 },
+                sidebar: {
+                    collapsed: {
+                        use: true,
+                    },
+                    expanded: {
+                        use: desktopQuery.media,
+                        initial: themeExpanded ? 'open' : 'closed',
+                    },
+                },
             });
 
-            const api = menu.API;
+            const sidebarApi = menu.API;
+            const wrapperElement = menu.node.wrpr || document.body;
 
-            $sidebarToggle.on('click', function (e) {
-                e.preventDefault();
-                api.open();
-            });
+            const resolveCollapsedPreference = () => {
+                const stored = window.sessionStorage?.getItem('mmenuExpandedState');
+                if (stored === 'open') return false;
+                if (stored === 'closed') return true;
+                return !themeExpanded;
+            };
 
-            api.bind('open:after', function () {
+            const setCollapsed = (collapsed) => {
+                wrapperElement.classList.toggle('mm-wrapper--sidebar-collapsed', collapsed);
+                $sidebarToggle.attr('aria-expanded', (!collapsed).toString());
+            };
+
+            if (desktopQuery.matches) {
+                setCollapsed(resolveCollapsedPreference());
+            }
+
+            sidebarApi.bind('open:after', function () {
+                if (desktopQuery.matches) {
+                    wrapperElement.classList.remove('mm-wrapper--sidebar-collapsed');
+                }
                 $sidebarToggle.attr('aria-expanded', 'true');
             });
 
-            api.bind('close:after', function () {
+            sidebarApi.bind('close:after', function () {
+                if (desktopQuery.matches) {
+                    wrapperElement.classList.add('mm-wrapper--sidebar-collapsed');
+                }
                 $sidebarToggle.attr('aria-expanded', 'false');
             });
 
-            if (themeExpanded && window.innerWidth >= 992) {
-                api.open();
-            }
+            $sidebarToggle.on('click', function (e) {
+                e.preventDefault();
+                if (desktopQuery.matches) {
+                    const isCollapsed = wrapperElement.classList.contains('mm-wrapper--sidebar-collapsed');
+                    if (isCollapsed) {
+                        sidebarApi.open();
+                    } else {
+                        sidebarApi.close();
+                    }
+                } else {
+                    sidebarApi.open();
+                }
+            });
+
+            desktopQuery.addEventListener('change', (event) => {
+                if (event.matches) {
+                    setCollapsed(resolveCollapsedPreference());
+                } else {
+                    wrapperElement.classList.remove('mm-wrapper--sidebar-collapsed');
+                    $sidebarToggle.attr('aria-expanded', 'false');
+                }
+            });
         }
     });
 })();
