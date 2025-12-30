@@ -1,20 +1,21 @@
 using System;
+using System.Collections.Generic;
 
-namespace Sistema.CORE.Entities
+namespace Sistema.APP.DTOs
 {
-    public class Mensagem : AuditableEntity
+    public class MensagemThreadDto
     {
         public int Id { get; set; }
         public int? RemetenteId { get; set; }
-        public Usuario? Remetente { get; set; }
+        public string RemetenteNome { get; set; } = string.Empty;
         public int DestinatarioId { get; set; }
-        public Usuario Destinatario { get; set; } = null!;
+        public string DestinatarioNome { get; set; } = string.Empty;
         public string Assunto { get; set; } = string.Empty;
         public string Corpo { get; set; } = string.Empty;
         public bool Lida { get; set; }
+        public DateTime DataInclusao { get; set; }
         public DateTime? DataLeitura { get; set; }
         public int? MensagemPaiId { get; set; }
-        public Mensagem? MensagemPai { get; set; }
-        public List<Mensagem> Respostas { get; set; } = new();
+        public List<MensagemThreadDto> Respostas { get; set; } = new();
     }
 }

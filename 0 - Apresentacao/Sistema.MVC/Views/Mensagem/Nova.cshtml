@@ -20,7 +20,14 @@
                 <select asp-for="DestinatarioId" class="form-select" asp-items="Model.Destinatarios">
                     <option value="">Selecione um destinatário</option>
                 </select>
-                <span asp-validation-for="DestinatarioId" class="text-danger"></span>
+                <span class="form-text">Preencha para enviar individualmente.</span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="PerfilId" class="form-label"></label>
+                <select asp-for="PerfilId" class="form-select" asp-items="Model.Perfis">
+                    <option value="">Selecione um setor</option>
+                </select>
+                <span class="form-text">Selecione um setor para enviar a todos os usuários nele.</span>
             </div>
             <div class="mb-3">
                 <label asp-for="Assunto" class="form-label"></label>
