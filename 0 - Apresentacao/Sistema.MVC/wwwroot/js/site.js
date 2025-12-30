@@ -48,6 +48,72 @@
         let mmApi = null;
         const expandedStateKey = 'mmenuExpandedState';
 
+        const classesTexto = ['text-white', 'text-dark'];
+
+        const normalizarHex = (valor) => {
+            if (!valor) return null;
+            const cor = valor.trim();
+
+            if (cor.startsWith('#')) {
+                let hex = cor.slice(1);
+                if (hex.length === 3) {
+                    hex = hex.split('').map((c) => c + c).join('');
+                }
+                return hex.length === 6 ? hex : null;
+            }
+
+            const rgb = cor.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+            if (rgb) {
+                const [r, g, b] = rgb.slice(1, 4).map((v) => parseInt(v, 10));
+                const toHex = (v) => v.toString(16).padStart(2, '0');
+                return `${toHex(r)}${toHex(g)}${toHex(b)}`;
+            }
+
+            return null;
+        };
+
+        const obterClasseTexto = (valor) => {
+            const hex = normalizarHex(valor);
+            if (!hex) return 'text-dark';
+
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            const luminosidade = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminosidade > 0.5 ? 'text-dark' : 'text-white';
+        };
+
+        const aplicarClasseTexto = ($elementos, classe) => {
+            if (!$elementos?.length) return;
+            $elementos.removeClass(classesTexto.join(' ')).addClass(classe);
+        };
+
+        const atualizarContraste = (cores) => {
+            const headerClasse = obterClasseTexto(cores.headerColor);
+            const esquerdaClasse = obterClasseTexto(cores.leftColor);
+            const direitaClasse = obterClasseTexto(cores.rightColor);
+            const footerClasse = obterClasseTexto(cores.footerColor);
+
+            if ($headerEl.length) {
+                aplicarClasseTexto($headerEl, headerClasse);
+                aplicarClasseTexto($headerEl.find('.navbar-brand, .nav-link, .btn-link'), headerClasse);
+                $headerEl.removeClass('navbar-dark navbar-light').addClass(headerClasse === 'text-white' ? 'navbar-dark' : 'navbar-light');
+            }
+
+            const $menu = $('#sidebarMenu');
+            aplicarClasseTexto($menu, esquerdaClasse);
+            aplicarClasseTexto($menu.find('.nav-link, .nav-header, .menu-brand-text *, .menu-user *'), esquerdaClasse);
+
+            const $temaPainel = $('#temaSidebar');
+            aplicarClasseTexto($temaPainel, direitaClasse);
+            aplicarClasseTexto($temaPainel.find('h5, label, .form-check-label, .btn'), direitaClasse);
+
+            if ($footerEl.length) {
+                aplicarClasseTexto($footerEl, footerClasse);
+                aplicarClasseTexto($footerEl.find('a'), footerClasse);
+            }
+        };
+
         const aplicarTema = (tema) => {
             const computed = getComputedStyle(root);
             const mode = typeof tema?.modoEscuro === 'boolean'
@@ -67,6 +133,8 @@
             if (leftColor) root.style.setProperty('--sidebar-bg', leftColor);
             if (rightColor) root.style.setProperty('--rightbar-bg', rightColor);
             if (footerColor) root.style.setProperty('--footer-bg', footerColor);
+
+            atualizarContraste({ headerColor, leftColor, rightColor, footerColor });
 
             const headerFixed = typeof tema?.headerFixo === 'boolean' ? tema.headerFixo : $headerEl.hasClass('fixed-top');
             const footerFixed = typeof tema?.footerFixo === 'boolean' ? tema.footerFixo : $footerEl.hasClass('fixed-bottom');
