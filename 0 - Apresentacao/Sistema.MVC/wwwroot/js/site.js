@@ -101,8 +101,11 @@
             }
 
             const $menu = $('#sidebarMenu');
+            const $iconbar = $('.app-iconbar');
             aplicarClasseTexto($menu, esquerdaClasse);
             aplicarClasseTexto($menu.find('.nav-link, .nav-header, .menu-brand-text *, .menu-user *'), esquerdaClasse);
+            aplicarClasseTexto($iconbar, esquerdaClasse);
+            aplicarClasseTexto($iconbar.find('.icon-link'), esquerdaClasse);
 
             const $temaPainel = $('#temaSidebar');
             aplicarClasseTexto($temaPainel, direitaClasse);
