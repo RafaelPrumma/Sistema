@@ -265,6 +265,13 @@ footer.footer {
     transition: max-width 0.25s ease, flex-basis 0.25s ease;
   }
 
+  .mm-wrapper--sidebar-collapsed {
+    --mm-size: var(--mm-sidebar-collapsed-size);
+    --mm-min-size: var(--mm-sidebar-collapsed-size);
+    --mm-max-size: var(--mm-sidebar-collapsed-size);
+    --mm-translate-horizontal: var(--mm-sidebar-collapsed-size);
+  }
+
   #sidebarMenu.app-menu .menu-brand,
   #sidebarMenu.app-menu .menu-user,
   #sidebarMenu.app-menu .nav-link {
