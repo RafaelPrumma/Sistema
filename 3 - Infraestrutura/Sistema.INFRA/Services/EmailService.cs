@@ -9,18 +9,12 @@ using System.Threading;
 
 namespace Sistema.INFRA.Services;
 
-public class EmailService : IEmailService
+public class EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger) : IEmailService
 {
-    private readonly EmailOptions _options;
-    private readonly ILogger<EmailService> _logger;
+    private readonly EmailOptions _options = options.Value;
+    private readonly ILogger<EmailService> _logger = logger;
 
-    public EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger)
-    {
-        _options = options.Value;
-        _logger = logger;
-    }
-
-    public async Task EnviarAsync(string destinatario, string assunto, string mensagem, CancellationToken cancellationToken = default)
+	public async Task EnviarAsync(string destinatario, string assunto, string mensagem, CancellationToken cancellationToken = default)
     {
         var tenantId = _options.TenantId;
         var clientId = _options.ClientId;
@@ -39,16 +33,15 @@ public class EmailService : IEmailService
                 ContentType = BodyType.Html,
                 Content = mensagem
             },
-            ToRecipients = new List<Recipient>
-            {
-                new Recipient
-                {
+            ToRecipients =
+			[
+				new() {
                     EmailAddress = new EmailAddress
                     {
                         Address = destinatario
                     }
                 }
-            }
+            ]
         };
         var request = new SendMailPostRequestBody
         {

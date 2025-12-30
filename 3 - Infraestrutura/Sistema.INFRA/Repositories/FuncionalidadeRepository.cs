@@ -7,16 +7,11 @@ using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class FuncionalidadeRepository : IFuncionalidadeRepository
+public class FuncionalidadeRepository(AppDbContext context) : IFuncionalidadeRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public FuncionalidadeRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<Funcionalidade> AdicionarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
+	public async Task<Funcionalidade> AdicionarAsync(Funcionalidade func, CancellationToken cancellationToken = default)
     {
         await _context.Funcionalidades.AddAsync(func, cancellationToken);
         return func;

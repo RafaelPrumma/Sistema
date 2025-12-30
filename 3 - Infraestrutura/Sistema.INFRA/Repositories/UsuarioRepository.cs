@@ -3,22 +3,14 @@ using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
-using System;
-using System.Linq;
-using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class UsuarioRepository : IUsuarioRepository
+public class UsuarioRepository(AppDbContext context) : IUsuarioRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public UsuarioRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<Usuario> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
+	public async Task<Usuario> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
         await _context.Usuarios.AddAsync(usuario, cancellationToken);
         return usuario;
@@ -26,7 +18,7 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        var usuario = await _context.Usuarios.FindAsync(new object?[] { id }, cancellationToken);
+        var usuario = await _context.Usuarios.FindAsync([id], cancellationToken);
         if (usuario is null) return;
         _context.Usuarios.Remove(usuario);
     }
@@ -59,9 +51,7 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default)
     {
-        return await _context.Usuarios
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Cpf == cpf, cancellationToken);
+        return await _context.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Cpf == cpf, cancellationToken);
     }
 
     public async Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -73,7 +63,7 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Usuarios.FindAsync(new object?[] { id }, cancellationToken);
+        return await _context.Usuarios.FindAsync([id], cancellationToken);
     }
 
     public async Task<List<Usuario>> BuscarPorPerfilAsync(int perfilId, CancellationToken cancellationToken = default)

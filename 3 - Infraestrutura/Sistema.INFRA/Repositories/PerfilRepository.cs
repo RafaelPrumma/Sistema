@@ -3,21 +3,14 @@ using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
-using System.Linq;
-using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class PerfilRepository : IPerfilRepository
+public class PerfilRepository(AppDbContext context) : IPerfilRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public PerfilRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<Perfil> AdicionarAsync(Perfil perfil, CancellationToken cancellationToken = default)
+	public async Task<Perfil> AdicionarAsync(Perfil perfil, CancellationToken cancellationToken = default)
     {
         await _context.Perfis.AddAsync(perfil, cancellationToken);
         return perfil;
@@ -25,7 +18,7 @@ public class PerfilRepository : IPerfilRepository
 
     public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        var perfil = await _context.Perfis.FindAsync(new object?[] { id }, cancellationToken);
+        var perfil = await _context.Perfis.FindAsync([id], cancellationToken);
         if (perfil is null) return;
         _context.Perfis.Remove(perfil);
     }
@@ -56,7 +49,7 @@ public class PerfilRepository : IPerfilRepository
 
     public async Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Perfis.FindAsync(new object?[] { id }, cancellationToken);
+        return await _context.Perfis.FindAsync([id], cancellationToken);
     }
 
     public Task AtualizarAsync(Perfil perfil)

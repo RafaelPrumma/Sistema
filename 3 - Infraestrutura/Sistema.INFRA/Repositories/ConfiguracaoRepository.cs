@@ -6,16 +6,11 @@ using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class ConfiguracaoRepository : IConfiguracaoRepository
+public class ConfiguracaoRepository(AppDbContext context) : IConfiguracaoRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public ConfiguracaoRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
+	public async Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
         await _context.Configuracoes
             .AsNoTracking()
             .Where(c => c.Agrupamento == agrupamento && c.Ativo)
@@ -40,7 +35,7 @@ public class ConfiguracaoRepository : IConfiguracaoRepository
 
     public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Configuracoes.FindAsync(new object?[] { id }, cancellationToken);
+        var entity = await _context.Configuracoes.FindAsync([id], cancellationToken);
         if (entity != null)
         {
             _context.Configuracoes.Remove(entity);

@@ -2,22 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sistema.INFRA.Repositories
 {
-    public class MensagemRepository : IMensagemRepository
+    public class MensagemRepository(AppDbContext context) : IMensagemRepository
     {
-        private readonly AppDbContext _context;
+        private readonly AppDbContext _context = context;
 
-        public MensagemRepository(AppDbContext context)
-        {
-            _context = context;
-        }
-
-        public async Task AddAsync(Mensagem mensagem, CancellationToken cancellationToken = default)
+		public async Task AddAsync(Mensagem mensagem, CancellationToken cancellationToken = default)
         {
             await _context.Mensagens.AddAsync(mensagem, cancellationToken);
         }

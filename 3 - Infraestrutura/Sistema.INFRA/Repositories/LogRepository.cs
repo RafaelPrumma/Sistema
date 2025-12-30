@@ -2,21 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
-using System.Linq;
-using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class LogRepository : ILogRepository
+public class LogRepository(AppDbContext context) : ILogRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public LogRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task AdicionarAsync(Log log, CancellationToken cancellationToken = default)
+	public async Task AdicionarAsync(Log log, CancellationToken cancellationToken = default)
     {
         await _context.Logs.AddAsync(log, cancellationToken);
     }

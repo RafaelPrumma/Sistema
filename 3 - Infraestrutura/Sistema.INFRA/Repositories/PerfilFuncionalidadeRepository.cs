@@ -6,16 +6,11 @@ using System.Threading;
 
 namespace Sistema.INFRA.Repositories;
 
-public class PerfilFuncionalidadeRepository : IPerfilFuncionalidadeRepository
+public class PerfilFuncionalidadeRepository(AppDbContext context) : IPerfilFuncionalidadeRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    public PerfilFuncionalidadeRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<IEnumerable<PerfilFuncionalidade>> BuscarPorPerfilIdAsync(int perfilId, CancellationToken cancellationToken = default)
+	public async Task<IEnumerable<PerfilFuncionalidade>> BuscarPorPerfilIdAsync(int perfilId, CancellationToken cancellationToken = default)
     {
         return await _context.PerfilFuncionalidades
             .Include(pf => pf.Funcionalidade)

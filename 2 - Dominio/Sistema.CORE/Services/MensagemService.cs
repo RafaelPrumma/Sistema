@@ -92,7 +92,7 @@ namespace Sistema.CORE.Services
             var todas = new List<Mensagem> { raiz };
             var fronteira = new List<int> { raiz.Id };
 
-            while (fronteira.Any())
+            while (fronteira.Count != 0)
             {
                 var filhos = await baseQuery
                     .Where(m => m.MensagemPaiId.HasValue && fronteira.Contains(m.MensagemPaiId.Value))
@@ -100,16 +100,16 @@ namespace Sistema.CORE.Services
                     .OrderBy(m => m.DataInclusao)
                     .ToListAsync(cancellationToken);
 
-                if (!filhos.Any()) break;
+                if (filhos.Count == 0) break;
 
                 todas.AddRange(filhos);
-                fronteira = filhos.Select(f => f.Id).ToList();
+                fronteira = [.. filhos.Select(f => f.Id)];
             }
 
             var porPai = todas.Where(m => m.MensagemPaiId.HasValue).ToLookup(m => m.MensagemPaiId!.Value);
             foreach (var msg in todas)
             {
-                msg.Respostas = porPai[msg.Id].OrderBy(m => m.DataInclusao).ToList();
+                msg.Respostas = [.. porPai[msg.Id].OrderBy(m => m.DataInclusao)];
             }
 
             return raiz;
@@ -159,7 +159,7 @@ namespace Sistema.CORE.Services
             var corpoLimpo = corpo.Trim();
 
             var usuarios = await _uow.Usuarios.BuscarPorPerfilAsync(perfilId, cancellationToken);
-            if (!usuarios.Any())
+            if (usuarios.Count == 0)
                 return new OperationResult<List<int>>(false, "Nenhum usuário ativo encontrado para o setor selecionado.");
 
             if (remetenteId.HasValue)
@@ -206,8 +206,7 @@ namespace Sistema.CORE.Services
 
         public async Task<int> ContarNaoLidasAsync(int usuarioId, CancellationToken cancellationToken = default)
         {
-            var total = await _uow.Mensagens.Query()
-                .CountAsync(m => m.DestinatarioId == usuarioId && !m.Lida, cancellationToken);
+            var total = await _uow.Mensagens.Query().CountAsync(m => m.DestinatarioId == usuarioId && !m.Lida, cancellationToken);
             return total;
         }
     }

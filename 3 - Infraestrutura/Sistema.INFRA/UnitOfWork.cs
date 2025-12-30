@@ -1,41 +1,20 @@
-using System.Threading;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
 
 namespace Sistema.INFRA;
 
-public class UnitOfWork : IUnitOfWork
+public class UnitOfWork(AppDbContext context, IPerfilRepository perfis, IUsuarioRepository usuarios, ILogRepository logs, IFuncionalidadeRepository funcionalidades,
+				  IPerfilFuncionalidadeRepository perfilFuncs, ITemaRepository temas, IConfiguracaoRepository configuracoes, IMensagemRepository mensagens) : IUnitOfWork
 {
-    private readonly AppDbContext _context;
-    public IPerfilRepository Perfis { get; }
-    public IUsuarioRepository Usuarios { get; }
-    public ILogRepository Logs { get; }
-    public IFuncionalidadeRepository Funcionalidades { get; }
-    public IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; }
-    public ITemaRepository Temas { get; }
-    public IConfiguracaoRepository Configuracoes { get; }
-    public IMensagemRepository Mensagens { get; }
+    private readonly AppDbContext _context = context;
+	public IPerfilRepository Perfis { get; } = perfis;
+	public IUsuarioRepository Usuarios { get; } = usuarios;
+	public ILogRepository Logs { get; } = logs;
+	public IFuncionalidadeRepository Funcionalidades { get; } = funcionalidades;
+	public IPerfilFuncionalidadeRepository PerfilFuncionalidades { get; } = perfilFuncs;
+	public ITemaRepository Temas { get; } = temas;
+	public IConfiguracaoRepository Configuracoes { get; } = configuracoes;
+	public IMensagemRepository Mensagens { get; } = mensagens;
 
-    public UnitOfWork(AppDbContext context,
-                      IPerfilRepository perfis,
-                      IUsuarioRepository usuarios,
-                      ILogRepository logs,
-                      IFuncionalidadeRepository funcionalidades,
-                      IPerfilFuncionalidadeRepository perfilFuncs,
-                      ITemaRepository temas,
-                      IConfiguracaoRepository configuracoes,
-                      IMensagemRepository mensagens)
-    {
-        _context = context;
-        Perfis = perfis;
-        Usuarios = usuarios;
-        Logs = logs;
-        Funcionalidades = funcionalidades;
-        PerfilFuncionalidades = perfilFuncs;
-        Temas = temas;
-        Configuracoes = configuracoes;
-        Mensagens = mensagens;
-    }
-
-    public Task<int> ConfirmarAsync(CancellationToken cancellationToken = default) => _context.SaveChangesAsync(cancellationToken);
+	public Task<int> ConfirmarAsync(CancellationToken cancellationToken = default) => _context.SaveChangesAsync(cancellationToken);
 }
