@@ -133,13 +133,54 @@
         const desktopQuery = window.matchMedia('(min-width: 992px)');
 
         if ($sidebarToggle.length && sidebarElement && window.Mmenu) {
+            const setStoredExpandedState = (state, force = false) => {
+                try {
+                    if (force || desktopQuery.matches) {
+                        window.sessionStorage?.setItem('mmenuExpandedState', state);
+                    }
+                } catch (e) {
+                    console.warn('Não foi possível persistir o estado do menu', e);
+                }
+            };
+
             const resolveInitialState = () => {
+                const serverState = $(sidebarElement).data('expanded') !== false ? 'open' : 'closed';
                 const stored = window.sessionStorage?.getItem('mmenuExpandedState');
+
                 if (stored === 'open' || stored === 'closed') {
+                    if (stored !== serverState) {
+                        setStoredExpandedState(serverState, true);
+                        return serverState;
+                    }
+
                     return stored;
                 }
 
-                return $(sidebarElement).data('expanded') !== false ? 'open' : 'closed';
+                setStoredExpandedState(serverState, true);
+                return serverState;
+            };
+
+            const buildIconbarItems = () => {
+                const items = [];
+
+                sidebarElement.querySelectorAll('.nav-link').forEach((link) => {
+                    const icon = link.querySelector('i');
+                    if (!icon) {
+                        return;
+                    }
+
+                    const anchor = document.createElement('a');
+                    anchor.href = link.getAttribute('href') || '#';
+                    anchor.title = link.getAttribute('title') || link.textContent?.trim() || '';
+
+                    const iconClone = icon.cloneNode(true);
+                    iconClone.classList.remove('me-2');
+                    anchor.appendChild(iconClone);
+
+                    items.push(anchor.outerHTML);
+                });
+
+                return items;
             };
 
             const menu = new window.Mmenu(sidebarSelector, {
@@ -153,6 +194,10 @@
                     position: 'top',
                     content: ['prev', 'title', 'close'],
                 }],
+                iconbar: {
+                    use: true,
+                    top: buildIconbarItems(),
+                },
             }, {
                 offCanvas: {
                     position: 'left',
@@ -172,13 +217,7 @@
             const wrapperElement = menu.node.wrpr || document.body;
 
             const persistExpandedState = (state) => {
-                try {
-                    if (desktopQuery.matches) {
-                        window.sessionStorage?.setItem('mmenuExpandedState', state);
-                    }
-                } catch (e) {
-                    console.warn('Não foi possível persistir o estado do menu', e);
-                }
+                setStoredExpandedState(state);
             };
 
             const syncToggleState = () => {
@@ -208,5 +247,17 @@
                 window.requestAnimationFrame(syncToggleState);
             });
         }
+
+        const clearStoredExpandedState = () => {
+            try {
+                window.sessionStorage?.removeItem('mmenuExpandedState');
+            } catch (e) {
+                console.warn('Não foi possível limpar o estado do menu', e);
+            }
+        };
+
+        $('form').filter(function () {
+            return $(this).find('input[name="MenuLateralExpandido"]').length > 0;
+        }).on('submit', clearStoredExpandedState);
     });
 })();
