@@ -50,6 +50,17 @@
 
         const classesTexto = ['text-white', 'text-dark'];
 
+        const atualizarEspacamentoHeader = () => {
+            if (!$headerEl.length) return;
+
+            const headerFixo = $headerEl.hasClass('fixed-top');
+            const alturaHeader = headerFixo
+                ? Math.ceil(($headerEl.outerHeight ? $headerEl.outerHeight() : $headerEl[0]?.offsetHeight) || 0)
+                : 0;
+
+            document.body.style.paddingTop = headerFixo && alturaHeader ? `${alturaHeader}px` : '';
+        };
+
         const normalizarHex = (valor) => {
             if (!valor) return null;
             const cor = valor.trim();
@@ -144,7 +155,8 @@
 
             if ($headerEl.length) {
                 $headerEl.toggleClass('fixed-top', headerFixed);
-                $body.toggleClass('pt-5', headerFixed);
+                $body.removeClass('pt-5');
+                atualizarEspacamentoHeader();
                 $('#HeaderFixo').prop('checked', headerFixed);
             }
 
@@ -388,6 +400,18 @@
                     });
             });
         }
+
+        let resizeRaf = null;
+        window.addEventListener('resize', () => {
+            if (resizeRaf) {
+                cancelAnimationFrame(resizeRaf);
+            }
+
+            resizeRaf = window.requestAnimationFrame(() => {
+                resizeRaf = null;
+                atualizarEspacamentoHeader();
+            });
+        });
 
     });
 })();
