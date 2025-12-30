@@ -10,7 +10,7 @@
     </div>
     <div class="mt-2">@Model.Corpo</div>
     <div class="mt-2">
-        <a class="btn btn-link p-0" href="@Url.Action("Nova", "Mensagem", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })">Responder</a>
+        <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Nova", "Mensagem", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })">Responder</a>
     </div>
 </div>
 @if (Model.Respostas?.Any() == true)
