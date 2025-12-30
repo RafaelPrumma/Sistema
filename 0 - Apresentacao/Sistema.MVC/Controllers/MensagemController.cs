@@ -6,6 +6,7 @@ using Sistema.MVC.Models;
 using AutoMapper;
 using Sistema.CORE.Common;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -149,10 +150,47 @@ namespace Sistema.MVC.Controllers
         {
             var userId = ObterUsuarioId();
             if (userId is null) return RedirectToAction("Login", "Account");
-            var conversa = await _mensagemService.BuscarConversaAsync(id, userId.Value);
+            var cancellationToken = HttpContext.RequestAborted;
+            var mensagemAtual = await _mensagemService.BuscarPorIdAsync(id, cancellationToken);
+            if (mensagemAtual is null || (mensagemAtual.RemetenteId != userId.Value && mensagemAtual.DestinatarioId != userId.Value))
+                return NotFound();
+
+            if (mensagemAtual.DestinatarioId == userId.Value)
+                await _mensagemService.MarcarComoLidaAsync(id, userId.Value, cancellationToken);
+
+            var conversa = await _mensagemService.BuscarConversaAsync(id, userId.Value, cancellationToken);
             if (conversa == null) return NotFound();
-            if (conversa.DestinatarioId == userId.Value) await _mensagemService.MarcarComoLidaAsync(id, userId.Value);
+
+            if (conversa.Respostas.Any())
+            {
+                var naoLidas = EnumerarThread(conversa)
+                    .Where(m => m.Id != id)
+                    .Where(m => m.DestinatarioId == userId.Value && !m.Lida)
+                    .Select(m => m.Id)
+                    .ToList();
+
+                foreach (var msgId in naoLidas)
+                {
+                    await _mensagemService.MarcarComoLidaAsync(msgId, userId.Value, cancellationToken);
+                }
+            }
+
             return View(_mapper.Map<Sistema.APP.DTOs.MensagemThreadDto>(conversa));
+        }
+
+        private static IEnumerable<Sistema.CORE.Entities.Mensagem> EnumerarThread(Sistema.CORE.Entities.Mensagem raiz)
+        {
+            var pilha = new Stack<Sistema.CORE.Entities.Mensagem>();
+            pilha.Push(raiz);
+            while (pilha.Count > 0)
+            {
+                var atual = pilha.Pop();
+                yield return atual;
+                foreach (var filha in atual.Respostas)
+                {
+                    pilha.Push(filha);
+                }
+            }
         }
 
         [HttpGet]

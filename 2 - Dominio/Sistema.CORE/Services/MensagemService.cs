@@ -37,6 +37,8 @@ namespace Sistema.CORE.Services
         public async Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default)
         {
             IQueryable<Mensagem> query = _uow.Mensagens.Query()
+                .Include(m => m.Remetente)
+                .Include(m => m.Destinatario)
                 .Where(m => m.DestinatarioId == usuarioId);
 
             if (remetenteId.HasValue)
@@ -58,6 +60,8 @@ namespace Sistema.CORE.Services
         public async Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize, CancellationToken cancellationToken = default)
         {
             var query = _uow.Mensagens.Query()
+                .Include(m => m.Remetente)
+                .Include(m => m.Destinatario)
                 .Where(m => m.RemetenteId == usuarioId)
                 .OrderByDescending(m => m.DataInclusao);
             var total = await query.CountAsync(cancellationToken);
@@ -69,7 +73,11 @@ namespace Sistema.CORE.Services
 
         public async Task<Mensagem?> BuscarConversaAsync(int mensagemId, int usuarioId, CancellationToken cancellationToken = default)
         {
-            var mensagem = await _uow.Mensagens.Query()
+            var baseQuery = _uow.Mensagens.Query()
+                .Include(m => m.Remetente)
+                .Include(m => m.Destinatario);
+
+            var mensagem = await baseQuery
                 .FirstOrDefaultAsync(m => m.Id == mensagemId, cancellationToken);
             if (mensagem is null || (mensagem.RemetenteId != usuarioId && mensagem.DestinatarioId != usuarioId))
                 return null;
@@ -77,10 +85,12 @@ namespace Sistema.CORE.Services
             var raiz = mensagem;
             while (raiz.MensagemPaiId.HasValue)
             {
-                var pai = await _uow.Mensagens.Query()
+                var pai = await baseQuery
                     .FirstOrDefaultAsync(m => m.Id == raiz.MensagemPaiId.Value, cancellationToken);
                 if (pai is null)
                     break;
+                if (pai.RemetenteId != usuarioId && pai.DestinatarioId != usuarioId)
+                    return null;
                 raiz = pai;
             }
 
@@ -89,8 +99,9 @@ namespace Sistema.CORE.Services
 
             while (fronteira.Any())
             {
-                var filhos = await _uow.Mensagens.Query()
+                var filhos = await baseQuery
                     .Where(m => m.MensagemPaiId.HasValue && fronteira.Contains(m.MensagemPaiId.Value))
+                    .Where(m => m.RemetenteId == usuarioId || m.DestinatarioId == usuarioId)
                     .OrderBy(m => m.DataInclusao)
                     .ToListAsync(cancellationToken);
 
