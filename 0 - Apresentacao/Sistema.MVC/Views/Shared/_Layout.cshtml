@@ -74,6 +74,7 @@
     <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
     <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="~/lib/aos/aos.css" />
+    <link rel="stylesheet" href="~/lib/mmenu/mmenu.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body data-bs-theme="@(modoEscuro ? "dark" : "light")" class="@(headerFixo ? "pt-5" : string.Empty)">
@@ -98,7 +99,11 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex app-shell">
-            <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal">
+            <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
+                 data-home-url="@Url.Action("Index", "Home")"
+                 data-config-url="@Url.Action("Index", "Configuracao")"
+                 data-theme-url="@Url.Action("Edit", "Tema")"
+                 data-logout-url="@Url.Action("Logout", "Account")">
                 <ul class="nav flex-column">
                     <li class="menu-brand">
                         <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
@@ -135,6 +140,10 @@
                                 <span class="badge bg-primary ms-auto">@unreadMessages</span>
                             }
                         </a>
+                        <ul>
+                            <li><a asp-controller="Mensagem" asp-action="Index" title="Caixa de entrada">Caixa de entrada</a></li>
+                            <li><a asp-controller="Mensagem" asp-action="CaixaSaida" title="Caixa de saída">Caixa de saída</a></li>
+                        </ul>
                     </li>
                     <li class="nav-header text-uppercase small">Personalização</li>
                     <li class="nav-item">
@@ -151,6 +160,14 @@
                         <a class="nav-link @leftText @IsActive("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
                             <i class="bi bi-book me-2"></i><span>Documentação</span>
                         </a>
+                        <ul>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="login" title="Login">Login</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="home" title="Página inicial">Página inicial</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="configuracoes" title="Configurações">Configurações</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="tema" title="Tema">Tema</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" title="Mensagens">Mensagens</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="scripts" title="Scripts">Scripts</a></li>
+                        </ul>
                     </li>
                 </ul>
             </nav>
@@ -171,6 +188,7 @@
     <script src="~/lib/izitoast/js/iziToast.min.js"></script>
     <script src="~/lib/izimodal/js/iziModal.min.js"></script>
     <script src="~/lib/aos/aos.js"></script>
+    <script src="~/lib/mmenu/mmenu.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
 

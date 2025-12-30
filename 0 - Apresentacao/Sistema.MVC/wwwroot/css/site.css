@@ -136,6 +136,12 @@ footer.footer {
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08);
 }
 
+.app-menu.mm-menu {
+  background-color: var(--sidebar-bg) !important;
+  color: inherit;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
 .app-menu .nav {
   padding: 0.5rem 0.25rem 1rem;
   gap: 0.15rem;
@@ -225,6 +231,37 @@ footer.footer {
   box-shadow: inset 4px 0 0 var(--bs-primary), 0 8px 24px rgba(0, 0, 0, 0.18);
   color: #fff;
   font-weight: 700;
+}
+
+.mm-menu .mm-navbar,
+.mm-menu .mm-panel,
+.mm-menu .mm-listitem__text,
+.mm-menu .mm-listitem__btn {
+  color: inherit;
+}
+
+.mm-menu .mm-navbar {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.mm-menu .mm-iconbar {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: transparent;
+}
+
+.mm-menu .mm-listitem__text,
+.mm-menu .mm-listitem__btn {
+  padding: 0.75rem 1rem;
+}
+
+.mm-menu .mm-counter {
+  background-color: #fff;
+  color: var(--bs-primary);
+}
+
+.mm-menu .mm-breadcrumbs {
+  font-weight: 600;
 }
 
 .app-menu .nav-link.active .badge {

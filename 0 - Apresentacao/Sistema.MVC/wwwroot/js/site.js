@@ -74,6 +74,71 @@
             });
         }
 
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (sidebarMenu && window.Mmenu) {
+            const homeUrl = sidebarMenu.dataset.homeUrl || '/';
+            const configUrl = sidebarMenu.dataset.configUrl || '/Configuracao/Index';
+            const themeUrl = sidebarMenu.dataset.themeUrl || '/Tema/Edit';
+            const logoutUrl = sidebarMenu.dataset.logoutUrl || '/Account/Logout';
+
+            const mmenu = new window.Mmenu('#sidebarMenu', {
+                iconPanels: {
+                    add: true,
+                    visible: 1
+                },
+                setSelected: {
+                    hover: true,
+                    parent: true,
+                    current: true
+                },
+                backButton: {
+                    close: true,
+                    open: false
+                },
+                navbars: [
+                    {
+                        position: 'top',
+                        content: ['prev', 'breadcrumbs']
+                    }
+                ]
+            }, {
+                offCanvas: false,
+                sidebar: {
+                    expanded: {
+                        use: true,
+                        initial: 'open'
+                    }
+                },
+                iconbar: {
+                    use: true,
+                    position: 'left',
+                    top: [
+                        `<a href="${homeUrl}" title="Home"><i class="bi bi-house"></i></a>`
+                    ],
+                    bottom: [
+                        `<a href="${logoutUrl}" title="Sair"><i class="bi bi-box-arrow-right"></i></a>`,
+                        `<a href="${configUrl}" title="Configurações"><i class="bi bi-gear"></i></a>`,
+                        `<a href="${themeUrl}" title="Tema"><i class="bi bi-palette"></i></a>`
+                    ]
+                }
+            });
+
+            const api = mmenu.API;
+            api.bind('setSelected:after', () => {
+                sidebarMenu.querySelectorAll('.mm-listitem__btn, .mm-listitem__text')
+                    .forEach(el => el.classList.remove('hovering'));
+            });
+
+            sidebarMenu.addEventListener('mouseover', (ev) => {
+                const target = ev.target;
+                if (!(target instanceof HTMLElement)) return;
+                const listItem = target.closest('.mm-listitem');
+                if (listItem) {
+                    api.setSelected(listItem);
+                }
+            });
+        }
+
         $('input[name="ModoEscuro"]').on('change', function () {
             const theme = $(this).val() === 'true' ? 'dark' : 'light';
             document.body.setAttribute('data-bs-theme', theme);
