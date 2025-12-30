@@ -126,11 +126,13 @@ namespace Sistema.MVC.Controllers
 
             if (model.PerfilId.HasValue)
             {
-                resultadoEnvio = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, model.PerfilId.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+                var resultadoPerfil = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, model.PerfilId.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+                resultadoEnvio = new OperationResult(resultadoPerfil.Success, resultadoPerfil.Message);
             }
             else
             {
-                resultadoEnvio = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+                var resultadoDestinatario = await _mensagemService.EnviarAsync(remetenteId.Value, model.DestinatarioId!.Value, model.Assunto, model.Corpo, model.MensagemPaiId);
+                resultadoEnvio = new OperationResult(resultadoDestinatario.Success, resultadoDestinatario.Message);
             }
 
             if (!resultadoEnvio.Success)
