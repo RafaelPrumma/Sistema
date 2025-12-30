@@ -32,7 +32,7 @@
         ? char.ToUpper(userName.Trim()[0], CultureInfo.CurrentCulture).ToString()
         : "U";
 
-    string IsActive(string controller, string? action = null)
+    string EstaAtivo(string controller, string? action = null)
     {
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
         var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
@@ -40,7 +40,7 @@
         var actionMatch = action is null || string.Equals(action, currentAction, StringComparison.OrdinalIgnoreCase);
         return controllerMatch && actionMatch ? "active" : string.Empty;
     }
-    string GetTextClass(string hex)
+    string ObterClasseTexto(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return "text-dark";
         hex = hex.TrimStart('#');
@@ -55,10 +55,10 @@
         return "text-dark";
     }
 
-    string headerText = GetTextClass(headerColor);
-    string leftText = GetTextClass(leftColor);
-    string rightText = GetTextClass(rightColor);
-    string footerText = GetTextClass(footerColor);
+    string headerText = ObterClasseTexto(headerColor);
+    string leftText = ObterClasseTexto(leftColor);
+    string rightText = ObterClasseTexto(rightColor);
+    string footerText = ObterClasseTexto(footerColor);
     string headerNavbarClass = headerText == "text-white" ? "navbar-dark" : "navbar-light";
     string headerFixedClass = headerFixo ? "fixed-top" : string.Empty;
     string footerFixedClass = footerFixo ? "fixed-bottom" : string.Empty;
@@ -124,17 +124,17 @@
                     </li>
                     <li class="nav-header text-uppercase small">Navegação</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
+                        <a class="nav-link @leftText @EstaAtivo("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
                             <i class="bi bi-house me-2"></i><span>Home</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
+                        <a class="nav-link @leftText @EstaAtivo("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
                             <i class="bi bi-shield-lock me-2"></i><span>Privacy</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
+                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
                             <i class="bi bi-envelope me-2"></i><span>Mensagens</span>
                             @if (unreadMessages > 0)
                             {
@@ -148,17 +148,17 @@
                     </li>
                     <li class="nav-header text-uppercase small">Personalização</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
+                        <a class="nav-link @leftText @EstaAtivo("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
                             <i class="bi bi-palette me-2"></i><span>Tema</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
+                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
                             <i class="bi bi-gear me-2"></i><span>Configurações</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
+                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
                             <i class="bi bi-book me-2"></i><span>Documentação</span>
                         </a>
                         <ul>

@@ -10,32 +10,32 @@
     window.$ = $;
     window.jQuery = $;
 
-    const toast = () => window.iziToast;
+    const brinde = () => window.iziToast;
 
-    function notify(type, title, message) {
-        const instance = toast();
-        if (instance && typeof instance[type] === 'function') {
-            instance[type]({ title, message });
+    function notificar(tipo, titulo, mensagem) {
+        const instancia = brinde();
+        if (instancia && typeof instancia[tipo] === 'function') {
+            instancia[tipo]({ title: titulo, message: mensagem });
         } else {
-            const prefix = title ? `${title}: ` : '';
-            console.log(`${prefix}${message}`);
+            const prefixo = titulo ? `${titulo}: ` : '';
+            console.log(`${prefixo}${mensagem}`);
         }
     }
 
-    window.showSuccess = function (message) {
-        notify('success', 'Sucesso', message);
+    window.mostrarSucesso = function (mensagem) {
+        notificar('success', 'Sucesso', mensagem);
     };
 
-    window.showError = function (message) {
-        notify('error', 'Erro', message);
+    window.mostrarErro = function (mensagem) {
+        notificar('error', 'Erro', mensagem);
     };
 
-    window.showWarning = function (message) {
-        notify('warning', 'Alerta', message);
+    window.mostrarAlerta = function (mensagem) {
+        notificar('warning', 'Alerta', mensagem);
     };
 
-    window.showInfo = function (message) {
-        notify('info', 'Info', message);
+    window.mostrarInfo = function (mensagem) {
+        notificar('info', 'Info', mensagem);
     };
 
     $(function () {
@@ -48,28 +48,28 @@
         let mmApi = null;
         const expandedStateKey = 'mmenuExpandedState';
 
-        const applyTheme = (theme) => {
+        const aplicarTema = (tema) => {
             const computed = getComputedStyle(root);
-            const mode = typeof theme?.modoEscuro === 'boolean'
-                ? (theme.modoEscuro ? 'dark' : 'light')
+            const mode = typeof tema?.modoEscuro === 'boolean'
+                ? (tema.modoEscuro ? 'dark' : 'light')
                 : (document.body.getAttribute('data-bs-theme') || 'light');
 
             document.body.setAttribute('data-bs-theme', mode);
             root.style.colorScheme = mode;
             localStorage.setItem('theme', mode);
 
-            const headerColor = theme?.corHeader ?? computed.getPropertyValue('--header-bg').trim();
-            const leftColor = theme?.corBarraEsquerda ?? computed.getPropertyValue('--sidebar-bg').trim();
-            const rightColor = theme?.corBarraDireita ?? computed.getPropertyValue('--rightbar-bg').trim();
-            const footerColor = theme?.corFooter ?? computed.getPropertyValue('--footer-bg').trim();
+            const headerColor = tema?.corHeader ?? computed.getPropertyValue('--header-bg').trim();
+            const leftColor = tema?.corBarraEsquerda ?? computed.getPropertyValue('--sidebar-bg').trim();
+            const rightColor = tema?.corBarraDireita ?? computed.getPropertyValue('--rightbar-bg').trim();
+            const footerColor = tema?.corFooter ?? computed.getPropertyValue('--footer-bg').trim();
 
             if (headerColor) root.style.setProperty('--header-bg', headerColor);
             if (leftColor) root.style.setProperty('--sidebar-bg', leftColor);
             if (rightColor) root.style.setProperty('--rightbar-bg', rightColor);
             if (footerColor) root.style.setProperty('--footer-bg', footerColor);
 
-            const headerFixed = typeof theme?.headerFixo === 'boolean' ? theme.headerFixo : $headerEl.hasClass('fixed-top');
-            const footerFixed = typeof theme?.footerFixo === 'boolean' ? theme.footerFixo : $footerEl.hasClass('fixed-bottom');
+            const headerFixed = typeof tema?.headerFixo === 'boolean' ? tema.headerFixo : $headerEl.hasClass('fixed-top');
+            const footerFixed = typeof tema?.footerFixo === 'boolean' ? tema.footerFixo : $footerEl.hasClass('fixed-bottom');
 
             if ($headerEl.length) {
                 $headerEl.toggleClass('fixed-top', headerFixed);
@@ -83,21 +83,21 @@
                 $('#FooterFixo').prop('checked', footerFixed);
             }
 
-            if (typeof theme?.modoEscuro === 'boolean') {
-                $(`input[name="ModoEscuro"][value="${theme.modoEscuro}"]`).prop('checked', true);
+            if (typeof tema?.modoEscuro === 'boolean') {
+                $(`input[name="ModoEscuro"][value="${tema.modoEscuro}"]`).prop('checked', true);
             }
 
-            if (theme?.corHeader) $('#CorHeader').val(theme.corHeader);
-            if (theme?.corBarraEsquerda) $('#CorBarraEsquerda').val(theme.corBarraEsquerda);
-            if (theme?.corBarraDireita) $('#CorBarraDireita').val(theme.corBarraDireita);
-            if (theme?.corFooter) $('#CorFooter').val(theme.corFooter);
+            if (tema?.corHeader) $('#CorHeader').val(tema.corHeader);
+            if (tema?.corBarraEsquerda) $('#CorBarraEsquerda').val(tema.corBarraEsquerda);
+            if (tema?.corBarraDireita) $('#CorBarraDireita').val(tema.corBarraDireita);
+            if (tema?.corFooter) $('#CorFooter').val(tema.corFooter);
 
-            if (typeof theme?.menuLateralExpandido === 'boolean') {
-                $('#MenuLateralExpandido').prop('checked', theme.menuLateralExpandido);
-                window.sessionStorage.setItem(expandedStateKey, theme.menuLateralExpandido ? 'open' : 'closed');
+            if (typeof tema?.menuLateralExpandido === 'boolean') {
+                $('#MenuLateralExpandido').prop('checked', tema.menuLateralExpandido);
+                window.sessionStorage.setItem(expandedStateKey, tema.menuLateralExpandido ? 'open' : 'closed');
 
                 if (mmApi) {
-                    if (theme.menuLateralExpandido) {
+                    if (tema.menuLateralExpandido) {
                         mmApi.open();
                     } else {
                         mmApi.close();
@@ -109,7 +109,7 @@
         const sidebarMenu = document.getElementById('sidebarMenu');
         const initialMenuExpanded = sidebarMenu?.dataset.menuExpanded === 'true';
 
-        applyTheme({ modoEscuro: serverTheme === 'dark', menuLateralExpandido: initialMenuExpanded });
+        aplicarTema({ modoEscuro: serverTheme === 'dark', menuLateralExpandido: initialMenuExpanded });
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
@@ -210,59 +210,59 @@
                 }
             });
 
-            applyTheme({ menuLateralExpandido: initialMenuExpanded });
+            aplicarTema({ menuLateralExpandido: initialMenuExpanded });
         }
 
         $('input[name="ModoEscuro"]').on('change', function () {
-            applyTheme({ modoEscuro: $(this).val() === 'true' });
+            aplicarTema({ modoEscuro: $(this).val() === 'true' });
         });
 
         const $headerInput = $('#CorHeader');
         if ($headerInput.length) {
             $headerInput.on('input', function () {
-                applyTheme({ corHeader: $(this).val() });
+                aplicarTema({ corHeader: $(this).val() });
             });
         }
 
         const $leftInput = $('#CorBarraEsquerda');
         if ($leftInput.length) {
             $leftInput.on('input', function () {
-                applyTheme({ corBarraEsquerda: $(this).val() });
+                aplicarTema({ corBarraEsquerda: $(this).val() });
             });
         }
 
         const $rightInput = $('#CorBarraDireita');
         if ($rightInput.length) {
             $rightInput.on('input', function () {
-                applyTheme({ corBarraDireita: $(this).val() });
+                aplicarTema({ corBarraDireita: $(this).val() });
             });
         }
 
         const $footerInput = $('#CorFooter');
         if ($footerInput.length) {
             $footerInput.on('input', function () {
-                applyTheme({ corFooter: $(this).val() });
+                aplicarTema({ corFooter: $(this).val() });
             });
         }
 
         const $headerFix = $('#HeaderFixo');
         if ($headerFix.length && $headerEl.length) {
             $headerFix.on('change', function () {
-                applyTheme({ headerFixo: this.checked });
+                aplicarTema({ headerFixo: this.checked });
             });
         }
 
         const $footerFix = $('#FooterFixo');
         if ($footerFix.length && $footerEl.length) {
             $footerFix.on('change', function () {
-                applyTheme({ footerFixo: this.checked });
+                aplicarTema({ footerFixo: this.checked });
             });
         }
 
         const $menuExpandido = $('#MenuLateralExpandido');
         if ($menuExpandido.length) {
             $menuExpandido.on('change', function () {
-                applyTheme({ menuLateralExpandido: this.checked });
+                aplicarTema({ menuLateralExpandido: this.checked });
             });
         }
 
@@ -290,7 +290,7 @@
                         }
 
                         if (data.theme) {
-                            applyTheme({
+                            aplicarTema({
                                 modoEscuro: data.theme.modoEscuro,
                                 corHeader: data.theme.corHeader,
                                 corBarraEsquerda: data.theme.corBarraEsquerda,
@@ -302,12 +302,12 @@
                             });
                         }
 
-                        notify('success', 'Sucesso', 'Preferências de tema salvas.');
+                        notificar('success', 'Sucesso', 'Preferências de tema salvas.');
                         $temaSidebar.removeClass('show');
                     })
                     .catch(err => {
                         console.error(err);
-                        notify('error', 'Erro', 'Não foi possível salvar o tema.');
+                        notificar('error', 'Erro', 'Não foi possível salvar o tema.');
                     });
             });
         }

@@ -12,7 +12,7 @@ public class TemaController(ITemaService temaService) : Controller
 {
     private readonly ITemaService _temaService = temaService;
 
-    private bool IsAjaxRequest()
+    private bool EhRequisicaoAjax()
     {
         if (Request.Headers.TryGetValue("X-Requested-With", out var header) && header == "XMLHttpRequest")
             return true;
@@ -78,7 +78,7 @@ public class TemaController(ITemaService temaService) : Controller
     {
         if (!ModelState.IsValid)
         {
-            if (IsAjaxRequest())
+            if (EhRequisicaoAjax())
             {
                 var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Where(e => !string.IsNullOrWhiteSpace(e));
                 return BadRequest(new { success = false, errors });
@@ -107,7 +107,7 @@ public class TemaController(ITemaService temaService) : Controller
         };
         await _temaService.SalvarAsync(tema);
 
-        if (IsAjaxRequest())
+        if (EhRequisicaoAjax())
         {
             return Json(new
             {
