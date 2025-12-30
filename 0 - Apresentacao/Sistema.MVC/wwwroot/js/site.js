@@ -172,6 +172,10 @@
                     }
                 }
             }
+
+            if (mmApi) {
+                mmApi.theme(mode === 'dark' ? 'dark' : 'light');
+            }
         };
 
         const sidebarMenu = document.getElementById('sidebarMenu');
@@ -212,12 +216,14 @@
             const configUrl = sidebarMenu.dataset.configUrl || '/Configuracao/Index';
             const themeUrl = sidebarMenu.dataset.themeUrl || '/Tema/Edit';
             const logoutUrl = sidebarMenu.dataset.logoutUrl || '/Account/Logout';
+            const isDarkMode = (document.body.getAttribute('data-bs-theme') || 'light') === 'dark';
 
             if (typeof initialMenuExpanded === 'boolean') {
                 window.sessionStorage.setItem(expandedStateKey, initialMenuExpanded ? 'open' : 'closed');
             }
 
             const mmenu = new window.Mmenu('#sidebarMenu', {
+                theme: isDarkMode ? 'dark' : 'light',
                 iconPanels: {
                     add: true,
                     visible: 1
