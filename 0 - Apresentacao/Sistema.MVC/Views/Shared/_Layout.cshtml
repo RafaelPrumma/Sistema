@@ -74,7 +74,6 @@
     <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
     <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="~/lib/aos/aos.css" />
-    <link rel="stylesheet" href="~/lib/mmenu/mmenu.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body data-bs-theme="@(modoEscuro ? "dark" : "light")" class="@(headerFixo ? "pt-5" : string.Empty)">
@@ -82,7 +81,6 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <button class="btn p-0 border-0 bg-transparent @headerText" type="button" id="sidebarToggle" aria-controls="sidebarMenu" aria-expanded="false"><i class="bi bi-list @headerText"></i><span class="visually-hidden">Abrir menu</span></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
@@ -100,7 +98,7 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex app-shell">
-            <nav id="sidebarMenu" data-expanded="@(menuExpandido.ToString().ToLower())" class="app-menu sidebar-bg @leftText" aria-label="Menu principal">
+            <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal">
                 <ul class="nav flex-column">
                     <li class="menu-brand">
                         <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
@@ -173,7 +171,6 @@
     <script src="~/lib/izitoast/js/iziToast.min.js"></script>
     <script src="~/lib/izimodal/js/iziModal.min.js"></script>
     <script src="~/lib/aos/aos.js"></script>
-    <script src="~/lib/mmenu/mmenu.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
 
@@ -217,11 +214,7 @@
                 <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" value="true" @(footerFixo ? "checked" : string.Empty) />
                 <label class="form-check-label" for="FooterFixo">Footer fixo</label>
             </div>
-            <div class="form-check form-switch mb-3">
-                <input type="hidden" name="MenuLateralExpandido" value="false" />
-                <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" value="true" @(menuExpandido ? "checked" : string.Empty) />
-                <label class="form-check-label" for="MenuLateralExpandido">Menu expandido</label>
-            </div>
+            <input type="hidden" name="MenuLateralExpandido" value="true" />
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
     </aside>

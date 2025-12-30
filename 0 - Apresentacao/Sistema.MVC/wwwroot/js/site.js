@@ -40,10 +40,11 @@
 
     $(function () {
         const root = document.documentElement;
-        const savedTheme = localStorage.getItem('theme');
-        const initialTheme = savedTheme || (document.body.getAttribute('data-bs-theme') || 'light');
+        const serverTheme = document.body.getAttribute('data-bs-theme') || 'light';
+        const initialTheme = serverTheme;
         document.body.setAttribute('data-bs-theme', initialTheme);
         root.style.colorScheme = initialTheme;
+        localStorage.setItem('theme', initialTheme);
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
@@ -127,137 +128,5 @@
             });
         }
 
-        const $sidebarToggle = $('#sidebarToggle');
-        const sidebarSelector = '#sidebarMenu';
-        const sidebarElement = document.querySelector(sidebarSelector);
-        const desktopQuery = window.matchMedia('(min-width: 992px)');
-
-        if ($sidebarToggle.length && sidebarElement && window.Mmenu) {
-            const setStoredExpandedState = (state, force = false) => {
-                try {
-                    if (force || desktopQuery.matches) {
-                        window.sessionStorage?.setItem('mmenuExpandedState', state);
-                    }
-                } catch (e) {
-                    console.warn('Não foi possível persistir o estado do menu', e);
-                }
-            };
-
-            const resolveInitialState = () => {
-                const serverState = $(sidebarElement).data('expanded') !== false ? 'open' : 'closed';
-                const stored = window.sessionStorage?.getItem('mmenuExpandedState');
-
-                if (stored === 'open' || stored === 'closed') {
-                    if (stored !== serverState) {
-                        setStoredExpandedState(serverState, true);
-                        return serverState;
-                    }
-
-                    return stored;
-                }
-
-                setStoredExpandedState(serverState, true);
-                return serverState;
-            };
-
-            const buildIconbarItems = () => {
-                const items = [];
-
-                sidebarElement.querySelectorAll('.nav-link').forEach((link) => {
-                    const icon = link.querySelector('i');
-                    if (!icon) {
-                        return;
-                    }
-
-                    const anchor = document.createElement('a');
-                    anchor.href = link.getAttribute('href') || '#';
-                    anchor.title = link.getAttribute('title') || link.textContent?.trim() || '';
-
-                    const iconClone = icon.cloneNode(true);
-                    iconClone.classList.remove('me-2');
-                    anchor.appendChild(iconClone);
-
-                    items.push(anchor.outerHTML);
-                });
-
-                return items;
-            };
-
-            const menu = new window.Mmenu(sidebarSelector, {
-                extensions: ['border-none', 'shadow-page', 'pagedim-black', 'position-front'],
-                setSelected: true,
-                slidingSubmenus: true,
-                navbar: {
-                    title: 'Menu',
-                },
-                navbars: [{
-                    position: 'top',
-                    content: ['prev', 'title', 'close'],
-                }],
-                iconbar: {
-                    use: true,
-                    top: buildIconbarItems(),
-                },
-            }, {
-                offCanvas: {
-                    position: 'left',
-                },
-                sidebar: {
-                    collapsed: {
-                        use: true,
-                    },
-                    expanded: {
-                        use: desktopQuery.media,
-                        initial: resolveInitialState(),
-                    },
-                },
-            });
-
-            const sidebarApi = menu.API;
-            const wrapperElement = menu.node.wrpr || document.body;
-
-            const persistExpandedState = (state) => {
-                setStoredExpandedState(state);
-            };
-
-            const syncToggleState = () => {
-                const isExpanded = wrapperElement.classList.contains('mm-wrapper--sidebar-expanded');
-                $sidebarToggle.attr('aria-expanded', isExpanded.toString());
-                persistExpandedState(isExpanded ? 'open' : 'closed');
-            };
-
-            syncToggleState();
-
-            sidebarApi.bind('open:after', function () {
-                syncToggleState();
-            });
-
-            sidebarApi.bind('close:after', function () {
-                syncToggleState();
-            });
-
-            $sidebarToggle.on('click', function (e) {
-                e.preventDefault();
-                const isExpanded = wrapperElement.classList.contains('mm-wrapper--sidebar-expanded');
-                const action = isExpanded && desktopQuery.matches ? 'close' : 'open';
-                sidebarApi[action]();
-            });
-
-            desktopQuery.addEventListener('change', (event) => {
-                window.requestAnimationFrame(syncToggleState);
-            });
-        }
-
-        const clearStoredExpandedState = () => {
-            try {
-                window.sessionStorage?.removeItem('mmenuExpandedState');
-            } catch (e) {
-                console.warn('Não foi possível limpar o estado do menu', e);
-            }
-        };
-
-        $('form').filter(function () {
-            return $(this).find('input[name="MenuLateralExpandido"]').length > 0;
-        }).on('submit', clearStoredExpandedState);
     });
 })();
