@@ -32,7 +32,7 @@
         ? char.ToUpper(userName.Trim()[0], CultureInfo.CurrentCulture).ToString()
         : "U";
 
-    string IsActive(string controller, string? action = null)
+    string EstaAtivo(string controller, string? action = null)
     {
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
         var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
@@ -40,7 +40,7 @@
         var actionMatch = action is null || string.Equals(action, currentAction, StringComparison.OrdinalIgnoreCase);
         return controllerMatch && actionMatch ? "active" : string.Empty;
     }
-    string GetTextClass(string hex)
+    string ObterClasseTexto(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return "text-dark";
         hex = hex.TrimStart('#');
@@ -55,10 +55,10 @@
         return "text-dark";
     }
 
-    string headerText = GetTextClass(headerColor);
-    string leftText = GetTextClass(leftColor);
-    string rightText = GetTextClass(rightColor);
-    string footerText = GetTextClass(footerColor);
+    string headerText = ObterClasseTexto(headerColor);
+    string leftText = ObterClasseTexto(leftColor);
+    string rightText = ObterClasseTexto(rightColor);
+    string footerText = ObterClasseTexto(footerColor);
     string headerNavbarClass = headerText == "text-white" ? "navbar-dark" : "navbar-light";
     string headerFixedClass = headerFixo ? "fixed-top" : string.Empty;
     string footerFixedClass = footerFixo ? "fixed-bottom" : string.Empty;
@@ -82,7 +82,6 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <button class="btn p-0 border-0 bg-transparent @headerText" type="button" id="sidebarToggle" aria-controls="sidebarMenu" aria-expanded="false"><i class="bi bi-list @headerText"></i><span class="visually-hidden">Abrir menu</span></button>
                 <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
@@ -100,7 +99,12 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex app-shell">
-            <nav id="sidebarMenu" data-expanded="@(menuExpandido.ToString().ToLower())" class="app-menu sidebar-bg @leftText" aria-label="Menu principal">
+            <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
+                 data-home-url="@Url.Action("Index", "Home")"
+                 data-config-url="@Url.Action("Index", "Configuracao")"
+                 data-theme-url="@Url.Action("Edit", "Tema")"
+                 data-logout-url="@Url.Action("Logout", "Account")"
+                 data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()">
                 <ul class="nav flex-column">
                     <li class="menu-brand">
                         <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
@@ -120,39 +124,51 @@
                     </li>
                     <li class="nav-header text-uppercase small">Navegação</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
+                        <a class="nav-link @leftText @EstaAtivo("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
                             <i class="bi bi-house me-2"></i><span>Home</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
+                        <a class="nav-link @leftText @EstaAtivo("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
                             <i class="bi bi-shield-lock me-2"></i><span>Privacy</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
+                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
                             <i class="bi bi-envelope me-2"></i><span>Mensagens</span>
                             @if (unreadMessages > 0)
                             {
                                 <span class="badge bg-primary ms-auto">@unreadMessages</span>
                             }
                         </a>
+                        <ul>
+                            <li><a asp-controller="Mensagem" asp-action="Index" title="Caixa de entrada">Caixa de entrada</a></li>
+                            <li><a asp-controller="Mensagem" asp-action="CaixaSaida" title="Caixa de saída">Caixa de saída</a></li>
+                        </ul>
                     </li>
                     <li class="nav-header text-uppercase small">Personalização</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
+                        <a class="nav-link @leftText @EstaAtivo("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
                             <i class="bi bi-palette me-2"></i><span>Tema</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
+                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
                             <i class="bi bi-gear me-2"></i><span>Configurações</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @IsActive("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
+                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
                             <i class="bi bi-book me-2"></i><span>Documentação</span>
                         </a>
+                        <ul>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="login" title="Login">Login</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="home" title="Página inicial">Página inicial</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="configuracoes" title="Configurações">Configurações</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="tema" title="Tema">Tema</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" title="Mensagens">Mensagens</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="scripts" title="Scripts">Scripts</a></li>
+                        </ul>
                     </li>
                 </ul>
             </nav>
@@ -208,19 +224,19 @@
                 <input type="color" class="form-control form-control-color" name="CorFooter" id="CorFooter" value="@footerColor" />
             </div>
             <div class="form-check form-switch mb-2">
-                <input type="hidden" name="HeaderFixo" value="false" />
                 <input class="form-check-input" type="checkbox" name="HeaderFixo" id="HeaderFixo" value="true" @(headerFixo ? "checked" : string.Empty) />
+                <input type="hidden" name="HeaderFixo" value="false" />
                 <label class="form-check-label" for="HeaderFixo">Header fixo</label>
             </div>
             <div class="form-check form-switch mb-2">
-                <input type="hidden" name="FooterFixo" value="false" />
                 <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" value="true" @(footerFixo ? "checked" : string.Empty) />
+                <input type="hidden" name="FooterFixo" value="false" />
                 <label class="form-check-label" for="FooterFixo">Footer fixo</label>
             </div>
-            <div class="form-check form-switch mb-3">
-                <input type="hidden" name="MenuLateralExpandido" value="false" />
+            <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" value="true" @(menuExpandido ? "checked" : string.Empty) />
-                <label class="form-check-label" for="MenuLateralExpandido">Menu expandido</label>
+                <input type="hidden" name="MenuLateralExpandido" value="false" />
+                <label class="form-check-label" for="MenuLateralExpandido">Menu lateral expandido</label>
             </div>
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>

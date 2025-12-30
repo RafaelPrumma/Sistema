@@ -16,8 +16,8 @@
                 $modal.iziModal('open');
             }
 
-            if (window.showInfo) {
-                window.showInfo('Enviando dados');
+            if (window.mostrarInfo) {
+                window.mostrarInfo('Enviando dados');
             }
         });
 
@@ -58,15 +58,15 @@
                     if ($register.length && typeof $register.iziModal === 'function') {
                         $register.iziModal('close');
                     }
-                    if (window.showSuccess) {
-                        window.showSuccess('Cadastro realizado');
+                    if (window.mostrarSucesso) {
+                        window.mostrarSucesso('Cadastro realizado');
                     }
-                } else if (window.showError) {
-                    window.showError('Erro ao cadastrar');
+                } else if (window.mostrarErro) {
+                    window.mostrarErro('Erro ao cadastrar');
                 }
             } catch (error) {
-                if (window.showError) {
-                    window.showError('Falha na comunicação');
+                if (window.mostrarErro) {
+                    window.mostrarErro('Falha na comunicação');
                 }
                 console.error('Erro ao cadastrar.', error);
             }
@@ -89,19 +89,19 @@
                     if ($forgot.length && typeof $forgot.iziModal === 'function') {
                         $forgot.iziModal('close');
                     }
-                    if (window.showSuccess) {
-                        window.showSuccess('Email enviado');
+                    if (window.mostrarSucesso) {
+                        window.mostrarSucesso('Email enviado');
                     }
                 } else if (response.status === 404) {
-                    if (window.showError) {
-                        window.showError('Usuário não encontrado');
+                    if (window.mostrarErro) {
+                        window.mostrarErro('Usuário não encontrado');
                     }
-                } else if (window.showError) {
-                    window.showError('Erro ao enviar email');
+                } else if (window.mostrarErro) {
+                    window.mostrarErro('Erro ao enviar email');
                 }
             } catch (error) {
-                if (window.showError) {
-                    window.showError('Falha na comunicação');
+                if (window.mostrarErro) {
+                    window.mostrarErro('Falha na comunicação');
                 }
                 console.error('Erro ao enviar email.', error);
             }
