@@ -252,6 +252,13 @@ footer.footer {
 }
 
 @media (min-width: 992px) {
+  :root {
+    --mm-size: var(--mm-sidebar-expanded-size);
+    --mm-min-size: var(--mm-sidebar-expanded-size);
+    --mm-max-size: var(--mm-sidebar-expanded-size);
+    --mm-translate-horizontal: var(--mm-sidebar-expanded-size);
+  }
+
   #sidebarMenu.app-menu {
     flex: 0 0 var(--mm-sidebar-expanded-size);
     max-width: var(--mm-sidebar-expanded-size);
@@ -272,6 +279,13 @@ footer.footer {
 
   .mm-wrapper--sidebar-collapsed #sidebarMenu.app-menu {
     flex-basis: var(--mm-sidebar-collapsed-size);
+    max-width: var(--mm-sidebar-collapsed-size);
+    transform: translate3d(0, 0, 0);
+  }
+
+  .mm-wrapper--sidebar-collapsed .mm-menu--sidebar-expanded,
+  .mm-wrapper--sidebar-collapsed #sidebarMenu.app-menu {
+    width: var(--mm-sidebar-collapsed-size);
     max-width: var(--mm-sidebar-collapsed-size);
   }
 
