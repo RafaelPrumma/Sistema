@@ -10,22 +10,12 @@ using System.Text;
 
 namespace Sistema.CORE.Services;
 
-/// <summary>
-/// Serviço de autenticação responsável por validar credenciais e emitir tokens JWT.
-/// </summary>
 public class AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IPasswordHasher<Usuario> _hasher = hasher;
     private readonly IConfiguration _config = config;
 
-    /// <summary>
-    /// Autentica um usuário pelo CPF e senha, retornando um token JWT válido ou nulo em caso de falha.
-    /// </summary>
-    /// <param name="cpf">CPF informado no login.</param>
-    /// <param name="senha">Senha em texto puro para validação.</param>
-    /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <returns>Token JWT quando autenticado ou nulo quando inválido.</returns>
     public async Task<string?> AutenticarAsync(string cpf, string senha, CancellationToken cancellationToken = default)
     {
         var usuario = await _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
