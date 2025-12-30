@@ -41,10 +41,56 @@
     $(function () {
         const root = document.documentElement;
         const serverTheme = document.body.getAttribute('data-bs-theme') || 'light';
-        const initialTheme = serverTheme;
-        document.body.setAttribute('data-bs-theme', initialTheme);
-        root.style.colorScheme = initialTheme;
-        localStorage.setItem('theme', initialTheme);
+        const $body = $(document.body);
+        const $headerEl = $('header.navbar');
+        const $footerEl = $('footer.footer');
+
+        const applyTheme = (theme) => {
+            const computed = getComputedStyle(root);
+            const mode = typeof theme?.modoEscuro === 'boolean'
+                ? (theme.modoEscuro ? 'dark' : 'light')
+                : (document.body.getAttribute('data-bs-theme') || 'light');
+
+            document.body.setAttribute('data-bs-theme', mode);
+            root.style.colorScheme = mode;
+            localStorage.setItem('theme', mode);
+
+            const headerColor = theme?.corHeader ?? computed.getPropertyValue('--header-bg').trim();
+            const leftColor = theme?.corBarraEsquerda ?? computed.getPropertyValue('--sidebar-bg').trim();
+            const rightColor = theme?.corBarraDireita ?? computed.getPropertyValue('--rightbar-bg').trim();
+            const footerColor = theme?.corFooter ?? computed.getPropertyValue('--footer-bg').trim();
+
+            if (headerColor) root.style.setProperty('--header-bg', headerColor);
+            if (leftColor) root.style.setProperty('--sidebar-bg', leftColor);
+            if (rightColor) root.style.setProperty('--rightbar-bg', rightColor);
+            if (footerColor) root.style.setProperty('--footer-bg', footerColor);
+
+            const headerFixed = typeof theme?.headerFixo === 'boolean' ? theme.headerFixo : $headerEl.hasClass('fixed-top');
+            const footerFixed = typeof theme?.footerFixo === 'boolean' ? theme.footerFixo : $footerEl.hasClass('fixed-bottom');
+
+            if ($headerEl.length) {
+                $headerEl.toggleClass('fixed-top', headerFixed);
+                $body.toggleClass('pt-5', headerFixed);
+                $('#HeaderFixo').prop('checked', headerFixed);
+            }
+
+            if ($footerEl.length) {
+                $footerEl.toggleClass('fixed-bottom', footerFixed).toggleClass('mt-auto', !footerFixed);
+                $body.toggleClass('pb-5', footerFixed);
+                $('#FooterFixo').prop('checked', footerFixed);
+            }
+
+            if (typeof theme?.modoEscuro === 'boolean') {
+                $(`input[name="ModoEscuro"][value="${theme.modoEscuro}"]`).prop('checked', true);
+            }
+
+            if (theme?.corHeader) $('#CorHeader').val(theme.corHeader);
+            if (theme?.corBarraEsquerda) $('#CorBarraEsquerda').val(theme.corBarraEsquerda);
+            if (theme?.corBarraDireita) $('#CorBarraDireita').val(theme.corBarraDireita);
+            if (theme?.corFooter) $('#CorFooter').val(theme.corFooter);
+        };
+
+        applyTheme({ modoEscuro: serverTheme === 'dark' });
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
@@ -140,56 +186,93 @@
         }
 
         $('input[name="ModoEscuro"]').on('change', function () {
-            const theme = $(this).val() === 'true' ? 'dark' : 'light';
-            document.body.setAttribute('data-bs-theme', theme);
-            root.style.colorScheme = theme;
-            localStorage.setItem('theme', theme);
+            applyTheme({ modoEscuro: $(this).val() === 'true' });
         });
 
         const $headerInput = $('#CorHeader');
         if ($headerInput.length) {
             $headerInput.on('input', function () {
-                root.style.setProperty('--header-bg', $(this).val());
+                applyTheme({ corHeader: $(this).val() });
             });
         }
 
         const $leftInput = $('#CorBarraEsquerda');
         if ($leftInput.length) {
             $leftInput.on('input', function () {
-                root.style.setProperty('--sidebar-bg', $(this).val());
+                applyTheme({ corBarraEsquerda: $(this).val() });
             });
         }
 
         const $rightInput = $('#CorBarraDireita');
         if ($rightInput.length) {
             $rightInput.on('input', function () {
-                root.style.setProperty('--rightbar-bg', $(this).val());
+                applyTheme({ corBarraDireita: $(this).val() });
             });
         }
 
         const $footerInput = $('#CorFooter');
         if ($footerInput.length) {
             $footerInput.on('input', function () {
-                root.style.setProperty('--footer-bg', $(this).val());
+                applyTheme({ corFooter: $(this).val() });
             });
         }
-
-        const $headerEl = $('header.navbar');
-        const $footerEl = $('footer.footer');
 
         const $headerFix = $('#HeaderFixo');
         if ($headerFix.length && $headerEl.length) {
             $headerFix.on('change', function () {
-                $headerEl.toggleClass('fixed-top', this.checked);
-                $('body').toggleClass('pt-5', this.checked);
+                applyTheme({ headerFixo: this.checked });
             });
         }
 
         const $footerFix = $('#FooterFixo');
         if ($footerFix.length && $footerEl.length) {
             $footerFix.on('change', function () {
-                $footerEl.toggleClass('fixed-bottom', this.checked).toggleClass('mt-auto', !this.checked);
-                $('body').toggleClass('pb-5', this.checked);
+                applyTheme({ footerFixo: this.checked });
+            });
+        }
+
+        const $temaForm = $('#temaSidebar form');
+        if ($temaForm.length) {
+            $temaForm.on('submit', function (e) {
+                e.preventDefault();
+                const form = this;
+                const formData = new FormData(form);
+
+                fetch(form.action, {
+                    method: form.method || 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Falha ao salvar tema');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data?.success) {
+                            throw new Error('Falha ao salvar tema');
+                        }
+
+                        if (data.theme) {
+                            applyTheme({
+                                modoEscuro: data.theme.modoEscuro,
+                                corHeader: data.theme.corHeader,
+                                corBarraEsquerda: data.theme.corBarraEsquerda,
+                                corBarraDireita: data.theme.corBarraDireita,
+                                corFooter: data.theme.corFooter,
+                                headerFixo: data.theme.headerFixo,
+                                footerFixo: data.theme.footerFixo
+                            });
+                        }
+
+                        notify('success', 'Sucesso', 'Preferências de tema salvas.');
+                        $temaSidebar.removeClass('show');
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        notify('error', 'Erro', 'Não foi possível salvar o tema.');
+                    });
             });
         }
 

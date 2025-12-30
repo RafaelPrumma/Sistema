@@ -4,6 +4,7 @@ using Sistema.CORE.Entities;
 using Sistema.CORE.Services.Interfaces;
 using Sistema.MVC.Models;
 using System.Security.Claims;
+using System.Linq;
 
 namespace Sistema.MVC.Controllers;
 
@@ -11,7 +12,15 @@ public class TemaController(ITemaService temaService) : Controller
 {
     private readonly ITemaService _temaService = temaService;
 
-	private int? ObterUsuarioId()
+    private bool IsAjaxRequest()
+    {
+        if (Request.Headers.TryGetValue("X-Requested-With", out var header) && header == "XMLHttpRequest")
+            return true;
+
+        return Request.Headers.TryGetValue("Accept", out var accepts) && accepts.Any(a => a.Contains("application/json", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private int? ObterUsuarioId()
     {
         var userId = HttpContext.Session.GetInt32("UserId");
         if (userId.HasValue)
@@ -68,7 +77,15 @@ public class TemaController(ITemaService temaService) : Controller
     public async Task<IActionResult> Edit(TemaViewModel model)
     {
         if (!ModelState.IsValid)
+        {
+            if (IsAjaxRequest())
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Where(e => !string.IsNullOrWhiteSpace(e));
+                return BadRequest(new { success = false, errors });
+            }
+
             return View(model);
+        }
 
         var userId = ObterUsuarioId();
         if (userId is null)
@@ -89,6 +106,26 @@ public class TemaController(ITemaService temaService) : Controller
             UsuarioAlteracao = userName
         };
         await _temaService.SalvarAsync(tema);
+
+        if (IsAjaxRequest())
+        {
+            return Json(new
+            {
+                success = true,
+                theme = new
+                {
+                    modoEscuro = tema.ModoEscuro,
+                    corHeader = tema.CorHeader,
+                    corBarraEsquerda = tema.CorBarraEsquerda,
+                    corBarraDireita = tema.CorBarraDireita,
+                    corFooter = tema.CorFooter,
+                    headerFixo = tema.HeaderFixo,
+                    footerFixo = tema.FooterFixo,
+                    menuLateralExpandido = tema.MenuLateralExpandido
+                }
+            });
+        }
+
         return RedirectToAction("Index", "Home");
     }
 }
