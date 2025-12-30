@@ -130,8 +130,18 @@
         const $sidebarToggle = $('#sidebarToggle');
         const sidebarSelector = '#sidebarMenu';
         const sidebarElement = document.querySelector(sidebarSelector);
+        const desktopQuery = window.matchMedia('(min-width: 992px)');
+
         if ($sidebarToggle.length && sidebarElement && window.Mmenu) {
-            const themeExpanded = $(sidebarElement).data('expanded');
+            const resolveInitialState = () => {
+                const stored = window.sessionStorage?.getItem('mmenuExpandedState');
+                if (stored === 'open' || stored === 'closed') {
+                    return stored;
+                }
+
+                return $(sidebarElement).data('expanded') !== false ? 'open' : 'closed';
+            };
+
             const menu = new window.Mmenu(sidebarSelector, {
                 extensions: ['border-none', 'shadow-page', 'pagedim-black', 'position-front'],
                 setSelected: true,
@@ -147,26 +157,56 @@
                 offCanvas: {
                     position: 'left',
                 },
+                sidebar: {
+                    collapsed: {
+                        use: true,
+                    },
+                    expanded: {
+                        use: desktopQuery.media,
+                        initial: resolveInitialState(),
+                    },
+                },
             });
 
-            const api = menu.API;
+            const sidebarApi = menu.API;
+            const wrapperElement = menu.node.wrpr || document.body;
+
+            const persistExpandedState = (state) => {
+                try {
+                    if (desktopQuery.matches) {
+                        window.sessionStorage?.setItem('mmenuExpandedState', state);
+                    }
+                } catch (e) {
+                    console.warn('Não foi possível persistir o estado do menu', e);
+                }
+            };
+
+            const syncToggleState = () => {
+                const isExpanded = wrapperElement.classList.contains('mm-wrapper--sidebar-expanded');
+                $sidebarToggle.attr('aria-expanded', isExpanded.toString());
+                persistExpandedState(isExpanded ? 'open' : 'closed');
+            };
+
+            syncToggleState();
+
+            sidebarApi.bind('open:after', function () {
+                syncToggleState();
+            });
+
+            sidebarApi.bind('close:after', function () {
+                syncToggleState();
+            });
 
             $sidebarToggle.on('click', function (e) {
                 e.preventDefault();
-                api.open();
+                const isExpanded = wrapperElement.classList.contains('mm-wrapper--sidebar-expanded');
+                const action = isExpanded && desktopQuery.matches ? 'close' : 'open';
+                sidebarApi[action]();
             });
 
-            api.bind('open:after', function () {
-                $sidebarToggle.attr('aria-expanded', 'true');
+            desktopQuery.addEventListener('change', (event) => {
+                window.requestAnimationFrame(syncToggleState);
             });
-
-            api.bind('close:after', function () {
-                $sidebarToggle.attr('aria-expanded', 'false');
-            });
-
-            if (themeExpanded && window.innerWidth >= 992) {
-                api.open();
-            }
         }
     });
 })();
