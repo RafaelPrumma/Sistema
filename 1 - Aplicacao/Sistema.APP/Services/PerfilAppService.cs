@@ -1,18 +1,16 @@
-using System.Threading;
-using System.Threading.Tasks;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.APP.Services;
 
-public class PerfilService(IUnitOfWork uow, ILogService log) : IPerfilService
+public class PerfilAppService(IUnitOfWork uow, ILogAppService log) : IPerfilAppService
 {
     private readonly IUnitOfWork _uow = uow;
-    private readonly ILogService _log = log;
+    private readonly ILogAppService _log = log;
 
-	public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+    public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _uow.Perfis.BuscarTodosAsync(page, pageSize, cancellationToken);
 
     public Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) =>
@@ -58,4 +56,3 @@ public class PerfilService(IUnitOfWork uow, ILogService log) : IPerfilService
         return new OperationResult(true, "Perfil removido");
     }
 }
-

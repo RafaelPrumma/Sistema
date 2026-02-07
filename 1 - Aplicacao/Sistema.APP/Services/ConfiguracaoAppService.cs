@@ -1,13 +1,10 @@
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.APP.Services;
 
-public class ConfiguracaoService(IUnitOfWork uow) : IConfiguracaoService
+public class ConfiguracaoAppService(IUnitOfWork uow) : IConfiguracaoAppService
 {
     private readonly IUnitOfWork _uow = uow;
 

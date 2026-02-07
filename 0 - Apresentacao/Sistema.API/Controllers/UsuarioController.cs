@@ -3,8 +3,8 @@ using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services;
-using Sistema.CORE.Services.Interfaces;
+
+using Sistema.APP.Services.Interfaces;
 
 namespace Sistema.API.Controllers;
 
@@ -12,10 +12,10 @@ namespace Sistema.API.Controllers;
 [Route("api/[controller]")]
 public class UsuarioController : ControllerBase
 {
-    private readonly IUsuarioService _service;
+    private readonly IUsuarioAppService _service;
     private readonly IMapper _mapper;
 
-    public UsuarioController(IUsuarioService service, IMapper mapper)
+    public UsuarioController(IUsuarioAppService service, IMapper mapper)
     {
         _service = service;
         _mapper = mapper;

@@ -1,16 +1,14 @@
-using System.Threading;
-using System.Threading.Tasks;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.APP.Services;
 
-public class UsuarioService(IUnitOfWork uow, ILogService log) : IUsuarioService
+public class UsuarioAppService(IUnitOfWork uow, ILogAppService log) : IUsuarioAppService
 {
     private readonly IUnitOfWork _uow = uow;
-    private readonly ILogService _log = log;
+    private readonly ILogAppService _log = log;
 
     public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _uow.Usuarios.BuscarTodosAsync(page, pageSize, cancellationToken);

@@ -3,18 +3,18 @@ using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services;
-using Sistema.CORE.Services.Interfaces;
+
+using Sistema.APP.Services.Interfaces;
 namespace Sistema.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class PerfilController : ControllerBase
 {
-    private readonly IPerfilService _service;
+    private readonly IPerfilAppService _service;
     private readonly IMapper _mapper;
 
-    public PerfilController(IPerfilService service, IMapper mapper)
+    public PerfilController(IPerfilAppService service, IMapper mapper)
     {
         _service = service;
         _mapper = mapper;

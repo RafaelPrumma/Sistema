@@ -1,0 +1,13 @@
+using Sistema.CORE.Common;
+using Sistema.CORE.Entities;
+
+namespace Sistema.APP.Services.Interfaces;
+
+public interface IPerfilAppService
+{
+    Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<OperationResult<Perfil>> AdicionarAsync(Perfil perfil, CancellationToken cancellationToken = default);
+    Task<OperationResult> AtualizarAsync(Perfil perfil, CancellationToken cancellationToken = default);
+    Task<OperationResult> RemoverAsync(int id, CancellationToken cancellationToken = default);
+}

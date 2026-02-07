@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
 
 namespace Sistema.MVC.Controllers;
 
-public class ConfiguracaoController(IConfiguracaoService service) : Controller
+public class ConfiguracaoController(IConfiguracaoAppService service) : Controller
 {
-    private readonly IConfiguracaoService _service = service;
+    private readonly IConfiguracaoAppService _service = service;
 
 	[HttpGet]
     public async Task<IActionResult> Index(string agrupamento = "AzureAd")

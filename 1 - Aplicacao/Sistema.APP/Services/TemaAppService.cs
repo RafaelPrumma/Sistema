@@ -1,16 +1,14 @@
-using System.Threading;
-using System.Threading.Tasks;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.APP.Services;
 
-public class TemaService(IUnitOfWork uow) : ITemaService
+public class TemaAppService(IUnitOfWork uow) : ITemaAppService
 {
     private readonly IUnitOfWork _uow = uow;
 
-	public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
+    public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
         _uow.Temas.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);
 
     public async Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default)
@@ -36,4 +34,3 @@ public class TemaService(IUnitOfWork uow) : ITemaService
         await _uow.ConfirmarAsync(cancellationToken);
     }
 }
-

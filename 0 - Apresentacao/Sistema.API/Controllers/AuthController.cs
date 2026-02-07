@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 
 namespace Sistema.API.Controllers;
 
@@ -10,9 +10,9 @@ namespace Sistema.API.Controllers;
 [AllowAnonymous]
 public class AuthController : ControllerBase
 {
-    private readonly IAuthService _authService;
+    private readonly IAuthAppService _authService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthAppService authService)
     {
         _authService = authService;
     }

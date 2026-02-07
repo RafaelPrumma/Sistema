@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace Sistema.CORE.Services;
+namespace Sistema.APP.Services;
 
-public class AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthService
+public class AuthAppService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthAppService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IPasswordHasher<Usuario> _hasher = hasher;

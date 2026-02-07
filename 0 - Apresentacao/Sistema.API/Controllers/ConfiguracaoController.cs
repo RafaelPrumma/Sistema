@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 
 namespace Sistema.API.Controllers;
 
@@ -12,10 +12,10 @@ namespace Sistema.API.Controllers;
 [Authorize]
 public class ConfiguracaoController : ControllerBase
 {
-	private readonly IConfiguracaoService _service;
+	private readonly IConfiguracaoAppService _service;
 	private readonly IMapper _mapper;
 
-	public ConfiguracaoController(IConfiguracaoService service, IMapper mapper)
+	public ConfiguracaoController(IConfiguracaoAppService service, IMapper mapper)
 	{
 		_service = service;
 		_mapper = mapper;

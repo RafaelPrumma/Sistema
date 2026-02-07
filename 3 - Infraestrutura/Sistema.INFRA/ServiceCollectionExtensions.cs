@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sistema.CORE.Repositories.Interfaces;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.INFRA.Data;
 using Sistema.INFRA.Repositories;
 using Sistema.INFRA.Services;
@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
         services.AddScoped<IMensagemRepository, MensagemRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IEmailAppService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
 
         return services;

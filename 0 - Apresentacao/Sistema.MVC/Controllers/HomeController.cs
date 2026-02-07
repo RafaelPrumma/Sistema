@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
 using System.Diagnostics;
 
 namespace Sistema.MVC.Controllers
 {
-        public class HomeController(ILogger<HomeController> logger, IUsuarioService usuarioService, IPerfilService perfilService, IFuncionalidadeService funcionalidadeService, IConfiguracaoService configuracaoService, IMensagemService mensagemService) : Controller
+        public class HomeController(ILogger<HomeController> logger, IUsuarioAppService usuarioService, IPerfilAppService perfilService, IFuncionalidadeAppService funcionalidadeService, IConfiguracaoAppService configuracaoService, IMensagemAppService mensagemService) : Controller
         {
                 private readonly ILogger<HomeController> _logger = logger;
-                private readonly IUsuarioService _usuarioService = usuarioService;
-                private readonly IPerfilService _perfilService = perfilService;
-                private readonly IFuncionalidadeService _funcionalidadeService = funcionalidadeService;
-                private readonly IConfiguracaoService _configuracaoService = configuracaoService;
-                private readonly IMensagemService _mensagemService = mensagemService;
+                private readonly IUsuarioAppService _usuarioService = usuarioService;
+                private readonly IPerfilAppService _perfilService = perfilService;
+                private readonly IFuncionalidadeAppService _funcionalidadeService = funcionalidadeService;
+                private readonly IConfiguracaoAppService _configuracaoService = configuracaoService;
+                private readonly IMensagemAppService _mensagemService = mensagemService;
 
 		public async Task<IActionResult> Index()
                 {

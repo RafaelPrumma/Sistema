@@ -1,12 +1,9 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Sistema.CORE.Entities;
 
-namespace Sistema.CORE.Services.Interfaces;
+namespace Sistema.APP.Services.Interfaces;
 
-public interface ITemaService
+public interface ITemaAppService
 {
     Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default);
     Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default);
 }
-

@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
 using System.Security.Claims;
 using System.Linq;
 
 namespace Sistema.MVC.Controllers;
 
-public class TemaController(ITemaService temaService) : Controller
+public class TemaController(ITemaAppService temaService) : Controller
 {
-    private readonly ITemaService _temaService = temaService;
+    private readonly ITemaAppService _temaService = temaService;
 
     private bool EhRequisicaoAjax()
     {

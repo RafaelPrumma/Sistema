@@ -3,17 +3,17 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
 using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
-public class AccountController(IUsuarioService usuarioService, IPasswordHasher<Usuario> hasher, IEmailService emailService, ILogger<AccountController> logger) : Controller
+public class AccountController(IUsuarioAppService usuarioService, IPasswordHasher<Usuario> hasher, IEmailAppService emailService, ILogger<AccountController> logger) : Controller
 {
-    private readonly IUsuarioService _usuarioService = usuarioService;
+    private readonly IUsuarioAppService _usuarioService = usuarioService;
     private readonly IPasswordHasher<Usuario> _hasher = hasher;
-    private readonly IEmailService _emailService = emailService;
+    private readonly IEmailAppService _emailService = emailService;
     private readonly ILogger<AccountController> _logger = logger;
 
 	private int? ObterUsuarioId()
