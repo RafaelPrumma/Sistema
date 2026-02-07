@@ -6,7 +6,7 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class TemaService(IUnitOfWork uow) : ITemaService
+public class TemaService(IUnitOfWork uow) : ITemaDomainService
 {
     private readonly IUnitOfWork _uow = uow;
 

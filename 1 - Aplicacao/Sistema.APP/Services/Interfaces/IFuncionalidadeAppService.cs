@@ -3,7 +3,7 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IFuncionalidadeService
+public interface IFuncionalidadeAppService
 {
     Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Funcionalidade?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);

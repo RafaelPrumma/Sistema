@@ -11,10 +11,10 @@ namespace Sistema.API.Controllers;
 [Route("api/[controller]")]
 public class PerfilController : ControllerBase
 {
-    private readonly IPerfilService _service;
+    private readonly IPerfilAppService _service;
     private readonly IMapper _mapper;
 
-    public PerfilController(IPerfilService service, IMapper mapper)
+    public PerfilController(IPerfilAppService service, IMapper mapper)
     {
         _service = service;
         _mapper = mapper;

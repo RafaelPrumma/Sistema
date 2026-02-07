@@ -3,7 +3,7 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IPerfilService
+public interface IPerfilAppService
 {
     Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);

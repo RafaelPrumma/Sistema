@@ -3,9 +3,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class TemaAppService(Sistema.CORE.Services.Interfaces.ITemaService domainService) : ITemaService
+public class TemaAppService(Sistema.CORE.Services.Interfaces.ITemaDomainService domainService) : ITemaAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.ITemaService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.ITemaDomainService _domainService = domainService;
 
     public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
         _domainService.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);

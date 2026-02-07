@@ -3,7 +3,7 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IMensagemService
+public interface IMensagemAppService
 {
     Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default);
     Task<PagedResult<Mensagem>> BuscarCaixaSaidaAsync(int usuarioId, int page, int pageSize, CancellationToken cancellationToken = default);

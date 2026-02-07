@@ -3,9 +3,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class ConfiguracaoAppService(Sistema.CORE.Services.Interfaces.IConfiguracaoService domainService) : IConfiguracaoService
+public class ConfiguracaoAppService(Sistema.CORE.Services.Interfaces.IConfiguracaoDomainService domainService) : IConfiguracaoAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IConfiguracaoService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IConfiguracaoDomainService _domainService = domainService;
 
     public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
         _domainService.BuscarPorAgrupamentoAsync(agrupamento, cancellationToken);

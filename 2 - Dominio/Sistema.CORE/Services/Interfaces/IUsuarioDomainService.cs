@@ -8,7 +8,7 @@ namespace Sistema.CORE.Services.Interfaces;
 /// <summary>
 /// Serviço responsável por operações de usuário e auditoria das ações executadas.
 /// </summary>
-public interface IUsuarioService
+public interface IUsuarioDomainService
 {
     /// <summary>
     /// Recupera todos os usuários ativos aplicando paginação.

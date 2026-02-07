@@ -5,7 +5,7 @@ namespace Sistema.CORE.Services.Interfaces;
 /// <summary>
 /// Serviço responsável por gerenciar configurações do sistema e delegar persistência ao repositório.
 /// </summary>
-public interface IConfiguracaoService
+public interface IConfiguracaoDomainService
 {
     /// <summary>
     /// Busca configurações pertencentes a um agrupamento específico.

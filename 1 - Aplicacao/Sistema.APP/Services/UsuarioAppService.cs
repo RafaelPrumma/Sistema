@@ -4,9 +4,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class UsuarioAppService(Sistema.CORE.Services.Interfaces.IUsuarioService domainService) : IUsuarioService
+public class UsuarioAppService(Sistema.CORE.Services.Interfaces.IUsuarioDomainService domainService) : IUsuarioAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IUsuarioService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IUsuarioDomainService _domainService = domainService;
 
     public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _domainService.BuscarTodosAsync(page, pageSize, cancellationToken);

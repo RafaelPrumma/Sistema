@@ -3,9 +3,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class LogAppService(Sistema.CORE.Services.Interfaces.ILogService domainService) : ILogService
+public class LogAppService(Sistema.CORE.Services.Interfaces.ILogDomainService domainService) : ILogAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.ILogService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.ILogDomainService _domainService = domainService;
 
     public Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default) =>
         _domainService.BuscarFiltradosAsync(inicio, fim, tipo, cancellationToken);

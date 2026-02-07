@@ -8,7 +8,7 @@ namespace Sistema.CORE.Services.Interfaces;
 /// <summary>
 /// Serviço que gerencia funcionalidades do sistema e registra auditorias das operações.
 /// </summary>
-public interface IFuncionalidadeService
+public interface IFuncionalidadeDomainService
 {
     /// <summary>
     /// Obtém funcionalidades com suporte a paginação.

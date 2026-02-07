@@ -7,7 +7,7 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class ConfiguracaoService(IUnitOfWork uow) : IConfiguracaoService
+public class ConfiguracaoService(IUnitOfWork uow) : IConfiguracaoDomainService
 {
     private readonly IUnitOfWork _uow = uow;
 

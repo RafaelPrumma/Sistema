@@ -8,9 +8,9 @@ using System.Linq;
 
 namespace Sistema.MVC.Controllers;
 
-public class TemaController(ITemaService temaService) : Controller
+public class TemaController(ITemaAppService temaService) : Controller
 {
-    private readonly ITemaService _temaService = temaService;
+    private readonly ITemaAppService _temaService = temaService;
 
     private bool EhRequisicaoAjax()
     {

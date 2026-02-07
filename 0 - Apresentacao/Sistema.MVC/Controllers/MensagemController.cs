@@ -7,14 +7,14 @@ using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers
 {
-    public class MensagemController(IMensagemService mensagemService, IUsuarioService usuarioService, IPerfilService perfilService, IMapper mapper) : Controller
+    public class MensagemController(IMensagemAppService mensagemService, IUsuarioAppService usuarioService, IPerfilAppService perfilService, IMapper mapper) : Controller
     {
         private const string PerfilPrefixo = "perfil:";
         private const string UsuarioPrefixo = "usuario:";
 
-        private readonly IMensagemService _mensagemService = mensagemService;
-        private readonly IUsuarioService _usuarioService = usuarioService;
-        private readonly IPerfilService _perfilService = perfilService;
+        private readonly IMensagemAppService _mensagemService = mensagemService;
+        private readonly IUsuarioAppService _usuarioService = usuarioService;
+        private readonly IPerfilAppService _perfilService = perfilService;
         private readonly IMapper _mapper = mapper;
 
 		private int? ObterUsuarioId()

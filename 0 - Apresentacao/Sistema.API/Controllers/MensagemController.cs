@@ -13,10 +13,10 @@ namespace Sistema.API.Controllers
     [Route("api/[controller]")]
     public class MensagemController : ControllerBase
     {
-        private readonly IMensagemService _mensagemService;
+        private readonly IMensagemAppService _mensagemService;
         private readonly IMapper _mapper;
 
-        public MensagemController(IMensagemService mensagemService, IMapper mapper)
+        public MensagemController(IMensagemAppService mensagemService, IMapper mapper)
         {
             _mensagemService = mensagemService;
             _mapper = mapper;

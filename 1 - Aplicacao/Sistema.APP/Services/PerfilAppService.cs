@@ -4,9 +4,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class PerfilAppService(Sistema.CORE.Services.Interfaces.IPerfilService domainService) : IPerfilService
+public class PerfilAppService(Sistema.CORE.Services.Interfaces.IPerfilDomainService domainService) : IPerfilAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IPerfilService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IPerfilDomainService _domainService = domainService;
 
     public Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _domainService.BuscarTodosAsync(page, pageSize, cancellationToken);

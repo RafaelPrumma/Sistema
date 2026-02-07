@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
         services.AddScoped<IMensagemRepository, MensagemRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IEmailDomainService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
 
         return services;

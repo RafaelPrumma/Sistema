@@ -11,7 +11,7 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services
 {
-    public class MensagemService(IUnitOfWork uow) : IMensagemService
+    public class MensagemService(IUnitOfWork uow) : IMensagemDomainService
     {
         private readonly IUnitOfWork _uow = uow;
 

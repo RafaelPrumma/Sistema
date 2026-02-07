@@ -5,9 +5,9 @@ using Sistema.MVC.Models;
 
 namespace Sistema.MVC.Controllers;
 
-public class ConfiguracaoController(IConfiguracaoService service) : Controller
+public class ConfiguracaoController(IConfiguracaoAppService service) : Controller
 {
-    private readonly IConfiguracaoService _service = service;
+    private readonly IConfiguracaoAppService _service = service;
 
 	[HttpGet]
     public async Task<IActionResult> Index(string agrupamento = "AzureAd")

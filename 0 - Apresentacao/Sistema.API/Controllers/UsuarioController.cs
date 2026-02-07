@@ -12,10 +12,10 @@ namespace Sistema.API.Controllers;
 [Route("api/[controller]")]
 public class UsuarioController : ControllerBase
 {
-    private readonly IUsuarioService _service;
+    private readonly IUsuarioAppService _service;
     private readonly IMapper _mapper;
 
-    public UsuarioController(IUsuarioService service, IMapper mapper)
+    public UsuarioController(IUsuarioAppService service, IMapper mapper)
     {
         _service = service;
         _mapper = mapper;

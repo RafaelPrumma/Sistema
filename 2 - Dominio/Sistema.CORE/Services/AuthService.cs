@@ -10,7 +10,7 @@ using System.Text;
 
 namespace Sistema.CORE.Services;
 
-public class AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthService
+public class AuthService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IConfiguration config) : IAuthDomainService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IPasswordHasher<Usuario> _hasher = hasher;

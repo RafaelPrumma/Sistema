@@ -2,9 +2,9 @@ using Sistema.APP.Services.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class EmailAppService(Sistema.CORE.Services.Interfaces.IEmailService domainService) : IEmailService
+public class EmailAppService(Sistema.CORE.Services.Interfaces.IEmailDomainService domainService) : IEmailAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IEmailService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IEmailDomainService _domainService = domainService;
 
     public Task EnviarAsync(string destinatario, string assunto, string mensagem, CancellationToken cancellationToken = default) =>
         _domainService.EnviarAsync(destinatario, assunto, mensagem, cancellationToken);

@@ -14,10 +14,10 @@ namespace Sistema.API.Controllers;
 [Authorize]
 public class FuncionalidadeController : ControllerBase
 {
-    private readonly IFuncionalidadeService _service;
+    private readonly IFuncionalidadeAppService _service;
     private readonly IMapper _mapper;
 
-    public FuncionalidadeController(IFuncionalidadeService service, IMapper mapper)
+    public FuncionalidadeController(IFuncionalidadeAppService service, IMapper mapper)
     {
         _service = service;
         _mapper = mapper;

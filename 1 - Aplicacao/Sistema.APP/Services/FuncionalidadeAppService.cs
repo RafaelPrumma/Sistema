@@ -4,9 +4,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class FuncionalidadeAppService(Sistema.CORE.Services.Interfaces.IFuncionalidadeService domainService) : IFuncionalidadeService
+public class FuncionalidadeAppService(Sistema.CORE.Services.Interfaces.IFuncionalidadeDomainService domainService) : IFuncionalidadeAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IFuncionalidadeService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IFuncionalidadeDomainService _domainService = domainService;
 
     public Task<PagedResult<Funcionalidade>> BuscarPaginadasAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _domainService.BuscarPaginadasAsync(page, pageSize, cancellationToken);

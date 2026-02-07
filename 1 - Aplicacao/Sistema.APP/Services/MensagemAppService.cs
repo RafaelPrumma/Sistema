@@ -4,9 +4,9 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services;
 
-public class MensagemAppService(Sistema.CORE.Services.Interfaces.IMensagemService domainService) : IMensagemService
+public class MensagemAppService(Sistema.CORE.Services.Interfaces.IMensagemDomainService domainService) : IMensagemAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IMensagemService _domainService = domainService;
+    private readonly Sistema.CORE.Services.Interfaces.IMensagemDomainService _domainService = domainService;
 
     public Task<PagedResult<Mensagem>> BuscarCaixaEntradaAsync(int usuarioId, int page, int pageSize, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null, CancellationToken cancellationToken = default) =>
         _domainService.BuscarCaixaEntradaAsync(usuarioId, page, pageSize, remetenteId, palavraChave, inicio, fim, cancellationToken);

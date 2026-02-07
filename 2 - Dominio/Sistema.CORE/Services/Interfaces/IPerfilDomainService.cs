@@ -5,7 +5,7 @@ using Sistema.CORE.Common;
 
 namespace Sistema.CORE.Services.Interfaces
 {
-    public interface IPerfilService
+    public interface IPerfilDomainService
     {
         Task<PagedResult<Perfil>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default);
         Task<Perfil?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);

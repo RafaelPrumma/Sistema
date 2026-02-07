@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace Sistema.INFRA.Services;
 
-public class EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger) : IEmailService
+public class EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger) : IEmailDomainService
 {
     private readonly EmailOptions _options = options.Value;
     private readonly ILogger<EmailService> _logger = logger;

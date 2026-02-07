@@ -10,7 +10,7 @@ namespace Sistema.CORE.Services.Interfaces
     /// <summary>
     /// Serviço de mensagens responsável por consultas, envio e atualização de status de leitura.
     /// </summary>
-    public interface IMensagemService
+    public interface IMensagemDomainService
     {
         /// <summary>
         /// Busca mensagens recebidas pelo usuário aplicando filtros opcionais e paginação.

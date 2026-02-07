@@ -7,10 +7,10 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class UsuarioService(IUnitOfWork uow, ILogService log) : IUsuarioService
+public class UsuarioService(IUnitOfWork uow, ILogDomainService log) : IUsuarioDomainService
 {
     private readonly IUnitOfWork _uow = uow;
-    private readonly ILogService _log = log;
+    private readonly ILogDomainService _log = log;
 
     public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
         _uow.Usuarios.BuscarTodosAsync(page, pageSize, cancellationToken);

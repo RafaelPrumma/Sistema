@@ -1,6 +1,6 @@
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IEmailService
+public interface IEmailAppService
 {
     Task EnviarAsync(string destinatario, string assunto, string mensagem, CancellationToken cancellationToken = default);
 }

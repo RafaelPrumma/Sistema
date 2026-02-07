@@ -8,7 +8,7 @@ using Sistema.CORE.Services.Interfaces;
 
 namespace Sistema.CORE.Services;
 
-public class LogService(IUnitOfWork uow) : ILogService
+public class LogService(IUnitOfWork uow) : ILogDomainService
 {
     private readonly IUnitOfWork _uow = uow;
 

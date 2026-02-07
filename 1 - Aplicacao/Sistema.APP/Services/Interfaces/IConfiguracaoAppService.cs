@@ -2,7 +2,7 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IConfiguracaoService
+public interface IConfiguracaoAppService
 {
     Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default);
     Task<Configuracao?> BuscarPorChaveAsync(string agrupamento, string chave, CancellationToken cancellationToken = default);

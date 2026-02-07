@@ -3,7 +3,7 @@ namespace Sistema.CORE.Services.Interfaces;
 /// <summary>
 /// Serviço de autenticação responsável por validar credenciais e emitir tokens JWT.
 /// </summary>
-public interface IAuthService
+public interface IAuthDomainService
 {
     /// <summary>
     /// Autentica um usuário pelo CPF e senha, retornando um token JWT válido ou nulo em caso de falha.
