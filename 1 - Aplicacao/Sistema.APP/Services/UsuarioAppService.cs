@@ -1,31 +1,61 @@
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
+using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class UsuarioAppService(Sistema.CORE.Services.Interfaces.IUsuarioDomainService domainService) : IUsuarioAppService
+public class UsuarioAppService(IUnitOfWork uow, ILogAppService log) : IUsuarioAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.IUsuarioDomainService _domainService = domainService;
+    private readonly IUnitOfWork _uow = uow;
+    private readonly ILogAppService _log = log;
 
     public Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
-        _domainService.BuscarTodosAsync(page, pageSize, cancellationToken);
+        _uow.Usuarios.BuscarTodosAsync(page, pageSize, cancellationToken);
 
-    public Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) =>
-        _domainService.BuscarPorIdAsync(id, cancellationToken);
+    public Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorIdAsync(id, cancellationToken);
 
-    public Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default) =>
-        _domainService.BuscarPorCpfAsync(cpf, cancellationToken);
+    public Task<Usuario?> BuscarPorCpfAsync(string cpf, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorCpfAsync(cpf, cancellationToken);
 
-    public Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default) =>
-        _domainService.BuscarPorResetTokenAsync(token, cancellationToken);
+    public Task<Usuario?> BuscarPorResetTokenAsync(string token, CancellationToken cancellationToken = default) => _uow.Usuarios.BuscarPorResetTokenAsync(token, cancellationToken);
 
-    public Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default) =>
-        _domainService.AdicionarAsync(usuario, cancellationToken);
+    public async Task<OperationResult<Usuario>> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
+    {
+        var existing = await _uow.Usuarios.BuscarPorCpfAsync(usuario.Cpf, cancellationToken);
+        if (existing is not null)
+        {
+            await _log.RegistrarAsync(nameof(Usuario), "Add", false, "Usuário já existe", LogTipo.Erro, usuario.UsuarioInclusao, null, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
+            return new OperationResult<Usuario>(false, "Usuário já existe");
+        }
 
-    public Task<OperationResult> AtualizarAsync(Usuario usuario, CancellationToken cancellationToken = default) =>
-        _domainService.AtualizarAsync(usuario, cancellationToken);
+        var created = await _uow.Usuarios.AdicionarAsync(usuario, cancellationToken);
+        await _log.RegistrarAsync(nameof(Usuario), "Add", true, "Usuário criado", LogTipo.Sucesso, usuario.UsuarioInclusao, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new OperationResult<Usuario>(true, "Usuário criado com sucesso", created);
+    }
 
-    public Task<OperationResult> RemoverAsync(int id, CancellationToken cancellationToken = default) =>
-        _domainService.RemoverAsync(id, cancellationToken);
+    public async Task<OperationResult> AtualizarAsync(Usuario usuario, CancellationToken cancellationToken = default)
+    {
+        var existing = await _uow.Usuarios.BuscarPorCpfAsync(usuario.Cpf, cancellationToken);
+        if (existing is not null && existing.Id != usuario.Id)
+        {
+            await _log.RegistrarAsync(nameof(Usuario), "Update", false, "CPF já utilizado", LogTipo.Erro, usuario.UsuarioAlteracao ?? "system", null, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
+            return new OperationResult(false, "CPF já utilizado");
+        }
+
+        await _uow.Usuarios.AtualizarAsync(usuario);
+        await _log.RegistrarAsync(nameof(Usuario), "Update", true, "Usuário atualizado", LogTipo.Sucesso, usuario.UsuarioAlteracao ?? "system", null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new OperationResult(true, "Usuário atualizado com sucesso");
+    }
+
+    public async Task<OperationResult> RemoverAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await _uow.Usuarios.RemoverAsync(id, cancellationToken);
+        await _log.RegistrarAsync(nameof(Usuario), "Delete", true, "Usuário removido", LogTipo.Sucesso, "system", null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new OperationResult(true, "Usuário removido");
+    }
 }

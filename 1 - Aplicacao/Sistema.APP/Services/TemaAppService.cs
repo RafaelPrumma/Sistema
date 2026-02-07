@@ -1,15 +1,36 @@
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
+using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class TemaAppService(Sistema.CORE.Services.Interfaces.ITemaDomainService domainService) : ITemaAppService
+public class TemaAppService(IUnitOfWork uow) : ITemaAppService
 {
-    private readonly Sistema.CORE.Services.Interfaces.ITemaDomainService _domainService = domainService;
+    private readonly IUnitOfWork _uow = uow;
 
     public Task<Tema?> BuscarPorUsuarioIdAsync(int usuarioId, CancellationToken cancellationToken = default) =>
-        _domainService.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);
+        _uow.Temas.BuscarPorUsuarioIdAsync(usuarioId, cancellationToken);
 
-    public Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default) =>
-        _domainService.SalvarAsync(tema, cancellationToken);
+    public async Task SalvarAsync(Tema tema, CancellationToken cancellationToken = default)
+    {
+        var existing = await _uow.Temas.BuscarPorUsuarioIdAsync(tema.UsuarioId, cancellationToken);
+        if (existing is null)
+        {
+            await _uow.Temas.AdicionarAsync(tema, cancellationToken);
+        }
+        else
+        {
+            existing.ModoEscuro = tema.ModoEscuro;
+            existing.CorHeader = tema.CorHeader;
+            existing.CorBarraEsquerda = tema.CorBarraEsquerda;
+            existing.CorBarraDireita = tema.CorBarraDireita;
+            existing.CorFooter = tema.CorFooter;
+            existing.HeaderFixo = tema.HeaderFixo;
+            existing.FooterFixo = tema.FooterFixo;
+            existing.MenuLateralExpandido = tema.MenuLateralExpandido;
+            existing.UsuarioAlteracao = tema.UsuarioAlteracao;
+            await _uow.Temas.AtualizarAsync(existing);
+        }
+        await _uow.ConfirmarAsync(cancellationToken);
+    }
 }
