@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services.Interfaces;
+using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
 
 namespace Sistema.MVC.Controllers;

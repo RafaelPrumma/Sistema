@@ -1,7 +1,7 @@
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
-@inject Sistema.CORE.Services.Interfaces.ITemaService TemaService
-@inject Sistema.CORE.Services.Interfaces.IMensagemService MensagemService
+@inject Sistema.APP.Services.Interfaces.ITemaService TemaService
+@inject Sistema.APP.Services.Interfaces.IMensagemService MensagemService
 @{ 
     var sessionUserId = Context.Session.GetInt32("UserId");
     var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);

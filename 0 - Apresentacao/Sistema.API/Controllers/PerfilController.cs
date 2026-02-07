@@ -3,8 +3,8 @@ using AutoMapper;
 using Sistema.APP.DTOs;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
-using Sistema.CORE.Services;
-using Sistema.CORE.Services.Interfaces;
+
+using Sistema.APP.Services.Interfaces;
 namespace Sistema.API.Controllers;
 
 [ApiController]
