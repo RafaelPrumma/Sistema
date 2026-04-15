@@ -7,12 +7,13 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Serilog;
 using Sistema.API.Middleware;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, lc) =>
-    lc.WriteTo.Console()
-      .WriteTo.File("log/log-.txt", rollingInterval: RollingInterval.Month));
+    lc.WriteTo.Console(formatProvider: CultureInfo.InvariantCulture)
+      .WriteTo.File("log/log-.txt", rollingInterval: RollingInterval.Month, formatProvider: CultureInfo.InvariantCulture));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -59,8 +60,9 @@ using (var scope = app.Services.CreateScope())
     if (db.Database.IsRelational())
     {
         db.Database.Migrate();
-        DbInitializer.Seed(db);
     }
+
+    DbInitializer.Seed(db);
 }
 
 app.Run();

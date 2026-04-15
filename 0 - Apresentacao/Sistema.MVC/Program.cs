@@ -45,8 +45,9 @@ using (var scope = app.Services.CreateScope())
     if (db.Database.IsRelational())
     {
         db.Database.Migrate();
-        DbInitializer.Seed(db);
     }
+
+    DbInitializer.Seed(db);
 }
 
 app.MapControllerRoute(

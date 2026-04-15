@@ -14,7 +14,16 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddInfraestrutura(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+        {
+            var useInMemoryDatabase = configuration.GetValue<bool>("UseInMemoryDatabase");
+            if (useInMemoryDatabase)
+            {
+                options.UseInMemoryDatabase("SistemaMockDb");
+                return;
+            }
+
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+        });
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<ILogRepository, LogRepository>();

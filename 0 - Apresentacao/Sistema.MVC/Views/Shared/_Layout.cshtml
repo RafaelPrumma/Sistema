@@ -209,11 +209,15 @@
     <script src="~/lib/aos/aos.js"></script>
     <script src="~/lib/mmenu/mmenu.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-    <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg">
-
-
+    <div id="temaSidebarBackdrop" class="tema-sidebar-backdrop" aria-hidden="true"></div>
+    <aside id="temaSidebar" class="tema-sidebar @rightText rightbar-bg" aria-hidden="true">
         <form asp-controller="Tema" asp-action="Edit" method="post" class="p-3">
-            <h5>Preferências de Tema</h5>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0">Preferências de Tema</h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="temaSidebarClose" aria-label="Fechar painel de tema">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
             <div class="mb-3">
                 <label class="form-label">Modo</label>
                 <div class="form-check">

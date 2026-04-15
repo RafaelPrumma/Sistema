@@ -29,7 +29,7 @@ namespace Sistema.MVC.Models
                 yield return new ValidationResult("Assunto é obrigatório", new[] { nameof(Assunto) });
             }
 
-            if (DestinatarioSelecionados is null || !DestinatarioSelecionados.Any())
+            if (DestinatarioSelecionados is null || DestinatarioSelecionados.Count == 0)
             {
                 yield return new ValidationResult("Selecione ao menos um destinatário ou setor.", new[] { nameof(DestinatarioSelecionados) });
             }

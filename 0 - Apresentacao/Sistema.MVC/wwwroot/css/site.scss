@@ -75,3 +75,20 @@
   max-width: var(--iconbar-width);
   width: var(--iconbar-width);
 }
+
+body.tema-sidebar-open {
+  overflow: hidden;
+}
+
+@media (max-width: 991.98px) {
+  .tema-sidebar {
+    width: 100vw;
+    max-width: 100vw;
+  }
+}
+
+@media (min-width: 992px) {
+  .mm-wrapper__blocker {
+    display: none !important;
+  }
+}

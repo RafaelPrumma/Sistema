@@ -216,7 +216,6 @@
                 const shouldOpen = obterPreferenciaMenuExpandido();
                 document.body.classList.toggle('menu-desktop-collapsed', !shouldOpen);
                 atualizarAriaMenu(false);
-
                 if (shouldOpen) {
                     mmApi.open();
                 } else {
@@ -231,20 +230,38 @@
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
-        if ($temaToggle.length && $temaSidebar.length) {
+        const $temaBackdrop = $('#temaSidebarBackdrop');
+        const $temaClose = $('#temaSidebarClose');
+
+        const abrirPainelTema = () => {
+            $temaSidebar.addClass('show').attr('aria-hidden', 'false');
+            $temaBackdrop.addClass('show');
+            document.body.classList.add('tema-sidebar-open');
+        };
+
+        const fecharPainelTema = () => {
+            $temaSidebar.removeClass('show').attr('aria-hidden', 'true');
+            $temaBackdrop.removeClass('show');
+            document.body.classList.remove('tema-sidebar-open');
+        };
+
+        if ($temaToggle.length && $temaSidebar.length && $temaBackdrop.length) {
             $temaToggle.on('click', function (e) {
                 e.preventDefault();
-                $temaSidebar.addClass('show');
+                abrirPainelTema();
             });
 
-            $(document).on('click', function (e) {
-                if (
-                    !$temaSidebar.is(e.target) &&
-                    $temaSidebar.has(e.target).length === 0 &&
-                    !$temaToggle.is(e.target) &&
-                    $temaToggle.has(e.target).length === 0
-                ) {
-                    $temaSidebar.removeClass('show');
+            $temaClose.on('click', function () {
+                fecharPainelTema();
+            });
+
+            $temaBackdrop.on('click', function () {
+                fecharPainelTema();
+            });
+
+            $(document).on('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    fecharPainelTema();
                 }
             });
         }
@@ -421,7 +438,7 @@
                         }
 
                         notificar('success', 'Sucesso', 'Preferências de tema salvas.');
-                        $temaSidebar.removeClass('show');
+                        fecharPainelTema();
                     })
                     .catch(err => {
                         console.error(err);
