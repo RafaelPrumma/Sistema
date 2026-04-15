@@ -92,6 +92,8 @@ footer.footer {
   --footer-bg: #0d6efd;
   --iconbar-width: 64px;
   --sidebar-width: 260px;
+  --mm-max-size: var(--sidebar-width);
+  --mm-sidebar-expanded-size: var(--sidebar-width);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -308,16 +310,42 @@ footer.footer {
   outline-offset: 2px;
 }
 
+
+.mobile-menu-toggle {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  .mobile-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .app-menu {
+    flex: 0 0 0;
+    max-width: 0;
+    width: 0;
+    min-width: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 992px) {
+  .app-menu {
+    flex: 0 0 var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    width: var(--sidebar-width);
+  }
+}
 @media (max-width: 991.98px) {
   .app-iconbar {
     display: none;
   }
 
-  .app-menu {
-    flex-basis: var(--sidebar-width);
-    max-width: var(--sidebar-width);
-    width: var(--sidebar-width);
-  }
 }
 
 /*# sourceMappingURL=site.css.map */

@@ -82,7 +82,12 @@
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
             <div class="container-fluid">
-                <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
+                <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-link @headerText mobile-menu-toggle" href="#sidebarMenu" aria-label="Abrir menu" title="Abrir menu">
+                        <i class="bi bi-list"></i>
+                    </a>
+                    <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
+                </div>
                 <div class="ms-auto d-flex align-items-center">
                     <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
                     <div class="dropdown">

@@ -47,6 +47,7 @@
 
         let mmApi = null;
         const expandedStateKey = 'mmenuExpandedState';
+        const desktopMedia = window.matchMedia('(min-width: 992px)');
 
         const classesTexto = ['text-white', 'text-dark'];
 
@@ -54,9 +55,7 @@
             if (!$headerEl.length) return;
 
             const headerFixo = $headerEl.hasClass('fixed-top');
-            const alturaHeader = headerFixo
-                ? Math.ceil(($headerEl.outerHeight ? $headerEl.outerHeight() : $headerEl[0]?.offsetHeight) || 0)
-                : 0;
+            const alturaHeader = headerFixo ? Math.ceil($headerEl.outerHeight() || $headerEl[0]?.offsetHeight || 0) : 0;
 
             document.body.style.paddingTop = headerFixo && alturaHeader ? `${alturaHeader}px` : '';
         };
@@ -180,8 +179,12 @@
                 window.sessionStorage.setItem(expandedStateKey, tema.menuLateralExpandido ? 'open' : 'closed');
 
                 if (mmApi) {
-                    if (tema.menuLateralExpandido) {
-                        mmApi.open();
+                    if (desktopMedia.matches) {
+                        if (tema.menuLateralExpandido) {
+                            mmApi.open();
+                        } else {
+                            mmApi.close();
+                        }
                     } else {
                         mmApi.close();
                     }
@@ -195,8 +198,25 @@
 
         const sidebarMenu = document.getElementById('sidebarMenu');
         const initialMenuExpanded = sidebarMenu?.dataset.menuExpanded === 'true';
+        const initialTheme = {
+            modoEscuro: serverTheme === 'dark',
+            menuLateralExpandido: initialMenuExpanded
+        };
 
-        aplicarTema({ modoEscuro: serverTheme === 'dark', menuLateralExpandido: initialMenuExpanded });
+        const atualizarEstadoMenuResponsivo = () => {
+            if (!mmApi) return;
+
+            if (desktopMedia.matches) {
+                const shouldOpen = $('#MenuLateralExpandido').is(':checked');
+                if (shouldOpen) {
+                    mmApi.open();
+                } else {
+                    mmApi.close();
+                }
+            } else {
+                mmApi.close();
+            }
+        };
 
         const $temaToggle = $('#temaToggle');
         const $temaSidebar = $('#temaSidebar');
@@ -227,10 +247,6 @@
         }
 
         if (sidebarMenu && window.Mmenu) {
-            const homeUrl = sidebarMenu.dataset.homeUrl || '/';
-            const configUrl = sidebarMenu.dataset.configUrl || '/Configuracao/Index';
-            const themeUrl = sidebarMenu.dataset.themeUrl || '/Tema/Edit';
-            const logoutUrl = sidebarMenu.dataset.logoutUrl || '/Account/Logout';
             const isDarkMode = (document.body.getAttribute('data-bs-theme') || 'light') === 'dark';
 
             if (typeof initialMenuExpanded === 'boolean') {
@@ -244,7 +260,7 @@
                     visible: 1
                 },
                 setSelected: {
-                    hover: true,
+                    hover: false,
                     parent: true,
                     current: true
                 },
@@ -265,42 +281,24 @@
                 },
                 sidebar: {
                     expanded: {
-                        use: true,
+                        use: '(min-width: 992px)',
                         initial: initialMenuExpanded ? 'open' : 'closed'
                     }
                 },
                 iconbar: {
-                    use: true,
-                    position: 'left',
-                    top: [
-                        `<a href="${homeUrl}" title="Home"><i class="bi bi-house"></i></a>`
-                    ],
-                    bottom: [
-                        `<a href="${logoutUrl}" title="Sair"><i class="bi bi-box-arrow-right"></i></a>`,
-                        `<a href="${configUrl}" title="Configurações"><i class="bi bi-gear"></i></a>`,
-                        `<a href="${themeUrl}" title="Tema"><i class="bi bi-palette"></i></a>`
-                    ]
+                    use: false
                 }
             });
 
             mmApi = mmenu.API;
 
-            mmApi.bind('setSelected:after', () => {
-                sidebarMenu.querySelectorAll('.mm-listitem__btn, .mm-listitem__text')
-                    .forEach(el => el.classList.remove('hovering'));
+            desktopMedia.addEventListener('change', () => {
+                atualizarEstadoMenuResponsivo();
             });
-
-            sidebarMenu.addEventListener('mouseover', (ev) => {
-                const target = ev.target;
-                if (!(target instanceof HTMLElement)) return;
-                const listItem = target.closest('.mm-listitem');
-                if (listItem) {
-                    mmApi.setSelected(listItem);
-                }
-            });
-
-            aplicarTema({ menuLateralExpandido: initialMenuExpanded });
         }
+
+        aplicarTema(initialTheme);
+        atualizarEstadoMenuResponsivo();
 
         $('input[name="ModoEscuro"]').on('change', function () {
             aplicarTema({ modoEscuro: $(this).val() === 'true' });
