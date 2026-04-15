@@ -8,16 +8,18 @@ using System.Linq;
 
 namespace Sistema.MVC.Controllers;
 
-public class TemaController(ITemaAppService temaService) : Controller
+public class TemaController(ITemaAppService temaService, ILogger<TemaController> logger) : Controller
 {
     private readonly ITemaAppService _temaService = temaService;
+    private readonly ILogger<TemaController> _logger = logger;
 
     private bool EhRequisicaoAjax()
     {
         if (Request.Headers.TryGetValue("X-Requested-With", out var header) && header == "XMLHttpRequest")
             return true;
 
-        return Request.Headers.TryGetValue("Accept", out var accepts) && accepts.Any(a => a.Contains("application/json", StringComparison.OrdinalIgnoreCase));
+        return Request.Headers.TryGetValue("Accept", out var accepts)
+            && accepts.Any(a => a?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private int? ObterUsuarioId()
@@ -105,7 +107,29 @@ public class TemaController(ITemaAppService temaService) : Controller
             UsuarioInclusao = userName,
             UsuarioAlteracao = userName
         };
-        await _temaService.SalvarAsync(tema);
+
+        try
+        {
+            await _temaService.SalvarAsync(tema);
+            _logger.LogInformation("Tema atualizado para o usuário {UserId}. HeaderFixo={HeaderFixo}, FooterFixo={FooterFixo}, MenuExpandido={MenuExpandido}, ModoEscuro={ModoEscuro}",
+                tema.UsuarioId, tema.HeaderFixo, tema.FooterFixo, tema.MenuLateralExpandido, tema.ModoEscuro);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao salvar tema para o usuário {UserId}", tema.UsuarioId);
+
+            if (EhRequisicaoAjax())
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    errors = new[] { "Não foi possível salvar o tema neste momento." }
+                });
+            }
+
+            ModelState.AddModelError(string.Empty, "Não foi possível salvar o tema neste momento.");
+            return View(model);
+        }
 
         if (EhRequisicaoAjax())
         {
@@ -129,4 +153,3 @@ public class TemaController(ITemaAppService temaService) : Controller
         return RedirectToAction("Index", "Home");
     }
 }
-
