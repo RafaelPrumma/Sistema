@@ -1,0 +1,32 @@
+name: Dependency Audit
+
+on:
+  push:
+    branches: [ "main", "master", "work" ]
+  pull_request:
+  schedule:
+    - cron: "0 8 * * 1"
+
+jobs:
+  dotnet-vulnerability-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore MVC
+        run: dotnet restore "0 - Apresentacao/Sistema.MVC/Sistema.MVC.csproj"
+
+      - name: Restore API
+        run: dotnet restore "0 - Apresentacao/Sistema.API/Sistema.API.csproj"
+
+      - name: Scan MVC dependencies
+        run: dotnet list "0 - Apresentacao/Sistema.MVC/Sistema.MVC.csproj" package --vulnerable --include-transitive
+
+      - name: Scan API dependencies
+        run: dotnet list "0 - Apresentacao/Sistema.API/Sistema.API.csproj" package --vulnerable --include-transitive

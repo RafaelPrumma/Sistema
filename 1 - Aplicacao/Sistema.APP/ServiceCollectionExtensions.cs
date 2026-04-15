@@ -21,7 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILogAppService, LogAppService>();
 
         services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
-        services.AddAutoMapper(typeof(MappingProfile));
+        services.AddAutoMapper(cfg => { }, typeof(MappingProfile).Assembly);
         return services;
     }
 }

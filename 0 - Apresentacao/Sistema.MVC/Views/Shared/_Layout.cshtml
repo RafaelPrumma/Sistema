@@ -77,7 +77,7 @@
     <link rel="stylesheet" href="~/lib/mmenu/mmenu.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body data-bs-theme="@(modoEscuro ? "dark" : "light")" class="@(headerFixo ? "pt-5" : string.Empty)">
+<body data-bs-theme="@(modoEscuro ? "dark" : "light")">
     <a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>
     <div class="d-flex flex-column min-vh-100">
         <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
@@ -122,10 +122,6 @@
                 </a>
             </div>
             <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
-                 data-home-url="@Url.Action("Index", "Home")"
-                 data-config-url="@Url.Action("Index", "Configuracao")"
-                 data-theme-url="@Url.Action("Edit", "Tema")"
-                 data-logout-url="@Url.Action("Logout", "Account")"
                  data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()">
                 <ul class="nav flex-column">
                     <li class="menu-brand">
