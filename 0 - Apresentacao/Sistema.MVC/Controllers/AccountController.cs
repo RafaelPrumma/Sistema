@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.APP.Services.Interfaces;
 using Sistema.MVC.Models;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
@@ -73,7 +74,7 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         HttpContext.Session.SetString("UserName", usuario.Nome);
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, usuario.Id.ToString(CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, usuario.Nome)
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -113,7 +114,7 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao registrar");
+            AccountControllerLogMessages.ErrorAoRegistrar(_logger, ex);
             return StatusCode(500, new { message = "Erro ao registrar" });
         }
     }
@@ -149,7 +150,7 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao recuperar senha");
+            AccountControllerLogMessages.ErrorAoRecuperarSenha(_logger, ex);
             return StatusCode(500, new { message = "Erro ao recuperar senha" });
         }
     }
@@ -261,4 +262,13 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login");
     }
+}
+
+internal static partial class AccountControllerLogMessages
+{
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "Erro ao registrar")]
+    public static partial void ErrorAoRegistrar(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Error, Message = "Erro ao recuperar senha")]
+    public static partial void ErrorAoRecuperarSenha(ILogger logger, Exception exception);
 }

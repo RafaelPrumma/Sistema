@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -25,9 +26,9 @@ public class AuthAppService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IC
 
         var reivindicacoes = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString(CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Name, usuario.Nome),
-            new Claim("perfil", usuario.PerfilId.ToString())
+            new Claim("perfil", usuario.PerfilId.ToString(CultureInfo.InvariantCulture))
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));

@@ -30,7 +30,7 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
+            LogMessages.UnhandledException(_logger, ex);
             await HandleExceptionAsync(context, ex);
         }
     }
@@ -56,4 +56,10 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = status;
         return context.Response.WriteAsJsonAsync(problem);
     }
+}
+
+internal static partial class LogMessages
+{
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "Unhandled exception")]
+    public static partial void UnhandledException(ILogger logger, Exception exception);
 }

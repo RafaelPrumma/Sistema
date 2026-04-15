@@ -10,6 +10,8 @@ namespace Sistema.MVC.Controllers;
 
 public class TemaController(ITemaAppService temaService, ILogger<TemaController> logger) : Controller
 {
+    private static readonly string[] ErroSalvarTema = ["Não foi possível salvar o tema neste momento."];
+
     private readonly ITemaAppService _temaService = temaService;
     private readonly ILogger<TemaController> _logger = logger;
 
@@ -111,19 +113,24 @@ public class TemaController(ITemaAppService temaService, ILogger<TemaController>
         try
         {
             await _temaService.SalvarAsync(tema);
-            _logger.LogInformation("Tema atualizado para o usuário {UserId}. HeaderFixo={HeaderFixo}, FooterFixo={FooterFixo}, MenuExpandido={MenuExpandido}, ModoEscuro={ModoEscuro}",
-                tema.UsuarioId, tema.HeaderFixo, tema.FooterFixo, tema.MenuLateralExpandido, tema.ModoEscuro);
+            TemaControllerLogMessages.TemaAtualizado(
+                _logger,
+                tema.UsuarioId,
+                tema.HeaderFixo,
+                tema.FooterFixo,
+                tema.MenuLateralExpandido,
+                tema.ModoEscuro);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao salvar tema para o usuário {UserId}", tema.UsuarioId);
+            TemaControllerLogMessages.ErroAoSalvarTema(_logger, tema.UsuarioId, ex);
 
             if (EhRequisicaoAjax())
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
                     success = false,
-                    errors = new[] { "Não foi possível salvar o tema neste momento." }
+                    errors = ErroSalvarTema
                 });
             }
 
@@ -152,4 +159,22 @@ public class TemaController(ITemaAppService temaService, ILogger<TemaController>
 
         return RedirectToAction("Index", "Home");
     }
+}
+
+internal static partial class TemaControllerLogMessages
+{
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Information,
+        Message = "Tema atualizado para o usuário {UserId}. HeaderFixo={HeaderFixo}, FooterFixo={FooterFixo}, MenuExpandido={MenuExpandido}, ModoEscuro={ModoEscuro}")]
+    public static partial void TemaAtualizado(
+        ILogger logger,
+        int userId,
+        bool headerFixo,
+        bool footerFixo,
+        bool menuExpandido,
+        bool modoEscuro);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Error, Message = "Erro ao salvar tema para o usuário {UserId}")]
+    public static partial void ErroAoSalvarTema(ILogger logger, int userId, Exception exception);
 }

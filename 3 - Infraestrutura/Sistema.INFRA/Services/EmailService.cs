@@ -55,8 +55,14 @@ public class EmailService(IOptions<EmailOptions> options, ILogger<EmailService> 
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao enviar e-mail");
+            LogMessages.ErroAoEnviarEmail(_logger, ex);
             throw;
         }
     }
+}
+
+internal static partial class LogMessages
+{
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "Erro ao enviar e-mail")]
+    public static partial void ErroAoEnviarEmail(ILogger logger, Exception exception);
 }
