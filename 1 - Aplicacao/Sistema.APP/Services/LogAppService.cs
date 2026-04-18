@@ -132,6 +132,7 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
                 var item = JsonSerializer.Deserialize<Log>(linha);
                 if (item is not null)
                 {
+                    item.Id = 0;
                     if (item.DataOperacao == default)
                         item.DataOperacao = DateTime.UtcNow;
                     registrosValidos.Add(item);
