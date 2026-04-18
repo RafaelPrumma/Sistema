@@ -56,6 +56,7 @@
             const alturaHeader = headerFixo ? Math.ceil($headerEl.outerHeight() || $headerEl[0]?.offsetHeight || 0) : 0;
 
             document.body.style.paddingTop = headerFixo && alturaHeader ? `${alturaHeader}px` : '';
+            root.style.setProperty('--layout-offset-top', headerFixo && alturaHeader ? `${alturaHeader}px` : '0px');
         };
 
         const atualizarEspacamentoFooter = () => {
@@ -65,6 +66,7 @@
             const alturaFooter = footerFixo ? Math.ceil($footerEl.outerHeight() || $footerEl[0]?.offsetHeight || 0) : 0;
 
             document.body.style.paddingBottom = footerFixo && alturaFooter ? `${alturaFooter}px` : '';
+            root.style.setProperty('--layout-offset-bottom', footerFixo && alturaFooter ? `${alturaFooter}px` : '0px');
         };
 
         const normalizarHex = (valor) => {
@@ -118,11 +120,8 @@
             }
 
             const $menu = $('#sidebarMenu');
-            const $iconbar = $('.app-iconbar');
             aplicarClasseTexto($menu, esquerdaClasse);
             aplicarClasseTexto($menu.find('.nav-link, .nav-header, .menu-brand-text *, .menu-user *'), esquerdaClasse);
-            aplicarClasseTexto($iconbar, esquerdaClasse);
-            aplicarClasseTexto($iconbar.find('.icon-link'), esquerdaClasse);
 
             const $temaPainel = $('#temaSidebar');
             aplicarClasseTexto($temaPainel, direitaClasse);
@@ -200,7 +199,6 @@
             ? window.initSistemaMenu({
                 sidebarSelector: '#sidebarMenu',
                 mobileToggleSelector: '.mobile-menu-toggle',
-                iconbarSelector: '.app-iconbar',
                 appShellSelector: '.app-shell',
                 expandedCheckboxSelector: '#MenuLateralExpandido',
                 onMobileStateChange: null

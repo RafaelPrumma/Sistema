@@ -28,10 +28,6 @@
     bool footerFixo = tema?.FooterFixo ?? false;
     bool menuExpandido = tema?.MenuLateralExpandido ?? true;
     var unreadMessages = userId > 0 ? await MensagemService.ContarNaoLidasAsync(userId) : 0;
-    var userInitial = !string.IsNullOrWhiteSpace(userName)
-        ? char.ToUpper(userName.Trim()[0], CultureInfo.CurrentCulture).ToString()
-        : "U";
-
     string EstaAtivo(string controller, string? action = null)
     {
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
@@ -103,46 +99,13 @@
             </div>
         </header>
         <div class="flex-grow-1 d-flex app-shell">
-            <div class="app-iconbar sidebar-bg @leftText" aria-label="Atalhos rápidos">
-                <a class="icon-link" asp-controller="Home" asp-action="Index" title="Início">
-                    <i class="bi bi-house"></i>
-                </a>
-                <a class="icon-link" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
-                    <i class="bi bi-envelope"></i>
-                </a>
-                <a class="icon-link" asp-controller="Configuracao" asp-action="Index" title="Configurações">
-                    <i class="bi bi-gear"></i>
-                </a>
-                <a class="icon-link" asp-controller="Tema" asp-action="Edit" title="Tema">
-                    <i class="bi bi-palette"></i>
-                </a>
-                <a class="icon-link" asp-controller="Account" asp-action="Logout" title="Sair">
-                    <i class="bi bi-box-arrow-right"></i>
-                </a>
-            </div>
             <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
                  data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()">
                 <ul class="nav flex-column">
-                    <li class="menu-brand">
-                        <div class="menu-brand-icon rounded-circle d-inline-flex align-items-center justify-content-center me-2">
-                            <i class="bi bi-grid-1x2-fill"></i>
-                        </div>
-                        <div class="menu-brand-text">
-                            <small class="text-opacity-75 d-block">Painel</small>
-                            <span class="fw-semibold">Sistema.MVC</span>
-                        </div>
-                    </li>
-                    <li class="menu-user d-flex align-items-center">
-                        <div class="menu-avatar me-3">@userInitial</div>
-                        <div class="menu-user-text">
-                            <div class="fw-semibold text-truncate">@userName</div>
-                            <small class="text-opacity-75">Bem-vindo(a)</small>
-                        </div>
-                    </li>
                     <li class="nav-header text-uppercase small">Módulos</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Home")" asp-controller="Home" asp-action="Index" title="Módulo Home">
-                            <i class="bi bi-house me-2"></i><span>Módulo Home</span>
+                        <a class="nav-link @leftText @EstaAtivo("Home")" href="#" title="Home">
+                            <i class="bi bi-house me-2"></i><span>Home</span>
                         </a>
                         <ul>
                             <li><a asp-controller="Home" asp-action="Index" title="Dashboard">Dashboard</a></li>
@@ -150,8 +113,8 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Account")" asp-controller="Account" asp-action="Login" title="Módulo Acesso">
-                            <i class="bi bi-shield-lock me-2"></i><span>Módulo Acesso</span>
+                        <a class="nav-link @leftText @EstaAtivo("Account")" href="#" title="Acesso">
+                            <i class="bi bi-shield-lock me-2"></i><span>Acesso</span>
                         </a>
                         <ul>
                             <li><a asp-controller="Account" asp-action="ChangePassword" title="Segurança">Segurança</a></li>
@@ -159,8 +122,8 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Módulo Comunicação">
-                            <i class="bi bi-envelope me-2"></i><span>Módulo Comunicação</span>
+                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" href="#" title="Comunicação">
+                            <i class="bi bi-envelope me-2"></i><span>Comunicação</span>
                             @if (unreadMessages > 0)
                             {
                                 <span class="badge bg-primary ms-auto">@unreadMessages</span>
@@ -174,8 +137,8 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Módulo Administração">
-                            <i class="bi bi-gear me-2"></i><span>Módulo Administração</span>
+                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" href="#" title="Administração">
+                            <i class="bi bi-gear me-2"></i><span>Administração</span>
                         </a>
                         <ul>
                             <li><a asp-controller="Configuracao" asp-action="Index" title="Configurações">Configurações</a></li>
@@ -184,8 +147,8 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Módulo Documentação">
-                            <i class="bi bi-book me-2"></i><span>Módulo Documentação</span>
+                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" href="#" title="Documentação">
+                            <i class="bi bi-book me-2"></i><span>Documentação</span>
                         </a>
                         <ul>
                             <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" title="Mensagens">Mensagens</a></li>

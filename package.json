@@ -19,6 +19,7 @@
     "izimodal": "^1.6.0",
     "izitoast": "^1.4.0",
     "jquery": "^3.7.1",
+    "playwright": "^1.59.1",
     "sass": "^1.91.0",
     "vite": "^5.0.0"
   }

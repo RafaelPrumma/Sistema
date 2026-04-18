@@ -11,7 +11,6 @@
         const config = {
             sidebarSelector: '#sidebarMenu',
             mobileToggleSelector: '.mobile-menu-toggle',
-            iconbarSelector: '.app-iconbar',
             appShellSelector: '.app-shell',
             expandedCheckboxSelector: '#MenuLateralExpandido',
             onMobileStateChange: null,
@@ -22,7 +21,6 @@
         if (!$sidebar.length) return null;
 
         const $mobileToggle = $(config.mobileToggleSelector);
-        const $iconbar = $(config.iconbarSelector);
         const $appShell = $(config.appShellSelector);
         const $expandedCheckbox = $(config.expandedCheckboxSelector);
         const desktopMedia = window.matchMedia('(min-width: 992px)');
@@ -134,6 +132,15 @@
                 $(this).attr('aria-expanded', 'true');
             });
 
+            $sidebar.on('click', '.nav-item > .nav-link', function (e) {
+                const $item = $(this).closest('.nav-item');
+                const $submenu = $item.children('.menu-subpanel').first();
+                if (!$submenu.length) return;
+
+                e.preventDefault();
+                $item.children('.submenu-toggle').trigger('click');
+            });
+
             $sidebar.on('click', '.submenu-back', function (e) {
                 e.preventDefault();
                 closeSubmenus();
@@ -152,14 +159,6 @@
             $(document).on('keydown', function (e) {
                 if (e.key === 'Escape' && menuMobileAberto) {
                     setMobileOpen(false);
-                }
-            });
-
-            // Quando recolhido no desktop, hover na barra de ícones abre menu completo.
-            $iconbar.on('mouseenter', function () {
-                if (!desktopMedia.matches) return;
-                if (document.body.classList.contains('menu-desktop-collapsed')) {
-                    document.body.classList.add('menu-hover-open');
                 }
             });
 
