@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
@@ -9,6 +10,11 @@ namespace Sistema.INFRA.Repositories;
 public class UsuarioRepository(AppDbContext context) : IUsuarioRepository
 {
     private readonly AppDbContext _context = context;
+
+    public IQueryable<Usuario> Query()
+    {
+        return _context.Usuarios.AsQueryable();
+    }
 
 	public async Task<Usuario> AdicionarAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {

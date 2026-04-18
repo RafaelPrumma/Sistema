@@ -1,12 +1,15 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Sistema.CORE.Entities;
 
 namespace Sistema.MVC.Models
 {
     public class NovaMensagemViewModel : IValidatableObject
     {
+        [Display(Name = "Tipo de publicação")]
+        public PublicacaoTipo Tipo { get; set; } = PublicacaoTipo.MensagemDireta;
+
         [Display(Name = "Assunto")]
         public string Assunto { get; set; } = string.Empty;
 
@@ -20,6 +23,23 @@ namespace Sistema.MVC.Models
 
         public IEnumerable<SelectListItem> Destinatarios { get; set; } = new List<SelectListItem>();
 
+        [Display(Name = "Setor")]
+        public int? PerfilId { get; set; }
+
+        public IEnumerable<SelectListItem> Perfis { get; set; } = new List<SelectListItem>();
+
+        [Display(Name = "Audiência do aviso")]
+        public AvisoAudiencia? AvisoAudiencia { get; set; }
+
+        [Display(Name = "Prioridade")]
+        public AvisoPrioridade? AvisoPrioridade { get; set; }
+
+        [Display(Name = "Válido até")]
+        public DateTime? AvisoValidoAte { get; set; }
+
+        [Display(Name = "Fixar no topo")]
+        public bool Fixada { get; set; }
+
         public bool ExibirCampoAssunto => !MensagemPaiId.HasValue;
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -29,9 +49,19 @@ namespace Sistema.MVC.Models
                 yield return new ValidationResult("Assunto é obrigatório", new[] { nameof(Assunto) });
             }
 
-            if (DestinatarioSelecionados is null || DestinatarioSelecionados.Count == 0)
+            if (Tipo == PublicacaoTipo.MensagemDireta && (DestinatarioSelecionados is null || DestinatarioSelecionados.Count == 0))
             {
                 yield return new ValidationResult("Selecione ao menos um destinatário ou setor.", new[] { nameof(DestinatarioSelecionados) });
+            }
+
+            if (Tipo == PublicacaoTipo.PostSetor && !PerfilId.HasValue)
+            {
+                yield return new ValidationResult("Selecione o setor para o post.", new[] { nameof(PerfilId) });
+            }
+
+            if (Tipo == PublicacaoTipo.Aviso && !AvisoAudiencia.HasValue)
+            {
+                yield return new ValidationResult("Selecione a audiência do aviso.", new[] { nameof(AvisoAudiencia) });
             }
         }
     }

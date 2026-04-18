@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
-using System;
+using Sistema.CORE.Entities;
 using System.Security.Claims;
 
 namespace Sistema.API.Controllers
@@ -50,6 +50,33 @@ namespace Sistema.API.Controllers
             return Ok(new { result.TotalCount, result.Page, result.PageSize, Items = dto });
         }
 
+        [HttpGet("feed")]
+        public async Task<IActionResult> Feed(int page = 1, int pageSize = 20, PublicacaoTipo? tipo = null, int? perfilId = null, bool somenteNaoLidas = false, AvisoPrioridade? prioridadeMinima = null, string? palavraChave = null)
+        {
+            var usuarioId = ObterUsuarioIdAutenticado();
+            if (usuarioId is null) return Unauthorized();
+            var cancellationToken = HttpContext.RequestAborted;
+            var filtro = new FeedFiltroDto
+            {
+                Tipo = tipo,
+                PerfilId = perfilId,
+                SomenteNaoLidas = somenteNaoLidas,
+                PrioridadeMinima = prioridadeMinima,
+                PalavraChave = palavraChave
+            };
+            var result = await _mensagemService.BuscarFeedAsync(usuarioId.Value, page, pageSize, filtro, cancellationToken);
+            var dto = result.Items.Select(m =>
+            {
+                var item = _mapper.Map<MensagemDto>(m);
+                item.PodeResponder = true;
+                item.PodeReagir = true;
+                item.PodeModerar = false;
+                return item;
+            });
+
+            return Ok(new { result.TotalCount, result.Page, result.PageSize, Items = dto });
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
         {
@@ -57,7 +84,7 @@ namespace Sistema.API.Controllers
             if (usuarioId is null) return Unauthorized();
             var cancellationToken = HttpContext.RequestAborted;
             var msg = await _mensagemService.BuscarPorIdAsync(id, cancellationToken);
-            if (msg == null || (msg.RemetenteId != usuarioId.Value && msg.DestinatarioId != usuarioId.Value))
+            if (msg == null)
                 return NotFound();
             return Ok(_mapper.Map<MensagemDto>(msg));
         }
@@ -79,6 +106,14 @@ namespace Sistema.API.Controllers
             var usuarioId = ObterUsuarioIdAutenticado();
             if (usuarioId is null) return Unauthorized();
             var cancellationToken = HttpContext.RequestAborted;
+
+            if (dto.Tipo != PublicacaoTipo.MensagemDireta)
+            {
+                var resultadoPublicacao = await _mensagemService.CriarPublicacaoAsync(usuarioId.Value, dto, cancellationToken);
+                if (!resultadoPublicacao.Success) return BadRequest(resultadoPublicacao.Message);
+                return CreatedAtAction(nameof(Get), new { id = resultadoPublicacao.Data }, resultadoPublicacao.Data);
+            }
+
             if (dto.PerfilId.HasValue)
             {
                 var resultadoGrupo = await _mensagemService.EnviarParaPerfilAsync(usuarioId, dto.PerfilId.Value, dto.Assunto, dto.Corpo, dto.MensagemPaiId, cancellationToken);
@@ -86,7 +121,10 @@ namespace Sistema.API.Controllers
                 return Created(string.Empty, resultadoGrupo.Data);
             }
 
-            var result = await _mensagemService.EnviarAsync(usuarioId, dto.DestinatarioId, dto.Assunto, dto.Corpo, dto.MensagemPaiId, cancellationToken);
+            if (!dto.DestinatarioId.HasValue)
+                return BadRequest("Destinatário é obrigatório para mensagem direta.");
+
+            var result = await _mensagemService.EnviarAsync(usuarioId, dto.DestinatarioId.Value, dto.Assunto, dto.Corpo, dto.MensagemPaiId, cancellationToken);
             if (!result.Success) return BadRequest(result.Message);
             return CreatedAtAction(nameof(Get), new { id = result.Data }, result.Data);
         }
@@ -98,6 +136,17 @@ namespace Sistema.API.Controllers
             if (usuarioId is null) return Unauthorized();
             var cancellationToken = HttpContext.RequestAborted;
             var result = await _mensagemService.MarcarComoLidaAsync(id, usuarioId.Value, cancellationToken);
+            if (!result.Success) return BadRequest(result.Message);
+            return NoContent();
+        }
+
+        [HttpPost("{id}/reacoes")]
+        public async Task<IActionResult> Reagir(int id, [FromBody] ReagirPublicacaoDto dto)
+        {
+            var usuarioId = ObterUsuarioIdAutenticado();
+            if (usuarioId is null) return Unauthorized();
+            var cancellationToken = HttpContext.RequestAborted;
+            var result = await _mensagemService.ReagirAsync(id, usuarioId.Value, dto.TipoReacao, cancellationToken);
             if (!result.Success) return BadRequest(result.Message);
             return NoContent();
         }

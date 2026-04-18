@@ -1,9 +1,12 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
+using Sistema.CORE.Entities;
 using Sistema.MVC.Models;
 using System.Security.Claims;
+using System.Globalization;
 
 namespace Sistema.MVC.Controllers
 {
@@ -17,7 +20,7 @@ namespace Sistema.MVC.Controllers
         private readonly IPerfilAppService _perfilService = perfilService;
         private readonly IMapper _mapper = mapper;
 
-		private int? ObterUsuarioId()
+        private int? ObterUsuarioId()
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId.HasValue)
@@ -74,26 +77,43 @@ namespace Sistema.MVC.Controllers
                 MensagemPaiId = mensagemPaiId,
                 Assunto = assunto ?? string.Empty,
                 DestinatarioSelecionados = destinatariosSelecionados?.Distinct().ToList() ?? [],
-                Destinatarios = opcoesDestinatarios
+                Destinatarios = opcoesDestinatarios,
+                Perfis = perfis.Items.OrderBy(p => p.Nome).Select(p => new SelectListItem(p.Nome, p.Id.ToString(CultureInfo.InvariantCulture)))
             };
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 20, int? remetenteId = null, string? palavraChave = null, DateTime? inicio = null, DateTime? fim = null)
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 20, PublicacaoTipo? tipo = null, int? perfilId = null, bool somenteNaoLidas = false, AvisoPrioridade? prioridadeMinima = null, string? palavraChave = null)
         {
             var userId = ObterUsuarioId();
             if (userId is null) return RedirectToAction("Login", "Account");
-            var result = await _mensagemService.BuscarCaixaEntradaAsync(userId.Value, page, pageSize, remetenteId, palavraChave, inicio, fim);
+
+            var result = await _mensagemService.BuscarFeedAsync(userId.Value, page, pageSize, new FeedFiltroDto
+            {
+                Tipo = tipo,
+                PerfilId = perfilId,
+                SomenteNaoLidas = somenteNaoLidas,
+                PrioridadeMinima = prioridadeMinima,
+                PalavraChave = palavraChave
+            });
+
             var model = new MensagemViewModel
             {
-                Mensagens = [.. result.Items.Select(m => _mapper.Map<APP.DTOs.MensagemDto>(m))],
+                Mensagens = [.. result.Items.Select(m =>
+                {
+                    var dto = _mapper.Map<MensagemDto>(m);
+                    dto.PodeReagir = true;
+                    dto.PodeResponder = true;
+                    return dto;
+                })],
                 Page = result.Page,
                 PageSize = result.PageSize,
                 TotalItems = result.TotalCount,
-                RemetenteId = remetenteId,
-                PalavraChave = palavraChave,
-                Inicio = inicio,
-                Fim = fim
+                Tipo = tipo,
+                PerfilId = perfilId,
+                SomenteNaoLidas = somenteNaoLidas,
+                PrioridadeMinima = prioridadeMinima,
+                PalavraChave = palavraChave
             };
             return View(model);
         }
@@ -139,60 +159,101 @@ namespace Sistema.MVC.Controllers
             {
                 var viewModel = await CriarNovaMensagemViewModelAsync(model.MensagemPaiId, model.DestinatarioSelecionados, model.Assunto);
                 model.Destinatarios = viewModel.Destinatarios;
+                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
-            var errosEnvio = new List<string>();
-
-            foreach (var destinatario in model.DestinatarioSelecionados.Distinct())
+            if (model.Tipo == PublicacaoTipo.MensagemDireta)
             {
-                if (destinatario.StartsWith(PerfilPrefixo, StringComparison.OrdinalIgnoreCase))
+                var errosEnvio = new List<string>();
+
+                foreach (var destinatario in model.DestinatarioSelecionados.Distinct())
                 {
-                    if (!int.TryParse(destinatario.Replace(PerfilPrefixo, string.Empty), out var perfilId))
+                    if (destinatario.StartsWith(PerfilPrefixo, StringComparison.OrdinalIgnoreCase))
                     {
-                        errosEnvio.Add($"Destino inválido: {destinatario}.");
-                        continue;
+                        if (!int.TryParse(destinatario.Replace(PerfilPrefixo, string.Empty), out var perfilId))
+                        {
+                            errosEnvio.Add($"Destino inválido: {destinatario}.");
+                            continue;
+                        }
+
+                        var resultadoPerfil = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, perfilId, model.Assunto, model.Corpo, model.MensagemPaiId);
+                        if (!resultadoPerfil.Success)
+                        {
+                            errosEnvio.Add(resultadoPerfil.Message);
+                        }
+                    }
+                    else if (destinatario.StartsWith(UsuarioPrefixo, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!int.TryParse(destinatario.Replace(UsuarioPrefixo, string.Empty), out var destinatarioId))
+                        {
+                            errosEnvio.Add($"Destino inválido: {destinatario}.");
+                            continue;
+                        }
+
+                        var resultadoDestinatario = await _mensagemService.EnviarAsync(remetenteId.Value, destinatarioId, model.Assunto, model.Corpo, model.MensagemPaiId);
+                        if (!resultadoDestinatario.Success)
+                        {
+                            errosEnvio.Add(resultadoDestinatario.Message);
+                        }
+                    }
+                    else
+                    {
+                        errosEnvio.Add($"Destino não reconhecido: {destinatario}.");
+                    }
+                }
+
+                if (errosEnvio.Count != 0)
+                {
+                    foreach (var erro in errosEnvio)
+                    {
+                        ModelState.AddModelError(string.Empty, erro);
                     }
 
-                    var resultadoPerfil = await _mensagemService.EnviarParaPerfilAsync(remetenteId.Value, perfilId, model.Assunto, model.Corpo, model.MensagemPaiId);
-                    if (!resultadoPerfil.Success)
-                    {
-                        errosEnvio.Add(resultadoPerfil.Message);
-                    }
+                    var viewModel = await CriarNovaMensagemViewModelAsync(model.MensagemPaiId, model.DestinatarioSelecionados, model.Assunto);
+                    model.Destinatarios = viewModel.Destinatarios;
+                    model.Perfis = viewModel.Perfis;
+                    return View(model);
                 }
-                else if (destinatario.StartsWith(UsuarioPrefixo, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!int.TryParse(destinatario.Replace(UsuarioPrefixo, string.Empty), out var destinatarioId))
-                    {
-                        errosEnvio.Add($"Destino inválido: {destinatario}.");
-                        continue;
-                    }
 
-                    var resultadoDestinatario = await _mensagemService.EnviarAsync(remetenteId.Value, destinatarioId, model.Assunto, model.Corpo, model.MensagemPaiId);
-                    if (!resultadoDestinatario.Success)
-                    {
-                        errosEnvio.Add(resultadoDestinatario.Message);
-                    }
-                }
-                else
-                {
-                    errosEnvio.Add($"Destino não reconhecido: {destinatario}.");
-                }
+                return RedirectToAction(nameof(Index));
             }
 
-            if (errosEnvio.Count != 0)
+            var dto = new NovaMensagemDto
             {
-                foreach (var erro in errosEnvio)
-                {
-                    ModelState.AddModelError(string.Empty, erro);
-                }
+                Tipo = model.Tipo,
+                Assunto = model.Assunto,
+                Corpo = model.Corpo,
+                MensagemPaiId = model.MensagemPaiId,
+                PerfilId = model.PerfilId,
+                AvisoAudiencia = model.AvisoAudiencia,
+                AvisoPrioridade = model.AvisoPrioridade,
+                AvisoValidoAte = model.AvisoValidoAte,
+                Fixada = model.Fixada
+            };
 
+            var resultado = await _mensagemService.CriarPublicacaoAsync(remetenteId.Value, dto);
+            if (!resultado.Success)
+            {
+                ModelState.AddModelError(string.Empty, resultado.Message);
                 var viewModel = await CriarNovaMensagemViewModelAsync(model.MensagemPaiId, model.DestinatarioSelecionados, model.Assunto);
                 model.Destinatarios = viewModel.Destinatarios;
+                model.Perfis = viewModel.Perfis;
                 return View(model);
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reagir(int id, TipoReacao tipoReacao)
+        {
+            var userId = ObterUsuarioId();
+            if (userId is null) return RedirectToAction("Login", "Account");
+
+            await _mensagemService.ReagirAsync(id, userId.Value, tipoReacao);
+            return RedirectToAction(nameof(Detalhe), new { id });
         }
 
         [HttpGet]
@@ -202,11 +263,10 @@ namespace Sistema.MVC.Controllers
             if (userId is null) return RedirectToAction("Login", "Account");
             var cancellationToken = HttpContext.RequestAborted;
             var mensagemAtual = await _mensagemService.BuscarPorIdAsync(id, cancellationToken);
-            if (mensagemAtual is null || (mensagemAtual.RemetenteId != userId.Value && mensagemAtual.DestinatarioId != userId.Value))
+            if (mensagemAtual is null)
                 return NotFound();
 
-            if (mensagemAtual.DestinatarioId == userId.Value)
-                await _mensagemService.MarcarComoLidaAsync(id, userId.Value, cancellationToken);
+            await _mensagemService.MarcarComoLidaAsync(id, userId.Value, cancellationToken);
 
             var conversa = await _mensagemService.BuscarConversaAsync(id, userId.Value, cancellationToken);
             if (conversa == null) return NotFound();
@@ -215,7 +275,6 @@ namespace Sistema.MVC.Controllers
             {
                 var naoLidas = EnumerarThread(conversa)
                     .Where(m => m.Id != id)
-                    .Where(m => m.DestinatarioId == userId.Value && !m.Lida)
                     .Select(m => m.Id)
                     .ToList();
 
@@ -225,7 +284,7 @@ namespace Sistema.MVC.Controllers
                 }
             }
 
-            return View(_mapper.Map<APP.DTOs.MensagemThreadDto>(conversa));
+            return View(_mapper.Map<MensagemThreadDto>(conversa));
         }
 
         private static IEnumerable<CORE.Entities.Mensagem> EnumerarThread(CORE.Entities.Mensagem raiz)
@@ -251,7 +310,7 @@ namespace Sistema.MVC.Controllers
             var result = await _mensagemService.BuscarCaixaSaidaAsync(userId.Value, page, pageSize);
             var model = new MensagemViewModel
             {
-                Mensagens = [.. result.Items.Select(m => _mapper.Map<APP.DTOs.MensagemDto>(m))],
+                Mensagens = [.. result.Items.Select(m => _mapper.Map<MensagemDto>(m))],
                 Page = result.Page,
                 PageSize = result.PageSize,
                 TotalItems = result.TotalCount

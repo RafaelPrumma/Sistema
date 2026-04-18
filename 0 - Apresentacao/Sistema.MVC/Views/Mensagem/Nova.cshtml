@@ -1,12 +1,13 @@
 @model Sistema.MVC.Models.NovaMensagemViewModel
+@using Sistema.CORE.Entities
 @{
-    ViewData["Title"] = "Nova Mensagem";
+    ViewData["Title"] = "Nova Publicação";
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
-    Title = "Mensagens",
-    Description = "Envie uma nova mensagem."
+    Title = "Comunicação Interna",
+    Description = "Composer unificado para mensagem direta, post de setor e aviso."
 })
 
 <div class="card">
@@ -16,30 +17,47 @@
             <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
             <input asp-for="MensagemPaiId" type="hidden" />
             <div class="mb-3">
-                <label asp-for="DestinatarioSelecionados" class="form-label"></label>
-                <select asp-for="DestinatarioSelecionados" class="form-select" asp-items="Model.Destinatarios" multiple>
-                    <option value="">Selecione destinatários</option>
-                </select>
-                <span asp-validation-for="DestinatarioSelecionados" class="text-danger"></span>
-                <span class="form-text">Escolha pessoas e/ou setores. Você pode selecionar mais de um.</span>
+                <label asp-for="Tipo" class="form-label"></label>
+                <select asp-for="Tipo" class="form-select" asp-items="Html.GetEnumSelectList<PublicacaoTipo>()"></select>
             </div>
-            @if (Model.ExibirCampoAssunto)
-            {
-                <div class="mb-3">
-                    <label asp-for="Assunto" class="form-label"></label>
-                    <input asp-for="Assunto" class="form-control" />
-                    <span asp-validation-for="Assunto" class="text-danger"></span>
+            <div class="mb-3 js-destinatarios">
+                <label asp-for="DestinatarioSelecionados" class="form-label"></label>
+                <select asp-for="DestinatarioSelecionados" class="form-select" asp-items="Model.Destinatarios" multiple></select>
+                <span asp-validation-for="DestinatarioSelecionados" class="text-danger"></span>
+            </div>
+            <div class="mb-3 js-perfil">
+                <label asp-for="PerfilId" class="form-label"></label>
+                <select asp-for="PerfilId" class="form-select" asp-items="Model.Perfis">
+                    <option value="">Selecione o setor</option>
+                </select>
+            </div>
+            <div class="row g-2 js-aviso">
+                <div class="col-md-4">
+                    <label asp-for="AvisoAudiencia" class="form-label"></label>
+                    <select asp-for="AvisoAudiencia" class="form-select" asp-items="Html.GetEnumSelectList<AvisoAudiencia>()">
+                        <option value="">Selecione</option>
+                    </select>
                 </div>
-            }
-            else
-            {
-                <input asp-for="Assunto" type="hidden" />
-                <div class="mb-3">
-                    <label class="form-label">Assunto da conversa</label>
-                    <input class="form-control" value="@Model.Assunto" readonly />
-                    <span class="form-text">Respostas mantêm o assunto da mensagem inicial.</span>
+                <div class="col-md-4">
+                    <label asp-for="AvisoPrioridade" class="form-label"></label>
+                    <select asp-for="AvisoPrioridade" class="form-select" asp-items="Html.GetEnumSelectList<AvisoPrioridade>()">
+                        <option value="">Selecione</option>
+                    </select>
                 </div>
-            }
+                <div class="col-md-4">
+                    <label asp-for="AvisoValidoAte" class="form-label"></label>
+                    <input asp-for="AvisoValidoAte" type="datetime-local" class="form-control" />
+                </div>
+                <div class="col-12 form-check mt-2 ms-2">
+                    <input asp-for="Fixada" class="form-check-input" />
+                    <label asp-for="Fixada" class="form-check-label"></label>
+                </div>
+            </div>
+            <div class="mb-3 mt-3">
+                <label asp-for="Assunto" class="form-label"></label>
+                <input asp-for="Assunto" class="form-control" />
+                <span asp-validation-for="Assunto" class="text-danger"></span>
+            </div>
             <div class="mb-3">
                 <label asp-for="Corpo" class="form-label"></label>
                 <textarea asp-for="Corpo" class="form-control" rows="5"></textarea>
@@ -48,21 +66,28 @@
         </div>
         <div class="card-footer d-flex justify-content-between">
             <a class="btn btn-outline-secondary" href="@Url.Action("Index")">Cancelar</a>
-            <button type="submit" class="btn btn-primary">Enviar</button>
+            <button type="submit" class="btn btn-primary">Publicar</button>
         </div>
     </form>
 </div>
 
 @section Scripts {
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        $(function () {
-            $('#DestinatarioSelecionados').select2({
-                placeholder: 'Selecione destinatários',
-                width: '100%',
-                closeOnSelect: false
-            });
-        });
+        (function() {
+            const tipoEl = document.getElementById('Tipo');
+            const destinos = document.querySelector('.js-destinatarios');
+            const perfil = document.querySelector('.js-perfil');
+            const aviso = document.querySelector('.js-aviso');
+
+            function refreshComposer() {
+                const tipo = Number(tipoEl.value || '1');
+                destinos.style.display = tipo === 1 ? 'block' : 'none';
+                perfil.style.display = (tipo === 2 || tipo === 3) ? 'block' : 'none';
+                aviso.style.display = tipo === 3 ? 'flex' : 'none';
+            }
+
+            tipoEl.addEventListener('change', refreshComposer);
+            refreshComposer();
+        })();
     </script>
 }

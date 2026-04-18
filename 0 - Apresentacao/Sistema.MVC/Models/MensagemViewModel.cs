@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Sistema.APP.DTOs;
+using Sistema.CORE.Entities;
 
 namespace Sistema.MVC.Models
 {
@@ -14,5 +15,9 @@ namespace Sistema.MVC.Models
         public string? PalavraChave { get; set; }
         public DateTime? Inicio { get; set; }
         public DateTime? Fim { get; set; }
+        public PublicacaoTipo? Tipo { get; set; }
+        public int? PerfilId { get; set; }
+        public bool SomenteNaoLidas { get; set; }
+        public AvisoPrioridade? PrioridadeMinima { get; set; }
     }
 }

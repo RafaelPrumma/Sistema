@@ -10,6 +10,7 @@
             <li class="nav-item"><a class="nav-link" href="#configuracoes">Configurações</a></li>
             <li class="nav-item"><a class="nav-link" href="#tema">Tema</a></li>
             <li class="nav-item"><a class="nav-link" href="#mensagens">Mensagens</a></li>
+            <li class="nav-item"><a class="nav-link" href="#logs">Logs e auditoria</a></li>
             <li class="nav-item"><a class="nav-link" href="#scripts">Scripts</a></li>
         </ul>
     </nav>
@@ -25,6 +26,13 @@
         <section id="configuracoes">
             <h2>Configurações</h2>
             <p>Permite listar, criar e editar configurações agrupadas por tema.</p>
+            <p>Para política de retenção de logs, use o agrupamento <code>LogsRetencao</code> e as chaves:</p>
+            <ul>
+                <li><code>AcessoMeses</code> (padrão: 3)</li>
+                <li><code>ComunicacaoMeses</code> (padrão: 6)</li>
+                <li><code>AdministracaoMeses</code> (padrão: 12)</li>
+                <li><code>GeralMeses</code> (padrão: 12)</li>
+            </ul>
         </section>
         <section id="tema">
             <h2>Tema</h2>
@@ -42,6 +50,17 @@
                 <li><strong>Detalhes do remetente/destinatário:</strong> os nomes de quem enviou e de quem recebeu são sempre exibidos em cada linha.</li>
             </ul>
             <p>Para responder, use o botão de resposta na própria thread. O sistema preserva o contexto, garantindo que cada réplica apareça logo abaixo da anterior.</p>
+        </section>
+        <section id="logs">
+            <h2>Logs e auditoria</h2>
+            <p>A auditoria usa tabela única de logs com segmentação por módulo (<code>Acesso</code>, <code>Comunicacao</code>, <code>Administracao</code>).</p>
+            <ul>
+                <li><strong>Consulta por módulo:</strong> <code>/api/log/acesso</code>, <code>/api/log/comunicacao</code>, <code>/api/log/administracao</code>.</li>
+                <li><strong>Correlação:</strong> o cabeçalho <code>X-Correlation-ID</code> é propagado e salvo no log para rastrear a requisição de ponta a ponta.</li>
+                <li><strong>Retenção:</strong> aplicada automaticamente conforme configurações do agrupamento <code>LogsRetencao</code>.</li>
+                <li><strong>Fallback de escrita:</strong> quando o banco está indisponível, o sistema grava no arquivo interno <code>log-fallback/audit-fallback.ndjson</code>.</li>
+                <li><strong>Migração automática:</strong> ao restabelecer o banco, os itens do arquivo são inseridos no banco e removidos do fallback.</li>
+            </ul>
         </section>
         <section id="scripts">
             <h2>Scripts e interações</h2>

@@ -19,6 +19,9 @@ public class AppDbContext : DbContext
     public DbSet<Tema> Temas => Set<Tema>();
     public DbSet<Configuracao> Configuracoes => Set<Configuracao>();
     public DbSet<Mensagem> Mensagens => Set<Mensagem>();
+    public DbSet<MensagemReacao> MensagemReacoes => Set<MensagemReacao>();
+    public DbSet<MensagemLeitura> MensagemLeituras => Set<MensagemLeitura>();
+    public DbSet<MensagemDestinatario> MensagemDestinatarios => Set<MensagemDestinatario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
