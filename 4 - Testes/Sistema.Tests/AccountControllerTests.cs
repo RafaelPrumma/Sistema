@@ -5,6 +5,7 @@ using Moq;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
+using Sistema.CORE.Repositories.Interfaces;
 using Sistema.MVC.Controllers;
 using Sistema.MVC.Models;
 
@@ -19,6 +20,8 @@ public class AccountControllerTests
         var hasher = new Mock<IPasswordHasher<Usuario>>();
         var emailService = new Mock<IEmailAppService>();
         var logger = new Mock<ILogger<AccountController>>();
+        var logService = new Mock<ILogAppService>();
+        var uow = new Mock<IUnitOfWork>();
 
         hasher
             .Setup(h => h.HashPassword(It.IsAny<Usuario>(), It.IsAny<string>()))
@@ -28,7 +31,7 @@ public class AccountControllerTests
             .Setup(s => s.AdicionarAsync(It.IsAny<Usuario>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OperationResult<Usuario>(true, "ok"));
 
-        var controller = new AccountController(usuarioService.Object, hasher.Object, emailService.Object, logger.Object);
+        var controller = new AccountController(usuarioService.Object, hasher.Object, emailService.Object, logger.Object, logService.Object, uow.Object);
         var model = new RegisterViewModel
         {
             Nome = "Usuário Teste",
@@ -52,6 +55,8 @@ public class AccountControllerTests
         var hasher = new Mock<IPasswordHasher<Usuario>>();
         var emailService = new Mock<IEmailAppService>();
         var logger = new Mock<ILogger<AccountController>>();
+        var logService = new Mock<ILogAppService>();
+        var uow = new Mock<IUnitOfWork>();
 
         hasher
             .Setup(h => h.HashPassword(It.IsAny<Usuario>(), It.IsAny<string>()))
@@ -61,7 +66,7 @@ public class AccountControllerTests
             .Setup(s => s.AdicionarAsync(It.IsAny<Usuario>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("falha simulada"));
 
-        var controller = new AccountController(usuarioService.Object, hasher.Object, emailService.Object, logger.Object);
+        var controller = new AccountController(usuarioService.Object, hasher.Object, emailService.Object, logger.Object, logService.Object, uow.Object);
         var model = new RegisterViewModel
         {
             Nome = "Usuário Teste",

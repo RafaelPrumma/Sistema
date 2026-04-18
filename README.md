@@ -6,38 +6,72 @@ Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.
 - **0 - Apresentacao**:
   - `Sistema.API` - API ASP.NET Core com Swagger e Serilog.
   - `Sistema.MVC` - frontend web MVC para autenticação, cadastro, recuperação de senha, documentação e edição de tema.
-- **1 - Aplicacao**: `Sistema.APP` - perfis do AutoMapper e registro de dependências.
-- **2 - Dominio**: `Sistema.CORE` - entidades e implementações dos serviços que definem as regras de negócio.
+- **1 - Aplicacao**: `Sistema.APP` - perfis do AutoMapper, serviços de aplicação e registro de dependências.
+- **2 - Dominio**: `Sistema.CORE` - entidades e regras de negócio.
 - **3 - Infraestrutura**: `Sistema.INFRA` - Entity Framework Core, repositórios, Unit of Work, serviços e seeds.
+- **4 - Testes**: `Sistema.Tests` - testes unitários.
 
-### Organização de pastas
-- `2 - Dominio/Sistema.CORE/Entities` contém todas as entidades do domínio.
-- `2 - Dominio/Sistema.CORE/Services` possui as implementações dos serviços e suas interfaces em `Services/Interfaces`.
-- `3 - Infraestrutura/Sistema.INFRA/Repositories` contém as implementações dos repositórios.
-- `2 - Dominio/Sistema.CORE/Repositories/Interfaces` guarda apenas as interfaces dos repositórios.
-- `1 - Aplicacao/Sistema.APP/DTOs` concentra os DTOs utilizados pela API.
-- `0 - Apresentacao/Sistema.MVC` reúne controllers, views e arquivos estáticos do frontend.
-- `3 - Infraestrutura/Sistema.INFRA/Services` disponibiliza serviços como envio de e-mails.
+## Funcionalidades principais
+- Hub de comunicação interna com três tipos de publicação:
+  - mensagem direta
+  - post de setor
+  - aviso institucional
+- Threads sociais com respostas em cadeia (pai/filho).
+- Reações por usuário/publicação com unicidade por item.
+- Controle de leitura/entrega em publicações.
+- Auditoria de operações por módulo (`Acesso`, `Comunicacao`, `Administracao`) em tabela única de logs.
 
-## Funcionalidades
-- CRUD de `Perfil`, `Usuario`, `Funcionalidade` e `Tema` com validações de negócio.
-- Campos de auditoria nas entidades e registro de operações em `Log`.
-- `UnitOfWork` centraliza o commit das alterações.
-- Seeds criam perfis, funcionalidades e usuários iniciais (Admin e Comercial).
-- Serilog grava logs mensais na pasta `log` e as operações também ficam salvas na tabela `Logs` com usuário e detalhes da exceção.
-- Perfis e usuários podem ser ativados ou desativados e as APIs permitem filtrar registros por data, perfil e status.
-- Listagens retornam `PagedResult<T>` para suportar paginação via `page` e `pageSize`.
-- Perfis possuem funcionalidades com permissões de leitura e escrita gravadas em `PerfilFuncionalidades`.
-- Autenticação via JWT protege a API; obtenha um token em `/api/auth/login`.
-- Interface MVC permite login, registro, recuperação de senha, consulta à documentação e personalização de tema.
-- `EmailService` envia mensagens SMTP para cadastro e recuperação de senha.
+## Auditoria e retenção de logs
+A aplicação utiliza tabela única de `Log` com campo `Modulo` para segmentação lógica.
 
-Para compilar a solução:
+### Endpoints de consulta
+- `GET /api/log`
+- `GET /api/log/acesso`
+- `GET /api/log/comunicacao`
+- `GET /api/log/administracao`
+
+### Correlação de requisições
+- A aplicação propaga `X-Correlation-ID` em API e MVC.
+- O valor é gravado no log em `CorrelationId` e pode ser usado para rastrear ponta a ponta.
+
+### Retenção por módulo (configurável via sistema)
+As regras de retenção são lidas do agrupamento de configuração **`LogsRetencao`**:
+- `AcessoMeses` (padrão: 3)
+- `ComunicacaoMeses` (padrão: 6)
+- `AdministracaoMeses` (padrão: 12)
+- `GeralMeses` (padrão: 12)
+
+Você pode editar esses valores na tela de configurações (`/Configuracao`) filtrando pelo agrupamento `LogsRetencao`.
+
+## Consistência transacional de logs
+- O `LogAppService` não confirma transação por conta própria.
+- O commit permanece no serviço/caso de uso chamador para manter consistência entre operação de negócio e auditoria.
+
+## Fallback de log (resiliência)
+Se ocorrer falha ao gravar log no banco, o sistema grava o evento em arquivo interno:
+- `log-fallback/audit-fallback.ndjson`
+
+Quando a gravação no banco volta a funcionar, os registros do arquivo fallback são migrados automaticamente para a tabela de logs e removidos do arquivo.
+
+## Seeds
+Na inicialização, o sistema cria dados iniciais de:
+- perfis
+- funcionalidades
+- usuários
+- configurações (incluindo `LogsRetencao`)
+
+## Build e testes
+Para compilar:
 
 ```bash
-dotnet build Sistema.sln -c Release
+dotnet build Sistema.sln -warnaserror
 ```
 
+Para executar testes:
+
+```bash
+dotnet test Sistema.sln --no-build
+```
 
 ## Estilos com Sass
 Os estilos do projeto foram organizados com [Sass](https://sass-lang.com/).
@@ -51,6 +85,5 @@ npm run build-css
 ```
 
 ## Scripts com jQuery
-
-- `0 - Apresentacao/Sistema.MVC/wwwroot/js/site.js` agora utiliza jQuery para controlar menus, tema e outras interações.
-- A tag `<html>` do layout foi configurada com `lang="pt-BR"` para indicar o idioma da aplicação.
+- `0 - Apresentacao/Sistema.MVC/wwwroot/js/site.js` utiliza jQuery para controlar menus, tema e outras interações.
+- A tag `<html>` do layout está configurada com `lang="pt-BR"`.

@@ -1,32 +1,52 @@
 @model Sistema.MVC.Models.MensagemViewModel
+@using Sistema.CORE.Entities
 @{
-    ViewData["Title"] = "Caixa de Entrada";
+    ViewData["Title"] = "Hub de Comunicação";
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
-    Title = "Mensagens",
-    Description = "Visualize e gerencie suas mensagens."
+    Title = "Comunicação Interna",
+    Description = "Feed híbrido de mensagens diretas, posts de setor e avisos."
 })
 
 <form method="get" class="mb-3">
     <div class="card">
-        <div class="card-body">
-            <input type="text" name="palavraChave" class="form-control" placeholder="Buscar" value="@Model.PalavraChave" />
+        <div class="card-body row g-2">
+            <div class="col-md-4">
+                <input type="text" name="palavraChave" class="form-control" placeholder="Buscar" value="@Model.PalavraChave" />
+            </div>
+            <div class="col-md-2">
+                <select name="tipo" class="form-select" asp-items="Html.GetEnumSelectList<PublicacaoTipo>()">
+                    <option value="">Todos os tipos</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="prioridadeMinima" class="form-select" asp-items="Html.GetEnumSelectList<AvisoPrioridade>()">
+                    <option value="">Qualquer prioridade</option>
+                </select>
+            </div>
+            <div class="col-md-2 form-check mt-2 ms-2">
+                <input class="form-check-input" type="checkbox" name="somenteNaoLidas" value="true" @(Model.SomenteNaoLidas ? "checked" : "") id="somenteNaoLidas" />
+                <label class="form-check-label" for="somenteNaoLidas">Não lidas</label>
+            </div>
         </div>
         <div class="card-footer text-end">
-            <button type="submit" class="btn btn-secondary">Buscar</button>
+            <button type="submit" class="btn btn-secondary">Filtrar</button>
         </div>
     </div>
 </form>
+
 <div class="card">
     <div class="card-body p-0">
         <table class="table mb-0">
             <thead>
                 <tr>
+                    <th>Tipo</th>
                     <th>Assunto</th>
-                    <th>Remetente</th>
+                    <th>Autor</th>
                     <th>Data</th>
+                    <th>Reações</th>
                     <th></th>
                 </tr>
             </thead>
@@ -34,9 +54,25 @@
             @foreach (var m in Model.Mensagens)
             {
                 <tr class="@(m.Lida ? "" : "fw-bold")">
-                    <td>@m.Assunto</td>
+                    <td>@m.Tipo</td>
+                    <td>
+                        @m.Assunto
+                        @if (m.Fixada)
+                        {
+                            <span class="badge bg-warning text-dark">Fixado</span>
+                        }
+                    </td>
                     <td>@m.RemetenteNome</td>
                     <td>@m.DataInclusao.ToLocalTime().ToString("g")</td>
+                    <td>
+                        @if (m.Reacoes?.Count > 0)
+                        {
+                            foreach (var r in m.Reacoes)
+                            {
+                                <span class="badge bg-light text-dark me-1">@r.Key: @r.Value</span>
+                            }
+                        }
+                    </td>
                     <td><a href="@Url.Action("Detalhe", new { id = m.Id })">Abrir</a></td>
                 </tr>
             }
@@ -45,6 +81,6 @@
     </div>
     <div class="card-footer text-end">
         <a href="@Url.Action("CaixaSaida")" class="btn btn-outline-secondary me-2">Caixa de saída</a>
-        <a href="@Url.Action("Nova")" class="btn btn-primary">Nova mensagem</a>
+        <a href="@Url.Action("Nova")" class="btn btn-primary">Nova publicação</a>
     </div>
 </div>

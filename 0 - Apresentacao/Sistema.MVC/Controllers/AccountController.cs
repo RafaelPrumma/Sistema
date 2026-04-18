@@ -4,18 +4,21 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.APP.Services.Interfaces;
+using Sistema.CORE.Repositories.Interfaces;
 using Sistema.MVC.Models;
 using System.Globalization;
 using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
-public class AccountController(IUsuarioAppService usuarioService, IPasswordHasher<Usuario> hasher, IEmailAppService emailService, ILogger<AccountController> logger) : Controller
+public class AccountController(IUsuarioAppService usuarioService, IPasswordHasher<Usuario> hasher, IEmailAppService emailService, ILogger<AccountController> logger, ILogAppService logService, IUnitOfWork uow) : Controller
 {
     private readonly IUsuarioAppService _usuarioService = usuarioService;
     private readonly IPasswordHasher<Usuario> _hasher = hasher;
     private readonly IEmailAppService _emailService = emailService;
     private readonly ILogger<AccountController> _logger = logger;
+    private readonly ILogAppService _logService = logService;
+    private readonly IUnitOfWork _uow = uow;
 
 	private int? ObterUsuarioId()
     {
@@ -52,6 +55,7 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         var usuario = await _usuarioService.BuscarPorCpfAsync(model.Cpf);
         if (usuario is null)
         {
+            await RegistrarLogAcessoAsync(nameof(Usuario), "LoginMVC", false, "Credenciais inválidas", LogTipo.Informacao, model.Cpf, "Usuário não encontrado");
             ModelState.AddModelError(string.Empty, "Credenciais inválidas");
             return View(model);
         }
@@ -59,12 +63,14 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         var result = _hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, model.Senha);
         if (result != PasswordVerificationResult.Success)
         {
+            await RegistrarLogAcessoAsync(nameof(Usuario), "LoginMVC", false, "Credenciais inválidas", LogTipo.Informacao, usuario.Cpf, "Senha inválida");
             ModelState.AddModelError(string.Empty, "Credenciais inválidas");
             return View(model);
         }
 
         if (!usuario.Ativo)
         {
+            await RegistrarLogAcessoAsync(nameof(Usuario), "LoginMVC", false, "Usuário inativo", LogTipo.Informacao, usuario.Cpf, null);
             ModelState.AddModelError(string.Empty, "Usuário inativo");
             return View(model);
         }
@@ -81,6 +87,7 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(identity));
+        await RegistrarLogAcessoAsync(nameof(Usuario), "LoginMVC", true, "Login MVC realizado com sucesso", LogTipo.Sucesso, usuario.Cpf, null);
         return RedirectToAction("Index", "Home");
     }
 
@@ -255,9 +262,17 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
         return View(new ChangePasswordViewModel());
     }
 
+    private async Task RegistrarLogAcessoAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, string? detalhe)
+    {
+        await _logService.RegistrarAcessoAsync(entidade, operacao, sucesso, mensagem, tipo, usuario, detalhe, HttpContext.RequestAborted);
+        await _uow.ConfirmarAsync(HttpContext.RequestAborted);
+    }
+
     [HttpGet]
     public async Task<IActionResult> Logout()
     {
+        var usuario = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? HttpContext.Session.GetString("UserName") ?? "anonimo";
+        await RegistrarLogAcessoAsync(nameof(Usuario), "LogoutMVC", true, "Logout realizado", LogTipo.Sucesso, usuario, null);
         HttpContext.Session.Clear();
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login");

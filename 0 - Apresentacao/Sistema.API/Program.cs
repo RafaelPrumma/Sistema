@@ -21,6 +21,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfraestrutura(builder.Configuration);
 builder.Services.AddAplicacao();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -40,6 +41,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    const string correlationHeader = "X-Correlation-ID";
+    var correlationId = context.Request.Headers[correlationHeader].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(correlationId))
+    {
+        correlationId = Guid.NewGuid().ToString("N");
+    }
+
+    context.TraceIdentifier = correlationId;
+    context.Response.Headers[correlationHeader] = correlationId;
+    await next();
+});
 
 if (app.Environment.IsDevelopment())
 {

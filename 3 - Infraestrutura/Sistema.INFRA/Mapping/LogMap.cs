@@ -14,5 +14,11 @@ public class LogMap : IEntityTypeConfiguration<Log>
         builder.Property(l => l.Operacao).IsRequired().HasMaxLength(100);
         builder.Property(l => l.Mensagem).IsRequired().HasMaxLength(2000);
         builder.Property(l => l.Usuario).IsRequired().HasMaxLength(100);
+        builder.Property(l => l.CorrelationId).HasMaxLength(100);
+        builder.Property(l => l.TraceId).HasMaxLength(64);
+        builder.Property(l => l.SpanId).HasMaxLength(32);
+        builder.Property(l => l.Modulo).IsRequired();
+        builder.HasIndex(l => new { l.Modulo, l.DataOperacao });
+        builder.HasIndex(l => l.CorrelationId);
     }
 }

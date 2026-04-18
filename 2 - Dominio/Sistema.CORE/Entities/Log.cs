@@ -9,6 +9,10 @@ public class Log
     public bool Sucesso { get; set; }
     public string Mensagem { get; set; } = string.Empty;
     public LogTipo Tipo { get; set; }
+    public LogModulo Modulo { get; set; } = LogModulo.Geral;
     public string Usuario { get; set; } = string.Empty;
+    public string? CorrelationId { get; set; }
+    public string? TraceId { get; set; }
+    public string? SpanId { get; set; }
     public string? Detalhe { get; set; }
 }

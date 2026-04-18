@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ namespace Sistema.CORE.Repositories.Interfaces;
 
 public interface IUsuarioRepository
 {
+    IQueryable<Usuario> Query();
     Task<PagedResult<Usuario>> BuscarTodosAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<PagedResult<Usuario>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, int? perfilId, bool? ativo, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Usuario?> BuscarPorIdAsync(int id, CancellationToken cancellationToken = default);

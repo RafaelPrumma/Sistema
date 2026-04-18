@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddInfraestrutura(builder.Configuration);
 builder.Services.AddAplicacao();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -20,6 +21,20 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    const string correlationHeader = "X-Correlation-ID";
+    var correlationId = context.Request.Headers[correlationHeader].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(correlationId))
+    {
+        correlationId = Guid.NewGuid().ToString("N");
+    }
+
+    context.TraceIdentifier = correlationId;
+    context.Response.Headers[correlationHeader] = correlationId;
+    await next();
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

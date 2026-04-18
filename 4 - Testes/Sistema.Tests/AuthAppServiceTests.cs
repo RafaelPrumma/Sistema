@@ -4,6 +4,7 @@ using Moq;
 using Sistema.APP.Services;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
+using Sistema.APP.Services.Interfaces;
 
 namespace Sistema.Tests;
 
@@ -15,6 +16,7 @@ public class AuthAppServiceTests
         var usuarioRepository = new Mock<IUsuarioRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
         var hasher = new Mock<IPasswordHasher<Usuario>>();
+        var logService = new Mock<ILogAppService>();
 
         var usuario = new Usuario
         {
@@ -44,7 +46,7 @@ public class AuthAppServiceTests
             })
             .Build();
 
-        var service = new AuthAppService(unitOfWork.Object, hasher.Object, config);
+        var service = new AuthAppService(unitOfWork.Object, hasher.Object, config, logService.Object);
 
         var token = await service.AutenticarAsync(usuario.Cpf, "Senha@123");
 
@@ -57,6 +59,7 @@ public class AuthAppServiceTests
         var usuarioRepository = new Mock<IUsuarioRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
         var hasher = new Mock<IPasswordHasher<Usuario>>();
+        var logService = new Mock<ILogAppService>();
 
         var usuario = new Usuario
         {
@@ -86,7 +89,7 @@ public class AuthAppServiceTests
             })
             .Build();
 
-        var service = new AuthAppService(unitOfWork.Object, hasher.Object, config);
+        var service = new AuthAppService(unitOfWork.Object, hasher.Object, config, logService.Object);
 
         var token = await service.AutenticarAsync(usuario.Cpf, "senha-invalida");
 

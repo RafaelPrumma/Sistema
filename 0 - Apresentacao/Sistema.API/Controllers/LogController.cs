@@ -19,9 +19,18 @@ public class LogController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IEnumerable<Log>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
-    {
+    public async Task<IEnumerable<Log>> Get([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, [FromQuery] LogModulo? modulo, CancellationToken cancellationToken)
+        => await _logs.BuscarFiltradosAsync(inicio, fim, tipo, modulo, cancellationToken);
 
-        return await _logs.BuscarFiltradosAsync(inicio, fim, tipo, cancellationToken);
-    }
+    [HttpGet("acesso")]
+    public async Task<IEnumerable<Log>> GetAcesso([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
+        => await _logs.BuscarAcessoAsync(inicio, fim, tipo, cancellationToken);
+
+    [HttpGet("comunicacao")]
+    public async Task<IEnumerable<Log>> GetComunicacao([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
+        => await _logs.BuscarComunicacaoAsync(inicio, fim, tipo, cancellationToken);
+
+    [HttpGet("administracao")]
+    public async Task<IEnumerable<Log>> GetAdministracao([FromQuery] DateTime? inicio, [FromQuery] DateTime? fim, [FromQuery] LogTipo? tipo, CancellationToken cancellationToken)
+        => await _logs.BuscarAdministracaoAsync(inicio, fim, tipo, cancellationToken);
 }

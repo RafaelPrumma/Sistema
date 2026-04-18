@@ -139,51 +139,57 @@
                             <small class="text-opacity-75">Bem-vindo(a)</small>
                         </div>
                     </li>
-                    <li class="nav-header text-uppercase small">Navegação</li>
+                    <li class="nav-header text-uppercase small">Módulos</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Home", "Index")" asp-controller="Home" asp-action="Index" title="Início">
-                            <i class="bi bi-house me-2"></i><span>Home</span>
+                        <a class="nav-link @leftText @EstaAtivo("Home")" asp-controller="Home" asp-action="Index" title="Módulo Home">
+                            <i class="bi bi-house me-2"></i><span>Módulo Home</span>
                         </a>
+                        <ul>
+                            <li><a asp-controller="Home" asp-action="Index" title="Dashboard">Dashboard</a></li>
+                            <li><a asp-controller="Home" asp-action="Privacy" title="Privacidade">Privacidade</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Home", "Privacy")" asp-controller="Home" asp-action="Privacy" title="Privacidade">
-                            <i class="bi bi-shield-lock me-2"></i><span>Privacy</span>
+                        <a class="nav-link @leftText @EstaAtivo("Account")" asp-controller="Account" asp-action="Login" title="Módulo Acesso">
+                            <i class="bi bi-shield-lock me-2"></i><span>Módulo Acesso</span>
                         </a>
+                        <ul>
+                            <li><a asp-controller="Account" asp-action="ChangePassword" title="Segurança">Segurança</a></li>
+                            <li><a href="/api/log/acesso" title="AcessoLog">AcessoLog (API)</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Mensagens">
-                            <i class="bi bi-envelope me-2"></i><span>Mensagens</span>
+                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" asp-controller="Mensagem" asp-action="Index" title="Módulo Comunicação">
+                            <i class="bi bi-envelope me-2"></i><span>Módulo Comunicação</span>
                             @if (unreadMessages > 0)
                             {
                                 <span class="badge bg-primary ms-auto">@unreadMessages</span>
                             }
                         </a>
                         <ul>
-                            <li><a asp-controller="Mensagem" asp-action="Index" title="Caixa de entrada">Caixa de entrada</a></li>
+                            <li><a asp-controller="Mensagem" asp-action="Index" title="Feed">Feed</a></li>
                             <li><a asp-controller="Mensagem" asp-action="CaixaSaida" title="Caixa de saída">Caixa de saída</a></li>
+                            <li><a asp-controller="Mensagem" asp-action="Nova" title="Nova publicação">Nova publicação</a></li>
+                            <li><a href="/api/log/comunicacao" title="ComunicacaoLog">ComunicacaoLog (API)</a></li>
                         </ul>
                     </li>
-                    <li class="nav-header text-uppercase small">Personalização</li>
                     <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Tema", "Edit")" asp-controller="Tema" asp-action="Edit" title="Tema">
-                            <i class="bi bi-palette me-2"></i><span>Tema</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Configurações">
-                            <i class="bi bi-gear me-2"></i><span>Configurações</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Documentação">
-                            <i class="bi bi-book me-2"></i><span>Documentação</span>
+                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" asp-controller="Configuracao" asp-action="Index" title="Módulo Administração">
+                            <i class="bi bi-gear me-2"></i><span>Módulo Administração</span>
                         </a>
                         <ul>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="login" title="Login">Login</a></li>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="home" title="Página inicial">Página inicial</a></li>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="configuracoes" title="Configurações">Configurações</a></li>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="tema" title="Tema">Tema</a></li>
+                            <li><a asp-controller="Configuracao" asp-action="Index" title="Configurações">Configurações</a></li>
+                            <li><a asp-controller="Tema" asp-action="Edit" title="Tema">Tema</a></li>
+                            <li><a href="/api/log/administracao" title="AdministracaoLog">AdministracaoLog (API)</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" asp-controller="Documentacao" asp-action="Index" title="Módulo Documentação">
+                            <i class="bi bi-book me-2"></i><span>Módulo Documentação</span>
+                        </a>
+                        <ul>
                             <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" title="Mensagens">Mensagens</a></li>
+                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="logs" title="Logs e auditoria">Logs e auditoria</a></li>
                             <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="scripts" title="Scripts">Scripts</a></li>
                         </ul>
                     </li>
