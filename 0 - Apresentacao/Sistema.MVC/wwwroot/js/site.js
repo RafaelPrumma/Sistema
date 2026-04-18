@@ -44,11 +44,7 @@
         const persistedTheme = localStorage.getItem('theme');
         const $headerEl = $('header.navbar');
         const $footerEl = $('footer.footer');
-        const $mobileMenuToggle = $('.mobile-menu-toggle');
-
-        let mmApi = null;
-        const expandedStateKey = 'mmenuExpandedState';
-        const desktopMedia = window.matchMedia('(min-width: 992px)');
+        const expandedStateKey = 'menuExpandedState';
 
         const classesTexto = ['text-white', 'text-dark'];
         const obterPreferenciaMenuExpandido = () => $('#MenuLateralExpandido').is(':checked');
@@ -69,12 +65,6 @@
             const alturaFooter = footerFixo ? Math.ceil($footerEl.outerHeight() || $footerEl[0]?.offsetHeight || 0) : 0;
 
             document.body.style.paddingBottom = footerFixo && alturaFooter ? `${alturaFooter}px` : '';
-        };
-
-        const atualizarAriaMenu = (menuAberto) => {
-            if (!$mobileMenuToggle.length) return;
-            $mobileMenuToggle.attr('aria-controls', 'sidebarMenu');
-            $mobileMenuToggle.attr('aria-expanded', menuAberto ? 'true' : 'false');
         };
 
         const normalizarHex = (valor) => {
@@ -197,9 +187,6 @@
 
             atualizarEstadoMenuResponsivo();
 
-            if (mmApi) {
-                mmApi.theme(mode === 'dark' ? 'dark' : 'light');
-            }
         };
 
         const sidebarMenu = document.getElementById('sidebarMenu');
@@ -209,23 +196,20 @@
             menuLateralExpandido: initialMenuExpanded
         };
 
-        const atualizarEstadoMenuResponsivo = () => {
-            if (!mmApi) return;
+        const menuController = typeof window.initSistemaMenu === 'function'
+            ? window.initSistemaMenu({
+                sidebarSelector: '#sidebarMenu',
+                mobileToggleSelector: '.mobile-menu-toggle',
+                iconbarSelector: '.app-iconbar',
+                appShellSelector: '.app-shell',
+                expandedCheckboxSelector: '#MenuLateralExpandido',
+                onMobileStateChange: null
+            })
+            : null;
 
-            if (desktopMedia.matches) {
-                const shouldOpen = obterPreferenciaMenuExpandido();
-                document.body.classList.toggle('menu-desktop-collapsed', !shouldOpen);
-                atualizarAriaMenu(false);
-                if (shouldOpen) {
-                    mmApi.open();
-                } else {
-                    mmApi.close();
-                }
-            } else {
-                document.body.classList.remove('menu-desktop-collapsed');
-                atualizarAriaMenu(false);
-                mmApi.close();
-            }
+        const atualizarEstadoMenuResponsivo = () => {
+            const shouldOpen = obterPreferenciaMenuExpandido();
+            menuController?.sync(shouldOpen);
         };
 
         const $temaToggle = $('#temaToggle');
@@ -274,67 +258,12 @@
             });
         }
 
-        if (sidebarMenu && window.Mmenu) {
-            const isDarkMode = (document.body.getAttribute('data-bs-theme') || 'light') === 'dark';
+        if (typeof initialMenuExpanded === 'boolean') {
+            window.sessionStorage.setItem(expandedStateKey, initialMenuExpanded ? 'open' : 'closed');
+        }
 
-            if (typeof initialMenuExpanded === 'boolean') {
-                window.sessionStorage.setItem(expandedStateKey, initialMenuExpanded ? 'open' : 'closed');
-            }
-
-            const mmenu = new window.Mmenu('#sidebarMenu', {
-                theme: isDarkMode ? 'dark' : 'light',
-                iconPanels: {
-                    add: true,
-                    visible: 1
-                },
-                setSelected: {
-                    hover: false,
-                    parent: true,
-                    current: true
-                },
-                backButton: {
-                    close: true,
-                    open: false
-                },
-                navbars: [
-                    {
-                        position: 'top',
-                        content: ['prev', 'breadcrumbs']
-                    }
-                ]
-            }, {
-                offCanvas: {
-                    use: true,
-                    position: 'left'
-                },
-                sidebar: {
-                    expanded: {
-                        use: '(min-width: 992px)',
-                        initial: initialMenuExpanded ? 'open' : 'closed'
-                    }
-                },
-                iconbar: {
-                    use: false
-                }
-            });
-
-            mmApi = mmenu.API;
-
-            if (typeof mmApi.bind === 'function') {
-                mmApi.bind('open:finish', () => {
-                    if (!desktopMedia.matches) {
-                        atualizarAriaMenu(true);
-                    }
-                });
-
-                mmApi.bind('close:finish', () => {
-                    atualizarAriaMenu(false);
-                });
-            }
-
-            desktopMedia.addEventListener('change', () => {
-                atualizarEstadoMenuResponsivo();
-            });
+        if (sidebarMenu && !menuController) {
+            console.warn('initSistemaMenu não foi encontrado. O menu lateral não foi inicializado.');
         }
 
         if (persistedTheme === 'light' || persistedTheme === 'dark') {

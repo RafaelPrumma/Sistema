@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using Sistema.APP.DTOs;
@@ -8,6 +9,7 @@ using Sistema.APP.Services.Interfaces;
 namespace Sistema.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class PerfilController : ControllerBase
 {
