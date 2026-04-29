@@ -11,6 +11,9 @@ public class PerfilFuncionalidadeMap : IEntityTypeConfiguration<PerfilFuncionali
         builder.ToTable("PerfilFuncionalidade");
         builder.HasKey(pf => new { pf.PerfilId, pf.FuncionalidadeId });
 
+        builder.Property(pf => pf.Permissoes)
+               .HasConversion<int>();
+
         builder.HasOne(pf => pf.Perfil)
                .WithMany()
                .HasForeignKey(pf => pf.PerfilId);

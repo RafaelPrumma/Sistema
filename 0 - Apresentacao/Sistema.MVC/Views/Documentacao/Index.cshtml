@@ -9,6 +9,7 @@
             <li class="nav-item"><a class="nav-link" href="#arquitetura">Arquitetura</a></li>
             <li class="nav-item"><a class="nav-link" href="#auditoria">Auditoria e soft delete</a></li>
             <li class="nav-item"><a class="nav-link" href="#seguranca">Autenticação e segurança</a></li>
+            <li class="nav-item"><a class="nav-link" href="#permissoes">Permissões granulares</a></li>
             <li class="nav-item"><a class="nav-link" href="#erros">Tratamento de erros</a></li>
             <li class="nav-item"><a class="nav-link" href="#mensagens">Mensagens</a></li>
             <li class="nav-item"><a class="nav-link" href="#logs">Logs e correlação</a></li>
@@ -46,6 +47,13 @@
             <h2>Autenticação e segurança</h2>
             <p>O sistema usa autenticação por cookie no MVC e possui serviço de emissão JWT na camada de aplicação para integrações/API.</p>
             <p>As ações críticas são auditadas com correlação de requisição para facilitar investigação e suporte.</p>
+        </section>
+
+        <section id="permissoes">
+            <h2>Permissões granulares por funcionalidade</h2>
+            <p>Após o login, o sistema gera claims no formato <code>perm:{funcionalidade}</code> com o valor inteiro do enum <code>Permissao</code>.</p>
+            <p>Exemplo: <code>perm:Perfil = 7</code> representa <code>Visualizar + Criar + Editar</code>.</p>
+            <p>No MVC, o atributo <code>[AuthorizePermission("Perfil", Permissao.Editar)]</code> valida as flags via <code>HasFlag</code> e retorna <code>403</code> quando necessário.</p>
         </section>
 
         <section id="erros">

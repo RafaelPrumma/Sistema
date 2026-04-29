@@ -214,20 +214,22 @@ namespace Sistema.INFRA.Data.Migrations
                 table: "Log",
                 column: "CorrelationId");
 
+            var logModuloDataOperacaoColumns = new[] { "Modulo", "DataOperacao" };
             migrationBuilder.CreateIndex(
                 name: "IX_Log_Modulo_DataOperacao",
                 table: "Log",
-                columns: new[] { "Modulo", "DataOperacao" });
+                columns: logModuloDataOperacaoColumns);
 
             migrationBuilder.CreateIndex(
                 name: "IX_MensagemDestinatarios_UsuarioId",
                 table: "MensagemDestinatarios",
                 column: "UsuarioId");
 
+            var mensagemLeiturasUniqueColumns = new[] { "PublicacaoId", "UsuarioId" };
             migrationBuilder.CreateIndex(
                 name: "IX_MensagemLeituras_PublicacaoId_UsuarioId",
                 table: "MensagemLeituras",
-                columns: new[] { "PublicacaoId", "UsuarioId" },
+                columns: mensagemLeiturasUniqueColumns,
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -235,10 +237,11 @@ namespace Sistema.INFRA.Data.Migrations
                 table: "MensagemLeituras",
                 column: "UsuarioId");
 
+            var mensagemReacoesUniqueColumns = new[] { "PublicacaoId", "UsuarioId" };
             migrationBuilder.CreateIndex(
                 name: "IX_MensagemReacoes_PublicacaoId_UsuarioId",
                 table: "MensagemReacoes",
-                columns: new[] { "PublicacaoId", "UsuarioId" },
+                columns: mensagemReacoesUniqueColumns,
                 unique: true);
 
             migrationBuilder.CreateIndex(

@@ -49,7 +49,7 @@ A tela `/Documentacao` descreve:
 - arquitetura por camadas
 - regras de auditoria/soft delete
 - tratamento de erros
-- autenticação e autorização atual
+- autenticação e autorização granular por funcionalidade (claims perm:{slug})
 - comunicação interna e logs operacionais
 
 ## Build e testes

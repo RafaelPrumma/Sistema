@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sistema.CORE.Entities;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Repositories.Interfaces;
+using Sistema.CORE.Enums;
 using Sistema.MVC.Models;
 using System.Globalization;
 using System.Security.Claims;
@@ -83,6 +84,14 @@ public class AccountController(IUsuarioAppService usuarioService, IPasswordHashe
             new(ClaimTypes.NameIdentifier, usuario.Id.ToString(CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, usuario.Nome)
         };
+
+        var perfilFuncionalidades = await _uow.PerfilFuncionalidades.BuscarPorPerfilIdAsync(usuario.PerfilId);
+        foreach (var perfilFuncionalidade in perfilFuncionalidades)
+        {
+            var slug = perfilFuncionalidade.Funcionalidade.Nome;
+            var permissao = (int)perfilFuncionalidade.Permissoes;
+            claims.Add(new Claim($"perm:{slug}", permissao.ToString(CultureInfo.InvariantCulture)));
+        }
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

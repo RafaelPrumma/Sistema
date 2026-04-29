@@ -1,28 +1,18 @@
-using Sistema.APP;
-using Sistema.INFRA;
 using Microsoft.EntityFrameworkCore;
+using Sistema.APP.DependencyInjection;
 using Sistema.INFRA.Data;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Sistema.INFRA.DependencyInjection;
+using Sistema.MVC.DependencyInjection;
 using Sistema.MVC.Middleware;
-using Sistema.APP.Services.Interfaces;
-using Sistema.MVC.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddInfraestrutura(builder.Configuration);
-builder.Services.AddAplicacao();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IExecutionContext, HttpExecutionContext>();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSecurity();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/Account/Login";
-        options.AccessDeniedPath = "/Account/Login";
-    });
 
 var app = builder.Build();
 
@@ -40,13 +30,11 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// Configure the HTTP request pipeline.
 app.UseMiddleware<GlobalExceptionMiddleware>();
 if (!app.Environment.IsDevelopment())
 {
-	app.UseExceptionHandler("/Home/Error");
-	// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-	app.UseHsts();
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
@@ -54,9 +42,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseSession();
-
 app.UseAuthentication();
-
 app.UseAuthorization();
 
 using (var scope = app.Services.CreateScope())
@@ -71,8 +57,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapControllerRoute(
-        name: "default",
-        pattern: "{controller=Account}/{action=Login}/{id?}");
-
+    name: "default",
+    pattern: "{controller=Account}/{action=Login}/{id?}");
 
 app.Run();
