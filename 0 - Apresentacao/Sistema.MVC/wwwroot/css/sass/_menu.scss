@@ -28,9 +28,16 @@
   position: fixed;
   left: 0;
   z-index: 1025;
-  overflow: hidden;
+  overflow: visible;
   transition: width 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08);
+
+  .menu-inner-wrap {
+    position: relative;
+    width: var(--sidebar-width);
+    height: 100%;
+    overflow: hidden;
+  }
 
   .nav {
     padding: 0.75rem 0.25rem 1rem;
@@ -44,7 +51,10 @@
 
   .menu-subpanel {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-width);
+    height: 100%;
     list-style: none;
     margin: 0;
     padding: 0.75rem 0.25rem 1rem;
@@ -170,6 +180,21 @@
       }
     }
   }
+
+  .menu-subpanel li a {
+    display: block;
+    color: inherit;
+    padding: 0.6rem 1rem;
+    margin-inline: 0.5rem;
+    border-radius: 0.65rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
 }
 
 .mobile-menu-toggle {
@@ -221,6 +246,17 @@
     width: var(--iconbar-width);
   }
 
+  body.menu-desktop-collapsed .app-shell .content {
+    margin-left: var(--iconbar-width);
+  }
+
+  body.menu-desktop-collapsed .app-menu.submenu-open {
+    width: var(--sidebar-width);
+    z-index: 1080;
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.18);
+  }
+
+  body.menu-desktop-collapsed .app-menu.submenu-open ~ * .content,
   body.menu-desktop-collapsed .app-shell .content {
     margin-left: var(--iconbar-width);
   }
