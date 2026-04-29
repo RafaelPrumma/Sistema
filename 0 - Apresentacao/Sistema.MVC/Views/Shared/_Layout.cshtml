@@ -73,105 +73,69 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body data-bs-theme="@(modoEscuro ? "dark" : "light")">
-    <a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>
-    <div class="d-flex flex-column min-vh-100">
-        <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
-            <div class="container-fluid">
-                <div class="d-flex align-items-center gap-2">
-                    <a class="btn btn-link @headerText mobile-menu-toggle" href="#sidebarMenu" aria-label="Abrir menu" title="Abrir menu">
-                        <i class="bi bi-list"></i>
-                    </a>
-                    <a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
-                </div>
-                <div class="ms-auto d-flex align-items-center">
-                    <button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button>
-                    <div class="dropdown">
-                        <a class="nav-link dropdown-toggle @headerText" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            @userName
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Alterar Senha</a></li>
-                            <li><hr class="dropdown-divider" /></li>
-                            <li><a class="dropdown-item" asp-controller="Account" asp-action="Logout">Sair</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </header>
-        <div class="flex-grow-1 d-flex app-shell">
-            <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" aria-label="Menu principal"
-                 data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()">
-                <div class="menu-inner-wrap">
-                    <ul class="nav flex-column">
-                    <li class="nav-header text-uppercase small">Módulos</li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Home")" href="#" title="Home">
-                            <i class="bi bi-house me-2"></i><span>Home</span>
-                        </a>
-                        <ul>
-                            <li><a asp-controller="Home" asp-action="Index" title="Dashboard">Dashboard</a></li>
-                            <li><a asp-controller="Home" asp-action="Privacy" title="Privacidade">Privacidade</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Account")" href="#" title="Acesso">
-                            <i class="bi bi-shield-lock me-2"></i><span>Acesso</span>
-                        </a>
-                        <ul>
-                            <li><a asp-controller="Account" asp-action="ChangePassword" title="Segurança">Segurança</a></li>
-                            <li><a href="/api/log/acesso" title="AcessoLog">AcessoLog (API)</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Mensagem")" href="#" title="Comunicação">
-                            <i class="bi bi-envelope me-2"></i><span>Comunicação</span>
-                            @if (unreadMessages > 0)
-                            {
-                                <span class="badge bg-primary ms-auto">@unreadMessages</span>
-                            }
-                        </a>
-                        <ul>
-                            <li><a asp-controller="Mensagem" asp-action="Index" title="Feed">Feed</a></li>
-                            <li><a asp-controller="Mensagem" asp-action="CaixaSaida" title="Caixa de saída">Caixa de saída</a></li>
-                            <li><a asp-controller="Mensagem" asp-action="Nova" title="Nova publicação">Nova publicação</a></li>
-                            <li><a href="/api/log/comunicacao" title="ComunicacaoLog">ComunicacaoLog (API)</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Configuracao")" href="#" title="Administração">
-                            <i class="bi bi-gear me-2"></i><span>Administração</span>
-                        </a>
-                        <ul>
-                            <li><a asp-controller="Configuracao" asp-action="Index" title="Configurações">Configurações</a></li>
-                            <li><a asp-controller="Tema" asp-action="Edit" title="Tema">Tema</a></li>
-                            <li><a href="/api/log/administracao" title="AdministracaoLog">AdministracaoLog (API)</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @leftText @EstaAtivo("Documentacao")" href="#" title="Documentação">
-                            <i class="bi bi-book me-2"></i><span>Documentação</span>
-                        </a>
-                        <ul>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" title="Mensagens">Mensagens</a></li>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="logs" title="Logs e auditoria">Logs e auditoria</a></li>
-                            <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="scripts" title="Scripts">Scripts</a></li>
-                        </ul>
-                    </li>
+    <div class="layout-root">
+        <nav id="sidebarMenu" class="app-menu sidebar-bg @leftText" data-menu-expanded="@menuExpandido.ToString().ToLowerInvariant()" aria-label="Menu principal">
+            <div class="menu-panels-track">
+                <div class="menu-panel menu-panel--root" id="menuPanelRoot">
+                    <ul class="menu-list">
+                        <li class="menu-section-label text-uppercase small">Módulos</li>
+                        <li class="menu-item" data-panel="menuPanelHome">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("Home")">
+                                <i class="bi bi-house"></i>
+                                <span>Home</span>
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Home"><i class="bi bi-chevron-right"></i></button>
+                        </li>
+                        <li class="menu-item" data-panel="menuPanelAcesso">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("Account")">
+                                <i class="bi bi-shield-lock"></i>
+                                <span>Acesso</span>
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Acesso"><i class="bi bi-chevron-right"></i></button>
+                        </li>
+                        <li class="menu-item" data-panel="menuPanelMensagens">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("Mensagem")">
+                                <i class="bi bi-envelope"></i>
+                                <span>Comunicação</span>
+                                @if (unreadMessages > 0)
+                                {
+                                    <span class="badge bg-primary ms-auto">@unreadMessages</span>
+                                }
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Comunicação"><i class="bi bi-chevron-right"></i></button>
+                        </li>
+                        <li class="menu-item" data-panel="menuPanelAdmin">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("Configuracao")">
+                                <i class="bi bi-gear"></i>
+                                <span>Administração</span>
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Administração"><i class="bi bi-chevron-right"></i></button>
+                        </li>
+                        <li class="menu-item" data-panel="menuPanelDocs">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("Documentacao")">
+                                <i class="bi bi-book"></i>
+                                <span>Documentação</span>
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Documentação"><i class="bi bi-chevron-right"></i></button>
+                        </li>
                     </ul>
                 </div>
-            </nav>
-            <div class="content flex-grow-1 p-3">
-                <main id="main" role="main" class="pb-3" data-aos="fade-up" data-aos-delay="50" data-aos-duration="750" data-aos-easing="ease-out-quart">
-                    @RenderBody()
-                </main>
+                <div class="menu-panel menu-panel--sub" id="menuPanelHome"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Home</span></div><ul class="menu-list"><li><a asp-controller="Home" asp-action="Index" class="menu-sublink @leftText">Dashboard</a></li><li><a asp-controller="Home" asp-action="Privacy" class="menu-sublink @leftText">Privacidade</a></li></ul></div>
+                <div class="menu-panel menu-panel--sub" id="menuPanelAcesso"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Acesso</span></div><ul class="menu-list"><li><a asp-controller="Account" asp-action="ChangePassword" class="menu-sublink @leftText">Segurança</a></li><li><a href="/api/log/acesso" class="menu-sublink @leftText">AcessoLog (API)</a></li></ul></div>
+                <div class="menu-panel menu-panel--sub" id="menuPanelMensagens"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Comunicação</span></div><ul class="menu-list"><li><a asp-controller="Mensagem" asp-action="Index" class="menu-sublink @leftText">Feed</a></li><li><a asp-controller="Mensagem" asp-action="CaixaSaida" class="menu-sublink @leftText">Caixa de saída</a></li><li><a asp-controller="Mensagem" asp-action="Nova" class="menu-sublink @leftText">Nova publicação</a></li><li><a href="/api/log/comunicacao" class="menu-sublink @leftText">ComunicacaoLog (API)</a></li></ul></div>
+                <div class="menu-panel menu-panel--sub" id="menuPanelAdmin"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Administração</span></div><ul class="menu-list"><li><a asp-controller="Configuracao" asp-action="Index" class="menu-sublink @leftText">Configurações</a></li><li><a asp-controller="Tema" asp-action="Edit" class="menu-sublink @leftText">Tema</a></li><li><a href="/api/log/administracao" class="menu-sublink @leftText">AdministracaoLog (API)</a></li></ul></div>
+                <div class="menu-panel menu-panel--sub" id="menuPanelDocs"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Documentação</span></div><ul class="menu-list"><li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" class="menu-sublink @leftText">Mensagens</a></li><li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="logs" class="menu-sublink @leftText">Logs e auditoria</a></li><li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="scripts" class="menu-sublink @leftText">Scripts</a></li></ul></div>
             </div>
+        </nav>
+        <div class="layout-main">
+            <header class="navbar @headerNavbarClass @headerFixedClass header-bg">
+                <div class="container-fluid"><div class="d-flex align-items-center gap-2"><button class="btn btn-link @headerText menu-hamburger" aria-label="Abrir/fechar menu" aria-expanded="true" aria-controls="sidebarMenu"><i class="bi bi-list fs-4"></i></button><a class="navbar-brand @headerText" asp-controller="Home" asp-action="Index">Sistema.MVC</a></div><div class="ms-auto d-flex align-items-center"><button class="btn btn-link @headerText" type="button" id="temaToggle"><i class="bi bi-palette"></i></button><div class="dropdown"><a class="nav-link dropdown-toggle @headerText" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">@userName</a><ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu"><li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Alterar Senha</a></li><li><hr class="dropdown-divider" /></li><li><a class="dropdown-item" asp-controller="Account" asp-action="Logout">Sair</a></li></ul></div></div></div>
+            </header>
+            <main id="main" role="main" class="layout-content p-3" data-aos="fade-up" data-aos-delay="50" data-aos-duration="750" data-aos-easing="ease-out-quart"><a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>@RenderBody()</main>
+            <footer class="footer @footerText @footerFixedClass footer-bg"><div class="container">&copy; 2025 - Sistema.MVC - <a class="@footerText" asp-controller="Home" asp-action="Privacy">Privacy</a></div></footer>
         </div>
-        <footer class="footer @footerText @footerFixedClass @(footerFixo ? string.Empty : "mt-auto") footer-bg">
-            <div class="container">
-                &copy; 2025 - Sistema.MVC - <a class="@footerText" asp-controller="Home" asp-action="Privacy">Privacy</a>
-            </div>
-        </footer>
     </div>
+    <div id="menuBackdrop" class="menu-backdrop" aria-hidden="true"></div>
     <script src="~/lib/jquery/dist/jquery.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
     <script src="~/lib/izitoast/js/iziToast.min.js"></script>
@@ -233,6 +197,7 @@
             <button type="submit" class="btn btn-primary">Salvar</button>
         </form>
     </aside>
+    
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

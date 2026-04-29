@@ -4,13 +4,12 @@
 @use 'sass/menu';
 
 :root {
-  --header-bg: #0d6efd;
-  --sidebar-bg: #0d6efd;
-  --rightbar-bg: #f8f9fa;
-  --footer-bg: #0d6efd;
-  --sidebar-width: 260px;          /* menu expandido */
-  --iconbar-width: 64px;           /* menu recolhido (só ícones) */
-  --mm-sidebar-panel-size: 260px;  /* valor ativo — alterado pelo JS */
+  --header-bg:    #0d6efd;
+  --sidebar-bg:   #0d6efd;
+  --rightbar-bg:  #f8f9fa;
+  --footer-bg:    #0d6efd;
+  --sidebar-width: 260px;
+  --iconbar-width:  64px;
 }
 
 @media (prefers-color-scheme: dark) {

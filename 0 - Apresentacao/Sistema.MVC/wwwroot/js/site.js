@@ -198,8 +198,7 @@
         const menuController = typeof window.initSistemaMenu === 'function'
             ? window.initSistemaMenu({
                 sidebarSelector: '#sidebarMenu',
-                mobileToggleSelector: '.mobile-menu-toggle',
-                appShellSelector: '.app-shell',
+                hamburgerSelector: '.menu-hamburger',
                 expandedCheckboxSelector: '#MenuLateralExpandido',
                 onMobileStateChange: null
             })
