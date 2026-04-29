@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection;
-using Sistema.MVC.Authorization;
 
 namespace Sistema.MVC.DependencyInjection;
 
@@ -16,7 +15,6 @@ public static class SecurityExtensions
             });
 
         services.AddAuthorization();
-        services.AddScoped<AuthorizePermissionAttribute>();
 
         return services;
     }
