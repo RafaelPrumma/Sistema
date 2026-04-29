@@ -37,6 +37,9 @@
             $sidebar.removeClass('submenu-open');
             $sidebar.find('.submenu-active').removeClass('submenu-active');
             $sidebar.find('.submenu-toggle').attr('aria-expanded', 'false');
+            if (!$sidebar.is(':hover')) {
+                document.body.classList.remove('menu-hover-open');
+            }
         };
 
         const notifyMobileState = () => {
@@ -86,7 +89,7 @@
         };
 
         const buildSlidingSubmenus = () => {
-            const $root = $sidebar.children('ul.nav').first();
+            const $root = $sidebar.find('ul.nav').first();
             if (!$root.length) return;
             $root.addClass('menu-root');
 
@@ -130,6 +133,9 @@
                 $sidebar.addClass('submenu-open');
                 $submenu.addClass('submenu-active');
                 $(this).attr('aria-expanded', 'true');
+                if (desktopMedia.matches && document.body.classList.contains('menu-desktop-collapsed')) {
+                    document.body.classList.add('menu-hover-open');
+                }
             });
 
             $sidebar.on('click', '.nav-item > .nav-link', function (e) {
