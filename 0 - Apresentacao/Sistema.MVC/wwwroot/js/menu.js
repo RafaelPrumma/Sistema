@@ -162,7 +162,17 @@
                 }
             });
 
-            $appShell.on('mouseleave', function () {
+
+            // Hover para expandir menu recolhido no desktop
+            const $sidebarEl = $sidebar;
+
+            $sidebarEl.on('mouseenter', function () {
+                if (!desktopMedia.matches) return;
+                if (!document.body.classList.contains('menu-desktop-collapsed')) return;
+                document.body.classList.add('menu-hover-open');
+            });
+
+            $sidebarEl.on('mouseleave', function () {
                 if (!desktopMedia.matches) return;
                 document.body.classList.remove('menu-hover-open');
                 closeSubmenus();
