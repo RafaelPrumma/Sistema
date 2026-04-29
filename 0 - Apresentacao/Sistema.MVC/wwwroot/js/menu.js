@@ -1,207 +1,159 @@
 (function (window) {
-    'use strict';
+  'use strict';
 
-    const $ = window.jQuery;
-    if (!$) {
-        console.error('jQuery é obrigatório para menu.js');
-        return;
-    }
+  const $ = window.jQuery;
+  if (!$) {
+    console.error('menu.js: jQuery é obrigatório');
+    return;
+  }
 
-    window.initSistemaMenu = function initSistemaMenu(options) {
-        const config = {
-            sidebarSelector: '#sidebarMenu',
-            mobileToggleSelector: '.mobile-menu-toggle',
-            appShellSelector: '.app-shell',
-            expandedCheckboxSelector: '#MenuLateralExpandido',
-            onMobileStateChange: null,
-            ...options
-        };
+  window.initSistemaMenu = function initSistemaMenu(options) {
 
-        const $sidebar = $(config.sidebarSelector);
-        if (!$sidebar.length) return null;
-
-        const $mobileToggle = $(config.mobileToggleSelector);
-        const $appShell = $(config.appShellSelector);
-        const $expandedCheckbox = $(config.expandedCheckboxSelector);
-        const desktopMedia = window.matchMedia('(min-width: 992px)');
-
-        let menuMobileAberto = false;
-
-        const atualizarAriaMenu = (aberto) => {
-            if (!$mobileToggle.length) return;
-            $mobileToggle.attr('aria-controls', 'sidebarMenu');
-            $mobileToggle.attr('aria-expanded', aberto ? 'true' : 'false');
-        };
-
-        const closeSubmenus = () => {
-            $sidebar.removeClass('submenu-open');
-            $sidebar.find('.submenu-active').removeClass('submenu-active');
-            $sidebar.find('.submenu-toggle').attr('aria-expanded', 'false');
-            if (!$sidebar.is(':hover')) {
-                document.body.classList.remove('menu-hover-open');
-            }
-        };
-
-        const notifyMobileState = () => {
-            if (typeof config.onMobileStateChange === 'function') {
-                config.onMobileStateChange(menuMobileAberto);
-            }
-        };
-
-        const setMobileOpen = (aberto) => {
-            menuMobileAberto = aberto;
-            document.body.classList.toggle('menu-mobile-open', aberto);
-            atualizarAriaMenu(aberto);
-            if (!aberto) {
-                closeSubmenus();
-            }
-            notifyMobileState();
-        };
-
-        const setDesktopExpanded = (expandido) => {
-            document.body.classList.toggle('menu-desktop-collapsed', !expandido);
-            if (expandido) {
-                document.body.classList.remove('menu-hover-open');
-            }
-        };
-
-        const syncResponsiveState = (desktopExpanded) => {
-            if (desktopMedia.matches) {
-                $expandedCheckbox.prop('disabled', false);
-                setDesktopExpanded(desktopExpanded);
-                setMobileOpen(false);
-                return;
-            }
-
-            // Em telas pequenas não pode ficar expandido persistentemente.
-            $expandedCheckbox.prop('disabled', true);
-            setDesktopExpanded(true);
-            setMobileOpen(false);
-        };
-
-        const ensureBackdrop = () => {
-            if (document.getElementById('sidebarMenuBackdrop')) return;
-            const backdrop = document.createElement('div');
-            backdrop.id = 'sidebarMenuBackdrop';
-            backdrop.className = 'sidebar-menu-backdrop';
-            backdrop.setAttribute('aria-hidden', 'true');
-            document.body.append(backdrop);
-        };
-
-        const buildSlidingSubmenus = () => {
-            const $root = $sidebar.find('ul.nav').first();
-            if (!$root.length) return;
-            $root.addClass('menu-root');
-
-            $root.children('li.nav-item').each(function (index) {
-                const $item = $(this);
-                const $submenu = $item.children('ul').first();
-                const $link = $item.children('a').first();
-                if (!$submenu.length || !$link.length) return;
-
-                const submenuId = `submenu-panel-${index + 1}`;
-                const titulo = ($link.text() || 'Submenu').trim();
-
-                $submenu.attr('id', submenuId).addClass('menu-subpanel');
-                const header = `
-                    <li class="submenu-header">
-                        <button type="button" class="submenu-back" aria-label="Voltar para menu principal">
-                            <i class="bi bi-chevron-left"></i>
-                            <span>Voltar</span>
-                        </button>
-                        <span class="submenu-title">${titulo}</span>
-                    </li>`;
-                $submenu.prepend(header);
-
-                const $toggle = $(`
-                    <button type="button" class="submenu-toggle" aria-label="Abrir submenu ${titulo}" aria-expanded="false" aria-controls="${submenuId}">
-                        <i class="bi bi-chevron-right"></i>
-                    </button>
-                `);
-                $item.append($toggle);
-            });
-        };
-
-        const bindEvents = () => {
-            $sidebar.on('click', '.submenu-toggle', function (e) {
-                e.preventDefault();
-                const $item = $(this).closest('.nav-item');
-                const $submenu = $item.children('.menu-subpanel').first();
-                if (!$submenu.length) return;
-
-                closeSubmenus();
-                $sidebar.addClass('submenu-open');
-                $submenu.addClass('submenu-active');
-                $(this).attr('aria-expanded', 'true');
-                if (desktopMedia.matches && document.body.classList.contains('menu-desktop-collapsed')) {
-                    document.body.classList.add('menu-hover-open');
-                }
-            });
-
-            $sidebar.on('click', '.nav-item > .nav-link', function (e) {
-                const $item = $(this).closest('.nav-item');
-                const $submenu = $item.children('.menu-subpanel').first();
-                if (!$submenu.length) return;
-
-                e.preventDefault();
-                $item.children('.submenu-toggle').trigger('click');
-            });
-
-            $sidebar.on('click', '.submenu-back', function (e) {
-                e.preventDefault();
-                closeSubmenus();
-            });
-
-            $mobileToggle.on('click', function (e) {
-                e.preventDefault();
-                if (desktopMedia.matches) return;
-                setMobileOpen(!menuMobileAberto);
-            });
-
-            $(document).on('click', '#sidebarMenuBackdrop', function () {
-                setMobileOpen(false);
-            });
-
-            $(document).on('keydown', function (e) {
-                if (e.key === 'Escape' && menuMobileAberto) {
-                    setMobileOpen(false);
-                }
-            });
-
-
-            // Hover para expandir menu recolhido no desktop
-            const $sidebarEl = $sidebar;
-
-            $sidebarEl.on('mouseenter', function () {
-                if (!desktopMedia.matches) return;
-                if (!document.body.classList.contains('menu-desktop-collapsed')) return;
-                document.body.classList.add('menu-hover-open');
-            });
-
-            $sidebarEl.on('mouseleave', function () {
-                if (!desktopMedia.matches) return;
-                document.body.classList.remove('menu-hover-open');
-                closeSubmenus();
-            });
-
-            desktopMedia.addEventListener('change', () => {
-                closeSubmenus();
-                document.body.classList.remove('menu-hover-open');
-            });
-        };
-
-        ensureBackdrop();
-        buildSlidingSubmenus();
-        bindEvents();
-        atualizarAriaMenu(false);
-
-        return {
-            sync(desktopExpanded) {
-                syncResponsiveState(Boolean(desktopExpanded));
-            },
-            closeMobile() {
-                setMobileOpen(false);
-            }
-        };
+    const config = {
+      menuSelector: '#sidebarMenu',
+      hamburgerSelector: '.menu-hamburger',
+      backdropSelector: '#menuBackdrop',
+      expandedCheckboxSelector: '#MenuLateralExpandido',
+      collapsedClass: 'menu-collapsed',
+      mobileOpenClass: 'menu-mobile-open',
+      ...options
     };
+
+    const $menu = $(config.menuSelector);
+    if (!$menu.length) return null;
+
+    const $hamburger = $(config.hamburgerSelector);
+    const $backdrop = $(config.backdropSelector);
+    const $checkbox = $(config.expandedCheckboxSelector);
+    const desktop = window.matchMedia('(min-width: 992px)');
+
+    let activePanelId = null;
+
+    const showPanel = (panelId) => {
+      const $root = $menu.find('.menu-panel--root');
+      const $sub = $menu.find('#' + panelId);
+      if (!$sub.length) return;
+
+      $menu.find('.menu-panel--sub').each(function () {
+        $(this).removeClass('panel-slide-in');
+      });
+
+      $root.addClass('panel-slide-out');
+      $sub.addClass('panel-slide-in');
+      activePanelId = panelId;
+    };
+
+    const showRoot = () => {
+      $menu.find('.menu-panel--root').removeClass('panel-slide-out');
+      $menu.find('.menu-panel--sub').removeClass('panel-slide-in');
+      activePanelId = null;
+    };
+
+    const setDesktopExpanded = (expanded) => {
+      document.body.classList.toggle(config.collapsedClass, !expanded);
+      $hamburger.attr('aria-expanded', expanded ? 'true' : 'false');
+      if (!expanded) showRoot();
+    };
+
+    const setMobileOpen = (open) => {
+      document.body.classList.toggle(config.mobileOpenClass, open);
+      $hamburger.attr('aria-expanded', open ? 'true' : 'false');
+      if (!open) showRoot();
+    };
+
+    const sync = (desktopExpanded) => {
+      if (desktop.matches) {
+        $checkbox.prop('disabled', false);
+        setDesktopExpanded(Boolean(desktopExpanded));
+        setMobileOpen(false);
+      } else {
+        $checkbox.prop('disabled', true);
+        setMobileOpen(false);
+        document.body.classList.remove(config.collapsedClass);
+      }
+    };
+
+    const bindEvents = () => {
+      $hamburger.on('click', function (e) {
+        e.preventDefault();
+
+        if (desktop.matches) {
+          const isCollapsed = document.body.classList.contains(config.collapsedClass);
+          const willExpand = isCollapsed;
+          setDesktopExpanded(willExpand);
+          $checkbox.prop('checked', willExpand);
+        } else {
+          const isOpen = document.body.classList.contains(config.mobileOpenClass);
+          setMobileOpen(!isOpen);
+        }
+      });
+
+      $menu.on('click', '.menu-arrow', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const panelId = $(this).closest('.menu-item').data('panel');
+        if (!panelId) return;
+
+        if (activePanelId === panelId) {
+          showRoot();
+        } else {
+          showPanel(panelId);
+        }
+      });
+
+      $menu.on('click', '.menu-link', function (e) {
+        const $item = $(this).closest('.menu-item');
+        const panelId = $item.data('panel');
+        if (!panelId) return;
+        e.preventDefault();
+        if (activePanelId === panelId) {
+          showRoot();
+        } else {
+          showPanel(panelId);
+        }
+      });
+
+      $menu.on('click', '.menu-back', function (e) {
+        e.preventDefault();
+        showRoot();
+      });
+
+      $backdrop.on('click', function () {
+        setMobileOpen(false);
+      });
+
+      $(document).on('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (!desktop.matches && document.body.classList.contains(config.mobileOpenClass)) {
+          setMobileOpen(false);
+          return;
+        }
+        if (activePanelId) {
+          showRoot();
+        }
+      });
+
+      $checkbox.on('change', function () {
+        if (!desktop.matches) return;
+        setDesktopExpanded(this.checked);
+      });
+
+      desktop.addEventListener('change', () => {
+        showRoot();
+        document.body.classList.remove(config.mobileOpenClass);
+        document.body.classList.remove(config.collapsedClass);
+        const saved = $menu.data('menu-expanded');
+        sync(saved === true || saved === 'true');
+      });
+    };
+
+    bindEvents();
+
+    return {
+      sync,
+      showRoot,
+      closeMobile() { setMobileOpen(false); }
+    };
+  };
+
 })(window);
