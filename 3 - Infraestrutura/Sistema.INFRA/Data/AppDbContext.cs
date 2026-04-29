@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,8 +8,11 @@ namespace Sistema.INFRA.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    private readonly IExecutionContext _executionContext;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext executionContext) : base(options)
     {
+        _executionContext = executionContext;
     }
 
     public DbSet<Perfil> Perfis => Set<Perfil>();
@@ -26,8 +30,20 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(AuditableEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var method = typeof(AppDbContext).GetMethod(nameof(SetSoftDeleteFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+                var generic = method.MakeGenericMethod(entityType.ClrType);
+                generic.Invoke(null, new object[] { modelBuilder });
+            }
+        }
         base.OnModelCreating(modelBuilder);
     }
+
+    private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : AuditableEntity
+        => builder.Entity<TEntity>().HasQueryFilter(x => x.DataExclusao == null);
 
     public override int SaveChanges()
     {
@@ -44,19 +60,28 @@ public class AppDbContext : DbContext
     private void UpdateAuditFields()
     {
         var entries = ChangeTracker.Entries<AuditableEntity>();
+        var usuario = _executionContext.Usuario ?? "system";
+        var agora = DateTime.UtcNow;
+
         foreach (var entry in entries)
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.DataInclusao = DateTime.UtcNow;
-                if (string.IsNullOrWhiteSpace(entry.Entity.UsuarioInclusao))
-                    entry.Entity.UsuarioInclusao = "system";
+                entry.Entity.DataInclusao = agora;
+                entry.Entity.UsuarioInclusao = string.IsNullOrWhiteSpace(entry.Entity.UsuarioInclusao) ? usuario : entry.Entity.UsuarioInclusao;
             }
             else if (entry.State == EntityState.Modified)
             {
-                entry.Entity.DataAlteracao = DateTime.UtcNow;
-                if (string.IsNullOrWhiteSpace(entry.Entity.UsuarioAlteracao))
-                    entry.Entity.UsuarioAlteracao = "system";
+                entry.Entity.DataAlteracao = agora;
+                entry.Entity.UsuarioAlteracao = string.IsNullOrWhiteSpace(entry.Entity.UsuarioAlteracao) ? usuario : entry.Entity.UsuarioAlteracao;
+            }
+            else if (entry.State == EntityState.Deleted)
+            {
+                entry.State = EntityState.Modified;
+                entry.Entity.DataExclusao = agora;
+                entry.Entity.UsuarioExclusao = usuario;
+                entry.Entity.DataAlteracao = agora;
+                entry.Entity.UsuarioAlteracao = usuario;
             }
         }
     }

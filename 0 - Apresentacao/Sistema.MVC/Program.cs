@@ -3,6 +3,9 @@ using Sistema.INFRA;
 using Microsoft.EntityFrameworkCore;
 using Sistema.INFRA.Data;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Sistema.MVC.Middleware;
+using Sistema.APP.Services.Interfaces;
+using Sistema.MVC.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +14,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddInfraestrutura(builder.Configuration);
 builder.Services.AddAplicacao();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IExecutionContext, HttpExecutionContext>();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -37,6 +41,7 @@ app.Use(async (context, next) =>
 });
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<GlobalExceptionMiddleware>();
 if (!app.Environment.IsDevelopment())
 {
 	app.UseExceptionHandler("/Home/Error");

@@ -6,4 +6,6 @@ public abstract class AuditableEntity
     public DateTime? DataAlteracao { get; set; }
     public string UsuarioInclusao { get; set; } = string.Empty;
     public string? UsuarioAlteracao { get; set; }
+    public DateTime? DataExclusao { get; set; }
+    public string? UsuarioExclusao { get; set; }
 }

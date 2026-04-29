@@ -5,66 +5,79 @@
 <div class="row">
     <nav class="col-md-3">
         <ul id="doc-nav" class="nav flex-column position-sticky" style="top:1rem">
-            <li class="nav-item"><a class="nav-link" href="#login">Login</a></li>
-            <li class="nav-item"><a class="nav-link" href="#home">Página inicial</a></li>
-            <li class="nav-item"><a class="nav-link" href="#configuracoes">Configurações</a></li>
-            <li class="nav-item"><a class="nav-link" href="#tema">Tema</a></li>
+            <li class="nav-item"><a class="nav-link" href="#visao-geral">Visão geral</a></li>
+            <li class="nav-item"><a class="nav-link" href="#arquitetura">Arquitetura</a></li>
+            <li class="nav-item"><a class="nav-link" href="#auditoria">Auditoria e soft delete</a></li>
+            <li class="nav-item"><a class="nav-link" href="#seguranca">Autenticação e segurança</a></li>
+            <li class="nav-item"><a class="nav-link" href="#erros">Tratamento de erros</a></li>
             <li class="nav-item"><a class="nav-link" href="#mensagens">Mensagens</a></li>
-            <li class="nav-item"><a class="nav-link" href="#logs">Logs e auditoria</a></li>
-            <li class="nav-item"><a class="nav-link" href="#scripts">Scripts</a></li>
+            <li class="nav-item"><a class="nav-link" href="#logs">Logs e correlação</a></li>
+            <li class="nav-item"><a class="nav-link" href="#configuracoes">Configurações</a></li>
         </ul>
     </nav>
     <div class="col-md-9">
-        <section id="login">
-            <h2>Login</h2>
-            <p>Informe CPF e senha para acessar o sistema. Há opções de registro e recuperação de senha.</p>
+        <section id="visao-geral">
+            <h2>Visão geral</h2>
+            <p>O Sistema é uma base corporativa em .NET 8 para autenticação, administração de usuários/perfis e comunicação interna com rastreabilidade operacional.</p>
         </section>
-        <section id="home">
-            <h2>Página inicial</h2>
-            <p>Apresenta um painel com o resumo geral após o login.</p>
+
+        <section id="arquitetura">
+            <h2>Arquitetura em camadas</h2>
+            <ul>
+                <li><strong>Apresentação (MVC):</strong> recebe requisições, valida entrada e renderiza views/respostas.</li>
+                <li><strong>Aplicação:</strong> orquestra casos de uso e integra domínio, repositórios e logs.</li>
+                <li><strong>Domínio:</strong> entidades, regras de estado e contratos centrais do negócio.</li>
+                <li><strong>Infraestrutura:</strong> EF Core, mapeamentos, persistência, seeds e serviços externos.</li>
+            </ul>
         </section>
+
+        <section id="auditoria">
+            <h2>Auditoria e soft delete</h2>
+            <p>Entidades auditáveis registram criação, alteração e exclusão lógica automaticamente via <code>AppDbContext</code>.</p>
+            <ul>
+                <li><code>DataInclusao</code> / <code>UsuarioInclusao</code></li>
+                <li><code>DataAlteracao</code> / <code>UsuarioAlteracao</code></li>
+                <li><code>DataExclusao</code> / <code>UsuarioExclusao</code></li>
+                            </ul>
+            <p>Exclusões são convertidas para atualização auditável, preservando histórico e evitando perda de dados.</p>
+        </section>
+
+        <section id="seguranca">
+            <h2>Autenticação e segurança</h2>
+            <p>O sistema usa autenticação por cookie no MVC e possui serviço de emissão JWT na camada de aplicação para integrações/API.</p>
+            <p>As ações críticas são auditadas com correlação de requisição para facilitar investigação e suporte.</p>
+        </section>
+
+        <section id="erros">
+            <h2>Tratamento global de erros</h2>
+            <p>O middleware global converte exceções em respostas padronizadas (<code>ApiResponse</code>) com <code>traceId</code>.</p>
+            <ul>
+                <li><strong>422:</strong> erros de validação de argumento.</li>
+                <li><strong>500:</strong> falhas inesperadas.</li>
+            </ul>
+        </section>
+
+        <section id="mensagens">
+            <h2>Mensagens e comunicação interna</h2>
+            <ul>
+                <li>Mensagem direta entre usuários.</li>
+                <li>Post por setor/perfil.</li>
+                <li>Aviso institucional.</li>
+                <li>Thread de respostas, reações e leitura/entrega.</li>
+            </ul>
+        </section>
+
+        <section id="logs">
+            <h2>Logs e correlação</h2>
+            <p>O cabeçalho <code>X-Correlation-ID</code> é propagado em todas as requisições e usado para rastrear eventos ponta a ponta.</p>
+            <p>Também há fallback de gravação de auditoria em arquivo local quando o banco estiver indisponível.</p>
+        </section>
+
         <section id="configuracoes">
             <h2>Configurações</h2>
-            <p>Permite listar, criar e editar configurações agrupadas por tema.</p>
-            <p>Para política de retenção de logs, use o agrupamento <code>LogsRetencao</code> e as chaves:</p>
-            <ul>
-                <li><code>AcessoMeses</code> (padrão: 3)</li>
-                <li><code>ComunicacaoMeses</code> (padrão: 6)</li>
-                <li><code>AdministracaoMeses</code> (padrão: 12)</li>
-                <li><code>GeralMeses</code> (padrão: 12)</li>
-            </ul>
-        </section>
-        <section id="tema">
-            <h2>Tema</h2>
-            <p>Personalize cores, modo escuro e disposição do layout.</p>
-        </section>
-        <section id="mensagens">
-            <h2>Mensagens</h2>
-            <p>O módulo de mensagens permite conversas diretas ou com todo um setor, mantendo o histórico encadeado.</p>
-            <ul>
-                <li><strong>Caixa de entrada e saída:</strong> listagem paginada com filtros por remetente, palavra-chave e intervalo de datas.</li>
-                <li><strong>Envio:</strong> escolha um destinatário individual ou selecione um setor/perfil para enviar a mesma mensagem a todos os integrantes.</li>
-                <li><strong>Threads:</strong> respostas ficam agrupadas à mensagem original, exibindo todo o histórico da conversa em formato de thread.</li>
-                <li><strong>Conversa completa:</strong> ao abrir um item, mostramos a cadeia de mensagens relacionadas que envolvem o usuário.</li>
-                <li><strong>Leitura:</strong> mensagens destinadas ao usuário são marcadas como lidas ao serem abertas, mantendo o contador atualizado.</li>
-                <li><strong>Detalhes do remetente/destinatário:</strong> os nomes de quem enviou e de quem recebeu são sempre exibidos em cada linha.</li>
-            </ul>
-            <p>Para responder, use o botão de resposta na própria thread. O sistema preserva o contexto, garantindo que cada réplica apareça logo abaixo da anterior.</p>
-        </section>
-        <section id="logs">
-            <h2>Logs e auditoria</h2>
-            <p>A auditoria usa tabela única de logs com segmentação por módulo (<code>Acesso</code>, <code>Comunicacao</code>, <code>Administracao</code>).</p>
-            <ul>
-                <li><strong>Consulta por módulo:</strong> <code>/api/log/acesso</code>, <code>/api/log/comunicacao</code>, <code>/api/log/administracao</code>.</li>
-                <li><strong>Correlação:</strong> o cabeçalho <code>X-Correlation-ID</code> é propagado e salvo no log para rastrear a requisição de ponta a ponta.</li>
-                <li><strong>Retenção:</strong> aplicada automaticamente conforme configurações do agrupamento <code>LogsRetencao</code>.</li>
-                <li><strong>Fallback de escrita:</strong> quando o banco está indisponível, o sistema grava no arquivo interno <code>log-fallback/audit-fallback.ndjson</code>.</li>
-                <li><strong>Migração automática:</strong> ao restabelecer o banco, os itens do arquivo são inseridos no banco e removidos do fallback.</li>
-            </ul>
-        </section>
-        <section id="scripts">
-            <h2>Scripts e interações</h2>
-            <p>A manipulação do tema, menus e outros elementos utiliza jQuery para facilitar o controle do DOM.</p>
+            <p>Parâmetros operacionais podem ser gerenciados no módulo de configurações, incluindo políticas de retenção de logs.</p>
+            <p>Grupo sugerido: <code>LogsRetencao</code> com chaves <code>AcessoMeses</code>, <code>ComunicacaoMeses</code>, <code>AdministracaoMeses</code>, <code>GeralMeses</code>.</p>
+        <p>O projeto também possui automação de responsividade com Playwright (`npm run test:layout`) para validar quebra de layout em desktop e mobile.</p>
         </section>
     </div>
 </div>
