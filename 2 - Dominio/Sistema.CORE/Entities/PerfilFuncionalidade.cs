@@ -1,3 +1,5 @@
+using Sistema.CORE.Enums;
+
 namespace Sistema.CORE.Entities;
 
 public class PerfilFuncionalidade
@@ -6,6 +8,5 @@ public class PerfilFuncionalidade
     public Perfil Perfil { get; set; } = null!;
     public int FuncionalidadeId { get; set; }
     public Funcionalidade Funcionalidade { get; set; } = null!;
-    public bool PodeLer { get; set; }
-    public bool PodeEscrever { get; set; }
+    public Permissao Permissoes { get; set; } = Permissao.Nenhuma;
 }

@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
+using Sistema.CORE.Enums;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -36,12 +37,21 @@ public class AuthAppService(IUnitOfWork uow, IPasswordHasher<Usuario> hasher, IC
             return null;
         }
 
-        var reivindicacoes = new[]
+        var perfilFuncionalidades = await _uow.PerfilFuncionalidades.BuscarPorPerfilIdAsync(usuario.PerfilId, cancellationToken);
+
+        var reivindicacoes = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString(CultureInfo.InvariantCulture)),
-            new Claim(ClaimTypes.Name, usuario.Nome),
-            new Claim("perfil", usuario.PerfilId.ToString(CultureInfo.InvariantCulture))
+            new(ClaimTypes.NameIdentifier, usuario.Id.ToString(CultureInfo.InvariantCulture)),
+            new(ClaimTypes.Name, usuario.Nome),
+            new("perfil", usuario.PerfilId.ToString(CultureInfo.InvariantCulture))
         };
+
+        foreach (var perfilFuncionalidade in perfilFuncionalidades)
+        {
+            var slug = perfilFuncionalidade.Funcionalidade.Nome;
+            var permissao = (int)perfilFuncionalidade.Permissoes;
+            reivindicacoes.Add(new Claim($"perm:{slug}", permissao.ToString(CultureInfo.InvariantCulture)));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

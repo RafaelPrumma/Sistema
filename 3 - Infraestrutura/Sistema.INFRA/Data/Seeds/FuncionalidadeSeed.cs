@@ -10,7 +10,10 @@ public static class FuncionalidadeSeed
         {
             new() { Nome = "Perfil", UsuarioInclusao = "seed" },
             new() { Nome = "Usuario", UsuarioInclusao = "seed" },
-            new() { Nome = "Log", UsuarioInclusao = "seed" }
+            new() { Nome = "Log", UsuarioInclusao = "seed" },
+            new() { Nome = "Mensagem", UsuarioInclusao = "seed" },
+            new() { Nome = "Configuracao", UsuarioInclusao = "seed" },
+            new() { Nome = "Documentacao", UsuarioInclusao = "seed" }
         };
     }
 }
