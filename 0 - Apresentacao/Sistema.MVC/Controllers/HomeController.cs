@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.Services.Interfaces;
+using Sistema.APP.DTOs;
 using Sistema.MVC.Models;
 using System.Diagnostics;
 
@@ -14,6 +15,8 @@ namespace Sistema.MVC.Controllers
                 private readonly IConfiguracaoAppService _configuracaoService = configuracaoService;
                 private readonly IMensagemAppService _mensagemService = mensagemService;
 
+                [HttpGet("/Home")]
+                [HttpGet("/Home/Index")]
 		public async Task<IActionResult> Index()
                 {
                         var model = new DashboardViewModel();
@@ -33,9 +36,59 @@ namespace Sistema.MVC.Controllers
                         var userId = HttpContext.Session.GetInt32("UserId");
                         if (userId is not null)
                         {
-                                var msgs = await _mensagemService.BuscarCaixaEntradaAsync(userId.Value, 1, 1);
+                                var msgs = await _mensagemService.BuscarFeedAsync(userId.Value, 1, 5, new FeedFiltroDto());
                                 model.TotalMensagens = msgs.TotalCount;
+                                model.TotalMensagensNaoLidas = await _mensagemService.ContarNaoLidasAsync(userId.Value);
+                                model.MensagensRecentes = [.. msgs.Items.Select(m => new DashboardMensagemViewModel
+                                {
+                                        Id = m.Id,
+                                        Assunto = m.Assunto,
+                                        Autor = m.Remetente?.Nome ?? m.Autor?.Nome ?? "Sistema",
+                                        Tipo = m.Tipo.ToString(),
+                                        Lida = m.Lida,
+                                        DataInclusao = m.DataInclusao
+                                })];
                         }
+
+                        model.Atalhos =
+                        [
+                                new DashboardAtalhoViewModel
+                                {
+                                        Titulo = "Minhas Financas",
+                                        Descricao = "Dashboard financeiro, documentos, B3, cripto e alertas.",
+                                        Icone = "bi-graph-up-arrow",
+                                        Controller = "MinhasFinancas",
+                                        Action = "Index",
+                                        Variante = "success"
+                                },
+                                new DashboardAtalhoViewModel
+                                {
+                                        Titulo = "Comunicacao",
+                                        Descricao = "Feed interno, avisos, threads e mensagens diretas.",
+                                        Icone = "bi-chat-square-text",
+                                        Controller = "Mensagem",
+                                        Action = "Index",
+                                        Variante = "primary"
+                                },
+                                new DashboardAtalhoViewModel
+                                {
+                                        Titulo = "Configuracoes",
+                                        Descricao = "Parametros operacionais, email, logs e modulos.",
+                                        Icone = "bi-sliders",
+                                        Controller = "Configuracao",
+                                        Action = "Index",
+                                        Variante = "warning"
+                                },
+                                new DashboardAtalhoViewModel
+                                {
+                                        Titulo = "Documentacao",
+                                        Descricao = "Arquitetura, modulos, seguranca e rotinas operacionais.",
+                                        Icone = "bi-journal-code",
+                                        Controller = "Documentacao",
+                                        Action = "Index",
+                                        Variante = "info"
+                                }
+                        ];
 
                         return View(model);
                 }

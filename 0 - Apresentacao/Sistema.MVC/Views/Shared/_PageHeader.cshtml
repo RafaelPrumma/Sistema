@@ -1,6 +1,11 @@
 @model Sistema.MVC.Models.PageHeaderViewModel
-<h2>@Model.Title</h2>
-@if (!string.IsNullOrEmpty(Model.Description))
-{
-    <p class="text-muted small">@Model.Description</p>
-}
+<div class="page-heading">
+    <div>
+        <span class="page-heading-eyebrow">Sistema</span>
+        <h1>@Model.Title</h1>
+        @if (!string.IsNullOrEmpty(Model.Description))
+        {
+            <p>@Model.Description</p>
+        }
+    </div>
+</div>

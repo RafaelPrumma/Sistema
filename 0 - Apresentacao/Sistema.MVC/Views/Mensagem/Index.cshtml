@@ -1,86 +1,158 @@
 @model Sistema.MVC.Models.MensagemViewModel
 @using Sistema.CORE.Entities
 @{
-    ViewData["Title"] = "Hub de Comunicação";
+    ViewData["Title"] = "Comunicacao";
+    var totalPages = Model.PageSize > 0 ? (int)Math.Ceiling(Model.TotalItems / (double)Model.PageSize) : 1;
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = "Comunicação Interna",
-    Description = "Feed híbrido de mensagens diretas, posts de setor e avisos."
-})
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Comunicacao interna",
+        Description = "Feed unificado para mensagens diretas, posts de setor e avisos institucionais."
+    })
 
-<form method="get" class="mb-3">
-    <div class="card">
-        <div class="card-body row g-2">
-            <div class="col-md-4">
-                <input type="text" name="palavraChave" class="form-control" placeholder="Buscar" value="@Model.PalavraChave" />
+    <div class="row g-4">
+        <div class="col-xl-3">
+            <div class="surface-card mb-4">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Caixas</h3>
+                        <p>Navegacao rapida.</p>
+                    </div>
+                </div>
+                <div class="config-group-list">
+                    <a class="config-group-link active" asp-action="Index">
+                        <i class="bi bi-inbox"></i>
+                        <span><strong>Feed</strong><small>Recebidas, avisos e posts.</small></span>
+                    </a>
+                    <a class="config-group-link" asp-action="CaixaSaida">
+                        <i class="bi bi-send"></i>
+                        <span><strong>Caixa de saida</strong><small>Mensagens enviadas.</small></span>
+                    </a>
+                    <a class="config-group-link" asp-action="Nova">
+                        <i class="bi bi-pencil-square"></i>
+                        <span><strong>Nova publicacao</strong><small>Mensagem, post ou aviso.</small></span>
+                    </a>
+                </div>
             </div>
-            <div class="col-md-2">
-                <select name="tipo" class="form-select" asp-items="Html.GetEnumSelectList<PublicacaoTipo>()">
-                    <option value="">Todos os tipos</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select name="prioridadeMinima" class="form-select" asp-items="Html.GetEnumSelectList<AvisoPrioridade>()">
-                    <option value="">Qualquer prioridade</option>
-                </select>
-            </div>
-            <div class="col-md-2 form-check mt-2 ms-2">
-                <input class="form-check-input" type="checkbox" name="somenteNaoLidas" value="true" @(Model.SomenteNaoLidas ? "checked" : "") id="somenteNaoLidas" />
-                <label class="form-check-label" for="somenteNaoLidas">Não lidas</label>
+
+            <div class="surface-card">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Resumo</h3>
+                        <p>Itens filtrados.</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-card-icon"><i class="bi bi-chat-square-dots"></i></div>
+                    <div>
+                        <span class="metric-card-label">Publicacoes</span>
+                        <strong class="metric-card-value">@Model.TotalItems</strong>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="card-footer text-end">
-            <button type="submit" class="btn btn-secondary">Filtrar</button>
-        </div>
-    </div>
-</form>
 
-<div class="card">
-    <div class="card-body p-0">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>Tipo</th>
-                    <th>Assunto</th>
-                    <th>Autor</th>
-                    <th>Data</th>
-                    <th>Reações</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var m in Model.Mensagens)
+        <div class="col-xl-9">
+            <div class="surface-card mb-4">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label" for="palavraChave">Buscar</label>
+                        <input type="text" id="palavraChave" name="palavraChave" class="form-control" placeholder="Assunto, autor ou texto" value="@Model.PalavraChave" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" asp-for="Tipo"></label>
+                        <select asp-for="Tipo" name="tipo" class="form-select" asp-items="Html.GetEnumSelectList<PublicacaoTipo>()">
+                            <option value="">Todos os tipos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" asp-for="PrioridadeMinima"></label>
+                        <select asp-for="PrioridadeMinima" name="prioridadeMinima" class="form-select" asp-items="Html.GetEnumSelectList<AvisoPrioridade>()">
+                            <option value="">Qualquer prioridade</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="submit" class="btn btn-primary" aria-label="Filtrar">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" name="somenteNaoLidas" value="true" @(Model.SomenteNaoLidas ? "checked" : "") />
+                            <span class="form-check-label">Mostrar apenas nao lidas</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+
+            @if (Model.Mensagens.Count == 0)
             {
-                <tr class="@(m.Lida ? "" : "fw-bold")">
-                    <td>@m.Tipo</td>
-                    <td>
-                        @m.Assunto
-                        @if (m.Fixada)
-                        {
-                            <span class="badge bg-warning text-dark">Fixado</span>
-                        }
-                    </td>
-                    <td>@m.RemetenteNome</td>
-                    <td>@m.DataInclusao.ToLocalTime().ToString("g")</td>
-                    <td>
-                        @if (m.Reacoes?.Count > 0)
-                        {
-                            foreach (var r in m.Reacoes)
-                            {
-                                <span class="badge bg-light text-dark me-1">@r.Key: @r.Value</span>
-                            }
-                        }
-                    </td>
-                    <td><a href="@Url.Action("Detalhe", new { id = m.Id })">Abrir</a></td>
-                </tr>
+                <div class="surface-card">
+                    <div class="empty-state">
+                        <i class="bi bi-chat-dots"></i>
+                        <strong>Nenhuma publicacao encontrada</strong>
+                        <span>Ajuste os filtros ou crie uma nova publicacao.</span>
+                        <a class="btn btn-primary mt-2" asp-action="Nova">Nova publicacao</a>
+                    </div>
+                </div>
             }
-            </tbody>
-        </table>
-    </div>
-    <div class="card-footer text-end">
-        <a href="@Url.Action("CaixaSaida")" class="btn btn-outline-secondary me-2">Caixa de saída</a>
-        <a href="@Url.Action("Nova")" class="btn btn-primary">Nova publicação</a>
+            else
+            {
+                <div class="message-feed">
+                    @foreach (var m in Model.Mensagens)
+                    {
+                        var corpo = string.IsNullOrWhiteSpace(m.Corpo)
+                            ? "Sem previa da mensagem."
+                            : (m.Corpo.Length > 180 ? $"{m.Corpo[..180]}..." : m.Corpo);
+                        <article class="message-card @(m.Lida ? "" : "message-card--unread")">
+                            <div class="message-avatar">
+                                <i class="bi @(m.Tipo == PublicacaoTipo.Aviso ? "bi-megaphone" : m.Tipo == PublicacaoTipo.PostSetor ? "bi-building" : "bi-person")"></i>
+                            </div>
+                            <div>
+                                <div class="message-card-title">
+                                    <strong>@m.Assunto</strong>
+                                    <span class="badge text-bg-light">@m.Tipo</span>
+                                    @if (m.Fixada)
+                                    {
+                                        <span class="badge text-bg-warning">Fixada</span>
+                                    }
+                                    @if (!m.Lida)
+                                    {
+                                        <span class="badge text-bg-primary">Nova</span>
+                                    }
+                                </div>
+                                <p class="message-card-body">@corpo</p>
+                                <div class="message-card-meta">
+                                    <span class="badge text-bg-secondary">Autor: @(string.IsNullOrWhiteSpace(m.RemetenteNome) ? "Sistema" : m.RemetenteNome)</span>
+                                    <span class="badge text-bg-light">@m.DataInclusao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                    @if (m.Reacoes?.Count > 0)
+                                    {
+                                        foreach (var r in m.Reacoes)
+                                        {
+                                            <span class="badge text-bg-light">@r.Key: @r.Value</span>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                            <div class="message-card-actions">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Detalhe" asp-route-id="@m.Id">
+                                    Abrir
+                                </a>
+                            </div>
+                        </article>
+                    }
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <small class="text-muted">Pagina @Model.Page de @(Math.Max(totalPages, 1))</small>
+                    <div class="btn-group">
+                        <a class="btn btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-action="Index" asp-route-page="@(Model.Page - 1)" asp-route-palavraChave="@Model.PalavraChave" asp-route-somenteNaoLidas="@Model.SomenteNaoLidas">Anterior</a>
+                        <a class="btn btn-outline-secondary @(Model.Page >= totalPages ? "disabled" : "")" asp-action="Index" asp-route-page="@(Model.Page + 1)" asp-route-palavraChave="@Model.PalavraChave" asp-route-somenteNaoLidas="@Model.SomenteNaoLidas">Proxima</a>
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 </div>

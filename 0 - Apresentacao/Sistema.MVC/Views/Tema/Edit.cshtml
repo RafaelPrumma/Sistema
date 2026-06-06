@@ -3,57 +3,112 @@
     ViewData["Title"] = "Tema";
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = "Tema",
-    Description = "Personalize o sistema com suas preferências."
-})
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Aparencia e tema",
+        Description = "Personalize cores, modo visual e comportamento do layout."
+    })
 
-<div class="card">
-    <form asp-action="Edit" method="post">
-    <div class="card-body">
-    <div class="mb-3">
-        <label class="form-label">Modo</label>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="ModoEscuro" value="false" @(Model.ModoEscuro ? "" : "checked") />
-            <label class="form-check-label">Claro</label>
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="surface-card h-100">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Presets visuais</h3>
+                        <p>Atalhos inspirados em dashboards admin modernos.</p>
+                    </div>
+                </div>
+                <div class="theme-preset-grid theme-preset-grid--large">
+                    <button type="button" class="theme-preset" data-theme-preset="executivo">
+                        <span class="theme-preset-swatches"><i style="background:#0f172a"></i><i style="background:#2563eb"></i><i style="background:#f8fafc"></i></span>
+                        Executivo
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="financeiro">
+                        <span class="theme-preset-swatches"><i style="background:#064e3b"></i><i style="background:#0f766e"></i><i style="background:#ecfdf5"></i></span>
+                        Financeiro
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="grafite">
+                        <span class="theme-preset-swatches"><i style="background:#111827"></i><i style="background:#374151"></i><i style="background:#1f2937"></i></span>
+                        Grafite
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="classico">
+                        <span class="theme-preset-swatches"><i style="background:#0d6efd"></i><i style="background:#0d6efd"></i><i style="background:#f8f9fa"></i></span>
+                        Classico
+                    </button>
+                </div>
+                <div class="theme-preview-card mt-4">
+                    <div class="theme-preview-header"></div>
+                    <div class="theme-preview-body">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="ModoEscuro" value="true" @(Model.ModoEscuro ? "checked" : "") />
-            <label class="form-check-label">Escuro</label>
+
+        <div class="col-lg-7">
+            <div class="surface-card">
+                <form asp-action="Edit" method="post">
+                    <div class="surface-card-header">
+                        <div>
+                            <h3>Preferencias</h3>
+                            <p>Alteracoes sao aplicadas em preview antes de salvar.</p>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Modo</label>
+                            <div class="segmented-control">
+                                <label>
+                                    <input type="radio" name="ModoEscuro" value="false" @(Model.ModoEscuro ? "" : "checked") />
+                                    <span><i class="bi bi-sun"></i> Claro</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="ModoEscuro" value="true" @(Model.ModoEscuro ? "checked" : "") />
+                                    <span><i class="bi bi-moon-stars"></i> Escuro</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Comportamento</label>
+                            <div class="theme-toggle-list">
+                                <label><input class="form-check-input" type="checkbox" asp-for="HeaderFixo" /> Header fixo</label>
+                                <label><input class="form-check-input" type="checkbox" asp-for="FooterFixo" /> Footer fixo</label>
+                                <label><input class="form-check-input" type="checkbox" asp-for="MenuLateralExpandido" /> Menu expandido</label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <label class="form-label" asp-for="CorHeader"></label>
+                            <input type="color" class="form-control form-control-color w-100" asp-for="CorHeader" />
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <label class="form-label" asp-for="CorBarraEsquerda"></label>
+                            <input type="color" class="form-control form-control-color w-100" asp-for="CorBarraEsquerda" />
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <label class="form-label" asp-for="CorBarraDireita"></label>
+                            <input type="color" class="form-control form-control-color w-100" asp-for="CorBarraDireita" />
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <label class="form-label" asp-for="CorFooter"></label>
+                            <input type="color" class="form-control form-control-color w-100" asp-for="CorFooter" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="button" class="btn btn-outline-secondary" data-theme-preset="classico">
+                            Restaurar padrao
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2"></i>
+                            Salvar tema
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-    <div class="form-floating mb-3">
-        <input type="color" class="form-control form-control-color" asp-for="CorHeader" placeholder="Cor do Header" />
-        <label asp-for="CorHeader"></label>
-    </div>
-    <div class="form-floating mb-3">
-        <input type="color" class="form-control form-control-color" asp-for="CorBarraEsquerda" placeholder="Barra Lateral Esquerda" />
-        <label asp-for="CorBarraEsquerda"></label>
-    </div>
-    <div class="form-floating mb-3">
-        <input type="color" class="form-control form-control-color" asp-for="CorBarraDireita" placeholder="Barra Lateral Direita" />
-        <label asp-for="CorBarraDireita"></label>
-    </div>
-    <div class="form-floating mb-3">
-        <input type="color" class="form-control form-control-color" asp-for="CorFooter" placeholder="Rodapé" />
-        <label asp-for="CorFooter"></label>
-    </div>
-    <div class="form-check form-switch mb-2">
-        <input class="form-check-input" type="checkbox" asp-for="HeaderFixo" />
-        <label class="form-check-label" asp-for="HeaderFixo">Header fixo</label>
-    </div>
-    <div class="form-check form-switch mb-2">
-        <input class="form-check-input" type="checkbox" asp-for="FooterFixo" />
-        <label class="form-check-label" asp-for="FooterFixo">Footer fixo</label>
-    </div>
-    <div class="form-check form-switch mb-3">
-        <input class="form-check-input" type="checkbox" asp-for="MenuLateralExpandido" />
-        <label class="form-check-label" asp-for="MenuLateralExpandido">Menu expandido</label>
-    </div>
-    </div>
-    <div class="card-footer text-end">
-        <button type="submit" class="btn btn-primary">Salvar</button>
-    </div>
-    </form>
 </div>

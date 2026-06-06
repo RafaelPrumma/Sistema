@@ -45,6 +45,48 @@
         const $headerEl = $('header.navbar');
         const $footerEl = $('footer.footer');
         const expandedStateKey = 'menuExpandedState';
+        const themePresets = {
+            executivo: {
+                modoEscuro: false,
+                corHeader: '#0f172a',
+                corBarraEsquerda: '#111827',
+                corBarraDireita: '#f8fafc',
+                corFooter: '#0f172a',
+                headerFixo: true,
+                footerFixo: false,
+                menuLateralExpandido: true
+            },
+            financeiro: {
+                modoEscuro: false,
+                corHeader: '#064e3b',
+                corBarraEsquerda: '#0f766e',
+                corBarraDireita: '#ecfdf5',
+                corFooter: '#064e3b',
+                headerFixo: true,
+                footerFixo: false,
+                menuLateralExpandido: true
+            },
+            grafite: {
+                modoEscuro: true,
+                corHeader: '#111827',
+                corBarraEsquerda: '#1f2937',
+                corBarraDireita: '#111827',
+                corFooter: '#111827',
+                headerFixo: true,
+                footerFixo: false,
+                menuLateralExpandido: false
+            },
+            classico: {
+                modoEscuro: false,
+                corHeader: '#0d6efd',
+                corBarraEsquerda: '#0d6efd',
+                corBarraDireita: '#f8f9fa',
+                corFooter: '#0d6efd',
+                headerFixo: false,
+                footerFixo: false,
+                menuLateralExpandido: true
+            }
+        };
 
         const classesTexto = ['text-white', 'text-dark'];
         const obterPreferenciaMenuExpandido = () => $('#MenuLateralExpandido').is(':checked');
@@ -107,6 +149,14 @@
             $elementos.removeClass(classesTexto.join(' ')).addClass(classe);
         };
 
+        const atualizarPreviewTema = (cores) => {
+            $('.theme-mini-preview span, .theme-preview-header').css('background-color', cores.headerColor);
+            $('.theme-mini-preview strong').css('background-color', cores.leftColor);
+            $('.theme-mini-preview em').css('background-color', cores.rightColor);
+            $('.theme-preview-body').css('background-color', cores.rightColor);
+            $('.theme-preview-body span').css('background-color', cores.headerColor);
+        };
+
         const atualizarContraste = (cores) => {
             const headerClasse = obterClasseTexto(cores.headerColor);
             const esquerdaClasse = obterClasseTexto(cores.leftColor);
@@ -154,6 +204,7 @@
             if (footerColor) root.style.setProperty('--footer-bg', footerColor);
 
             atualizarContraste({ headerColor, leftColor, rightColor, footerColor });
+            atualizarPreviewTema({ headerColor, leftColor, rightColor, footerColor });
 
             const headerFixed = typeof tema?.headerFixo === 'boolean' ? tema.headerFixo : $headerEl.hasClass('fixed-top');
             const footerFixed = typeof tema?.footerFixo === 'boolean' ? tema.footerFixo : $footerEl.hasClass('fixed-bottom');
@@ -326,6 +377,14 @@
                 aplicarTema({ menuLateralExpandido: this.checked });
             });
         }
+
+        $(document).on('click', '[data-theme-preset]', function () {
+            const presetName = $(this).data('theme-preset');
+            const preset = themePresets[presetName];
+            if (!preset) return;
+
+            aplicarTema(preset);
+        });
 
         const $temaForm = $('#temaSidebar form');
         if ($temaForm.length) {

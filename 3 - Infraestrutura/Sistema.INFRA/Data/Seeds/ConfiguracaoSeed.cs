@@ -75,6 +75,51 @@ public static class ConfiguracaoSeed
                 Tipo = ConfiguracaoTipo.Texto,
                 Descricao = "Tempo de retenção do log geral, em meses.",
                 UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "Sistema",
+                Chave = "NomeAplicacao",
+                Valor = "Sistema",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Nome exibido na aplicacao e documentacao.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "Sistema",
+                Chave = "AmbientePadrao",
+                Valor = "Development",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Ambiente padrao usado para operacao local.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "Aparencia",
+                Chave = "PresetPadrao",
+                Valor = "executivo",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Preset visual sugerido para novos usuarios.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "Mensagens",
+                Chave = "PageSizeFeed",
+                Valor = "20",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Quantidade padrao de itens no feed de comunicacao.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "MinhasFinancas",
+                Chave = "ImportacaoAutomaticaHabilitada",
+                Valor = "true",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Permite carregar a base financeira configurada no ambiente de desenvolvimento.",
+                UsuarioInclusao = "seed"
             }
         };
     }

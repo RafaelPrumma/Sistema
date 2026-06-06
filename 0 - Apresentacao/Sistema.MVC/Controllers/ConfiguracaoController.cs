@@ -9,7 +9,8 @@ public class ConfiguracaoController(IConfiguracaoAppService service) : Controlle
 {
     private readonly IConfiguracaoAppService _service = service;
 
-	[HttpGet]
+	[HttpGet("/Configuracao")]
+	[HttpGet("/Configuracao/Index")]
     public async Task<IActionResult> Index(string agrupamento = "AzureAd")
     {
         var configs = await _service.BuscarPorAgrupamentoAsync(agrupamento);

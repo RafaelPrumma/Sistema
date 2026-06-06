@@ -1,92 +1,113 @@
 @{
-    ViewData["Title"] = "Documentação do Sistema";
+    ViewData["Title"] = "Documentacao";
 }
 
-<div class="row">
-    <nav class="col-md-3">
-        <ul id="doc-nav" class="nav flex-column position-sticky" style="top:1rem">
-            <li class="nav-item"><a class="nav-link" href="#visao-geral">Visão geral</a></li>
-            <li class="nav-item"><a class="nav-link" href="#arquitetura">Arquitetura</a></li>
-            <li class="nav-item"><a class="nav-link" href="#auditoria">Auditoria e soft delete</a></li>
-            <li class="nav-item"><a class="nav-link" href="#seguranca">Autenticação e segurança</a></li>
-            <li class="nav-item"><a class="nav-link" href="#permissoes">Permissões granulares</a></li>
-            <li class="nav-item"><a class="nav-link" href="#erros">Tratamento de erros</a></li>
-            <li class="nav-item"><a class="nav-link" href="#mensagens">Mensagens</a></li>
-            <li class="nav-item"><a class="nav-link" href="#logs">Logs e correlação</a></li>
-            <li class="nav-item"><a class="nav-link" href="#configuracoes">Configurações</a></li>
-        </ul>
-    </nav>
-    <div class="col-md-9">
-        <section id="visao-geral">
-            <h2>Visão geral</h2>
-            <p>O Sistema é uma base corporativa em .NET 8 para autenticação, administração de usuários/perfis e comunicação interna com rastreabilidade operacional.</p>
-        </section>
+<div class="admin-dashboard doc-shell">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Documentacao do Sistema",
+        Description = "Mapa vivo da arquitetura, modulos, operacao e qualidade da aplicacao."
+    })
 
-        <section id="arquitetura">
-            <h2>Arquitetura em camadas</h2>
-            <ul>
-                <li><strong>Apresentação (MVC):</strong> recebe requisições, valida entrada e renderiza views/respostas.</li>
-                <li><strong>Aplicação:</strong> orquestra casos de uso e integra domínio, repositórios e logs.</li>
-                <li><strong>Domínio:</strong> entidades, regras de estado e contratos centrais do negócio.</li>
-                <li><strong>Infraestrutura:</strong> EF Core, mapeamentos, persistência, seeds e serviços externos.</li>
-            </ul>
-        </section>
+    <div class="row g-4">
+        <aside class="col-xl-3">
+            <div class="surface-card doc-nav-card position-sticky">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Indice</h3>
+                        <p>Navegue por assunto.</p>
+                    </div>
+                </div>
+                <nav id="doc-nav" class="nav flex-column">
+                    <a class="nav-link" href="#visao-geral">Visao geral</a>
+                    <a class="nav-link" href="#arquitetura">Arquitetura</a>
+                    <a class="nav-link" href="#layout-tema">Layout e tema</a>
+                    <a class="nav-link" href="#modulos">Modulos</a>
+                    <a class="nav-link" href="#seguranca">Seguranca</a>
+                    <a class="nav-link" href="#configuracoes">Configuracoes</a>
+                    <a class="nav-link" href="#qualidade">Qualidade</a>
+                    <a class="nav-link" href="#operacao">Operacao</a>
+                </nav>
+            </div>
+        </aside>
 
-        <section id="auditoria">
-            <h2>Auditoria e soft delete</h2>
-            <p>Entidades auditáveis registram criação, alteração e exclusão lógica automaticamente via <code>AppDbContext</code>.</p>
-            <ul>
-                <li><code>DataInclusao</code> / <code>UsuarioInclusao</code></li>
-                <li><code>DataAlteracao</code> / <code>UsuarioAlteracao</code></li>
-                <li><code>DataExclusao</code> / <code>UsuarioExclusao</code></li>
-                            </ul>
-            <p>Exclusões são convertidas para atualização auditável, preservando histórico e evitando perda de dados.</p>
-        </section>
+        <div class="col-xl-9">
+            <section id="visao-geral" class="surface-card doc-section">
+                <h2>Visao geral</h2>
+                <p>O Sistema e uma aplicacao .NET 8 em camadas para operacao pessoal/corporativa, com autenticacao, configuracoes, comunicacao interna, auditoria e o modulo Minhas Financas.</p>
+                <div class="quick-actions-grid mt-3">
+                    <div class="system-health-item"><i class="bi bi-layers text-primary"></i><div><strong>DDD em camadas</strong><span>MVC/API, Application, Domain e Infrastructure.</span></div></div>
+                    <div class="system-health-item"><i class="bi bi-palette text-info"></i><div><strong>Admin UI</strong><span>Layout com sidebar, tema, cards e superficies reutilizaveis.</span></div></div>
+                    <div class="system-health-item"><i class="bi bi-graph-up-arrow text-success"></i><div><strong>Financas</strong><span>Importacao auditavel, B3, cripto, posicoes estimadas e alertas.</span></div></div>
+                </div>
+            </section>
 
-        <section id="seguranca">
-            <h2>Autenticação e segurança</h2>
-            <p>O sistema usa autenticação por cookie no MVC e possui serviço de emissão JWT na camada de aplicação para integrações/API.</p>
-            <p>As ações críticas são auditadas com correlação de requisição para facilitar investigação e suporte.</p>
-        </section>
+            <section id="arquitetura" class="surface-card doc-section">
+                <h2>Arquitetura</h2>
+                <p>A regra de dependencia continua simples: apresentacao chama aplicacao; aplicacao orquestra dominio e contratos; infraestrutura implementa persistencia e integracoes.</p>
+                <ul>
+                    <li><strong>Apresentacao:</strong> controllers, views, autorizacao, middleware e assets.</li>
+                    <li><strong>Aplicacao:</strong> DTOs, services, mappers e casos de uso.</li>
+                    <li><strong>Dominio:</strong> entidades, enums, contratos e regras centrais.</li>
+                    <li><strong>Infraestrutura:</strong> EF Core, mapeamentos, repositories, seeds, importadores e servicos externos.</li>
+                </ul>
+            </section>
 
-        <section id="permissoes">
-            <h2>Permissões granulares por funcionalidade</h2>
-            <p>Após o login, o sistema gera claims no formato <code>perm:{funcionalidade}</code> com o valor inteiro do enum <code>Permissao</code>.</p>
-            <p>Exemplo: <code>perm:Perfil = 7</code> representa <code>Visualizar + Criar + Editar</code>.</p>
-            <p>No MVC, o atributo <code>[AuthorizePermission("Perfil", Permissao.Editar)]</code> valida as flags via <code>HasFlag</code> e retorna <code>403</code> quando necessário.</p>
-        </section>
+            <section id="layout-tema" class="surface-card doc-section">
+                <h2>Layout e tema</h2>
+                <p>O shell visual usa Bootstrap local, Sass, menu lateral responsivo e preferencias por usuario. Presets de tema aplicam cores, modo claro/escuro e comportamento do menu sem alterar o banco.</p>
+                <ul>
+                    <li>Header e footer podem ser fixos.</li>
+                    <li>Menu lateral pode iniciar expandido ou recolhido.</li>
+                    <li>Presets sugeridos: executivo, financeiro, grafite e classico.</li>
+                    <li>Componentes visuais principais: <code>surface-card</code>, <code>metric-card</code>, <code>quick-action</code> e <code>message-card</code>.</li>
+                </ul>
+            </section>
 
-        <section id="erros">
-            <h2>Tratamento global de erros</h2>
-            <p>O middleware global converte exceções em respostas padronizadas (<code>ApiResponse</code>) com <code>traceId</code>.</p>
-            <ul>
-                <li><strong>422:</strong> erros de validação de argumento.</li>
-                <li><strong>500:</strong> falhas inesperadas.</li>
-            </ul>
-        </section>
+            <section id="modulos" class="surface-card doc-section">
+                <h2>Modulos</h2>
+                <div class="roadmap-list">
+                    <div><span>1</span> Home: painel operacional, atalhos e comunicacoes recentes.</div>
+                    <div><span>2</span> Configuracoes: parametros por grupo e operacao.</div>
+                    <div><span>3</span> Mensagens: feed, caixa de saida, avisos, posts e threads.</div>
+                    <div><span>4</span> Minhas Financas: importacao, documentos, B3, cripto, posicoes e alertas.</div>
+                </div>
+            </section>
 
-        <section id="mensagens">
-            <h2>Mensagens e comunicação interna</h2>
-            <ul>
-                <li>Mensagem direta entre usuários.</li>
-                <li>Post por setor/perfil.</li>
-                <li>Aviso institucional.</li>
-                <li>Thread de respostas, reações e leitura/entrega.</li>
-            </ul>
-        </section>
+            <section id="seguranca" class="surface-card doc-section">
+                <h2>Seguranca</h2>
+                <p>O MVC usa cookies e sessoes; a API possui fluxo JWT. As permissoes sao claims no formato <code>perm:{funcionalidade}</code>, avaliadas por <code>AuthorizePermissionAttribute</code>.</p>
+                <p>Para operacao local, chaves de DataProtection em Development sao persistidas em <code>App_Data/DataProtectionKeys</code>, pasta ignorada pelo Git.</p>
+            </section>
 
-        <section id="logs">
-            <h2>Logs e correlação</h2>
-            <p>O cabeçalho <code>X-Correlation-ID</code> é propagado em todas as requisições e usado para rastrear eventos ponta a ponta.</p>
-            <p>Também há fallback de gravação de auditoria em arquivo local quando o banco estiver indisponível.</p>
-        </section>
+            <section id="configuracoes" class="surface-card doc-section">
+                <h2>Configuracoes</h2>
+                <p>As configuracoes sao agrupadas por modulo. Novas seeds sao incrementais: valores ja existentes nao sao sobrescritos.</p>
+                <ul>
+                    <li><code>Sistema</code>: identidade e comportamento geral.</li>
+                    <li><code>Aparencia</code>: preset visual padrao.</li>
+                    <li><code>AzureAd</code>: email e Microsoft Graph.</li>
+                    <li><code>LogsRetencao</code>: retencao de logs por modulo.</li>
+                    <li><code>Mensagens</code>: padroes do feed.</li>
+                    <li><code>MinhasFinancas</code>: importacao e analises financeiras.</li>
+                </ul>
+            </section>
 
-        <section id="configuracoes">
-            <h2>Configurações</h2>
-            <p>Parâmetros operacionais podem ser gerenciados no módulo de configurações, incluindo políticas de retenção de logs.</p>
-            <p>Grupo sugerido: <code>LogsRetencao</code> com chaves <code>AcessoMeses</code>, <code>ComunicacaoMeses</code>, <code>AdministracaoMeses</code>, <code>GeralMeses</code>.</p>
-        <p>O projeto também possui automação de responsividade com Playwright (`npm run test:layout`) para validar quebra de layout em desktop e mobile.</p>
-        </section>
+            <section id="qualidade" class="surface-card doc-section">
+                <h2>Qualidade</h2>
+                <p>A base de qualidade deve sempre rodar antes de mudancas maiores:</p>
+                <pre><code>dotnet build
+dotnet test
+npm run test:layout</code></pre>
+                <p>O teste de layout com Playwright deve cobrir login, dashboard, tema, mensagens, configuracoes e Minhas Financas nos breakpoints principais.</p>
+            </section>
+
+            <section id="operacao" class="surface-card doc-section">
+                <h2>Operacao</h2>
+                <p>O startup aplica migrations em bancos relacionais e roda seeds incrementais. Logs usam correlacao por <code>X-Correlation-ID</code> e o middleware global padroniza erros.</p>
+                <p>Para o modulo financeiro, dados importados devem ser tratados como base auditavel e posicoes como estimadas ate reconciliacao completa.</p>
+            </section>
+        </div>
     </div>
 </div>
 
@@ -94,14 +115,14 @@
     <script>
         const observer = new IntersectionObserver(entries => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    document.querySelectorAll('#doc-nav .nav-link').forEach(l => l.classList.remove('active'));
-                    const id = entry.target.getAttribute('id');
-                    document.querySelector(`#doc-nav .nav-link[href="#${id}"]`).classList.add('active');
-                }
+                if (!entry.isIntersecting) return;
+                document.querySelectorAll('#doc-nav .nav-link').forEach(l => l.classList.remove('active'));
+                const id = entry.target.getAttribute('id');
+                const link = document.querySelector(`#doc-nav .nav-link[href="#${id}"]`);
+                if (link) link.classList.add('active');
             });
-        }, { rootMargin: '-50% 0px -50% 0px' });
+        }, { rootMargin: '-45% 0px -45% 0px' });
 
-        document.querySelectorAll('section').forEach(sec => observer.observe(sec));
+        document.querySelectorAll('.doc-section').forEach(sec => observer.observe(sec));
     </script>
 }

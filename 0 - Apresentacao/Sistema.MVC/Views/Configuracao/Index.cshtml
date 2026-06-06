@@ -1,54 +1,142 @@
 @model Sistema.MVC.Models.ConfiguracaoIndexViewModel
 @{
-    ViewData["Title"] = "Configurações";
+    ViewData["Title"] = "Configuracoes";
+    var grupos = new[]
+    {
+        new { Nome = "Sistema", Icone = "bi-window-stack", Descricao = "Identidade, comportamento geral e modulos." },
+        new { Nome = "Aparencia", Icone = "bi-palette", Descricao = "Tema, layout e preferencias visuais globais." },
+        new { Nome = "AzureAd", Icone = "bi-microsoft", Descricao = "Email, autenticacao externa e Graph." },
+        new { Nome = "LogsRetencao", Icone = "bi-clock-history", Descricao = "Politicas de retencao por modulo." },
+        new { Nome = "Mensagens", Icone = "bi-chat-left-text", Descricao = "Comunicacao interna, avisos e feed." },
+        new { Nome = "MinhasFinancas", Icone = "bi-graph-up-arrow", Descricao = "Importacao, dashboards e reconciliacao financeira." }
+    };
+    var grupoAtual = grupos.FirstOrDefault(g => string.Equals(g.Nome, Model.Agrupamento, StringComparison.OrdinalIgnoreCase)) ?? grupos[0];
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = "Configurações",
-    Description = "Gerencie as configurações do sistema."
-})
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Configuracoes",
+        Description = "Centralize parametros operacionais por modulo e mantenha o sistema governavel."
+    })
 
-<form method="get" class="mb-3">
-    <div class="card">
-        <div class="card-body">
-            <input type="text" name="agrupamento" value="@Model.Agrupamento" class="form-control" placeholder="Agrupamento" />
+    <div class="row g-4">
+        <div class="col-xl-3">
+            <div class="surface-card">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Grupos</h3>
+                        <p>Areas configuraveis.</p>
+                    </div>
+                </div>
+                <div class="config-group-list">
+                    @foreach (var grupo in grupos)
+                    {
+                        var active = string.Equals(grupo.Nome, Model.Agrupamento, StringComparison.OrdinalIgnoreCase);
+                        <a class="config-group-link @(active ? "active" : "")" asp-action="Index" asp-route-agrupamento="@grupo.Nome">
+                            <i class="bi @grupo.Icone"></i>
+                            <span>
+                                <strong>@grupo.Nome</strong>
+                                <small>@grupo.Descricao</small>
+                            </span>
+                        </a>
+                    }
+                </div>
+            </div>
         </div>
-        <div class="card-footer text-end">
-            <button type="submit" class="btn btn-secondary">Buscar</button>
-            <a class="btn btn-primary" asp-action="Create" asp-route-agrupamento="@Model.Agrupamento">Nova Configuração</a>
-        </div>
-    </div>
-</form>
-<div class="card">
-    <div class="card-body">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>Chave</th>
-                    <th>Valor</th>
-                    <th>Tipo</th>
-                    <th>Descrição</th>
-                    <th>Ativo</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in Model.Configuracoes)
+
+        <div class="col-xl-9">
+            <div class="surface-card mb-4">
+                <form method="get" class="admin-filter-bar">
+                    <div>
+                        <label class="form-label" for="agrupamento">Agrupamento</label>
+                        <input type="text" id="agrupamento" name="agrupamento" value="@Model.Agrupamento" class="form-control" placeholder="Ex: LogsRetencao" />
+                    </div>
+                    <div class="admin-filter-actions">
+                        <button type="submit" class="btn btn-outline-secondary">
+                            <i class="bi bi-search"></i>
+                            Buscar
+                        </button>
+                        <a class="btn btn-primary" asp-action="Create" asp-route-agrupamento="@Model.Agrupamento">
+                            <i class="bi bi-plus-lg"></i>
+                            Nova configuracao
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="surface-card">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>@grupoAtual.Nome</h3>
+                        <p>@grupoAtual.Descricao</p>
+                    </div>
+                    <span class="badge text-bg-secondary">@Model.Configuracoes.Count item(ns)</span>
+                </div>
+
+                @if (Model.Configuracoes.Count == 0)
                 {
-                    <tr>
-                        <td>@item.Chave</td>
-                        <td>@item.Valor</td>
-                        <td>@item.Tipo</td>
-                        <td>@item.Descricao</td>
-                        <td>@(item.Ativo ? "Sim" : "Não")</td>
-                        <td>
-                            <a class="btn btn-sm btn-secondary" asp-action="Edit" asp-route-agrupamento="@item.Agrupamento" asp-route-chave="@item.Chave">Editar</a>
-                            <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@item.Id" asp-route-agrupamento="@item.Agrupamento" onclick="return confirm('Tem certeza que deseja excluir?');">Excluir</a>
-                        </td>
-                    </tr>
+                    <div class="empty-state">
+                        <i class="bi bi-sliders"></i>
+                        <strong>Nenhuma configuracao neste grupo</strong>
+                        <span>Crie o primeiro parametro para este agrupamento.</span>
+                    </div>
                 }
-            </tbody>
-        </table>
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle admin-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Chave</th>
+                                    <th>Valor</th>
+                                    <th>Tipo</th>
+                                    <th>Descricao</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Acoes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Configuracoes.OrderBy(c => c.Chave))
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@item.Chave</strong>
+                                            <small class="d-block text-muted">@item.Agrupamento</small>
+                                        </td>
+                                        <td class="text-truncate config-value-cell">
+                                            @if (item.Tipo == Sistema.CORE.Entities.ConfiguracaoTipo.Password && !string.IsNullOrWhiteSpace(item.Valor))
+                                            {
+                                                <span>••••••••</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@item.Valor</span>
+                                            }
+                                        </td>
+                                        <td><span class="badge text-bg-light">@item.Tipo</span></td>
+                                        <td>@(string.IsNullOrWhiteSpace(item.Descricao) ? "-" : item.Descricao)</td>
+                                        <td>
+                                            <span class="badge @(item.Ativo ? "text-bg-success" : "text-bg-secondary")">
+                                                @(item.Ativo ? "Ativa" : "Inativa")
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-agrupamento="@item.Agrupamento" asp-route-chave="@item.Chave">
+                                                <i class="bi bi-pencil"></i>
+                                                Editar
+                                            </a>
+                                            <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@item.Id" asp-route-agrupamento="@item.Agrupamento" onclick="return confirm('Excluir esta configuracao?');">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>

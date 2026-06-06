@@ -1,40 +1,67 @@
 @model Sistema.MVC.Models.MensagemViewModel
 @{
-    ViewData["Title"] = "Caixa de Saída";
+    ViewData["Title"] = "Caixa de saida";
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = "Mensagens",
-    Description = "Visualize mensagens enviadas."
-})
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Caixa de saida",
+        Description = "Acompanhe mensagens e publicacoes enviadas por voce."
+    })
 
-<div class="card">
-    <div class="card-body p-0">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>Assunto</th>
-                    <th>Destinatário</th>
-                    <th>Data</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var m in Model.Mensagens)
-            {
-                <tr>
-                    <td>@m.Assunto</td>
-                    <td>@m.DestinatarioNome</td>
-                    <td>@m.DataInclusao.ToLocalTime().ToString("g")</td>
-                    <td><a href="@Url.Action("Detalhe", new { id = m.Id })">Abrir</a></td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-    <div class="card-footer text-end">
-        <a href="@Url.Action("Index")" class="btn btn-outline-secondary me-2">Caixa de entrada</a>
-        <a href="@Url.Action("Nova")" class="btn btn-primary">Nova mensagem</a>
+    <div class="surface-card">
+        <div class="surface-card-header">
+            <div>
+                <h3>Enviadas</h3>
+                <p>@Model.TotalItems item(ns) encontrados.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-inbox"></i>
+                    Feed
+                </a>
+                <a asp-action="Nova" class="btn btn-primary">
+                    <i class="bi bi-pencil-square"></i>
+                    Nova
+                </a>
+            </div>
+        </div>
+
+        @if (Model.Mensagens.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-send"></i>
+                <strong>Nenhuma mensagem enviada</strong>
+                <span>As mensagens enviadas aparecem aqui.</span>
+            </div>
+        }
+        else
+        {
+            <div class="message-feed">
+                @foreach (var m in Model.Mensagens)
+                {
+                    <article class="message-card">
+                        <div class="message-avatar"><i class="bi bi-send"></i></div>
+                        <div>
+                            <div class="message-card-title">
+                                <strong>@m.Assunto</strong>
+                                <span class="badge text-bg-light">@m.Tipo</span>
+                            </div>
+                            <p class="message-card-body">
+                                Destino: @(string.IsNullOrWhiteSpace(m.DestinatarioNome) ? (string.IsNullOrWhiteSpace(m.PerfilNome) ? "Publicacao" : m.PerfilNome) : m.DestinatarioNome)
+                            </p>
+                            <div class="message-card-meta">
+                                <span class="badge text-bg-light">@m.DataInclusao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="badge @(m.Status.ToString() == "Ativa" ? "text-bg-success" : "text-bg-secondary")">@m.Status</span>
+                            </div>
+                        </div>
+                        <div class="message-card-actions">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Detalhe" asp-route-id="@m.Id">Abrir</a>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
     </div>
 </div>

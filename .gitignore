@@ -17,6 +17,8 @@
 /0 - Apresentacao/Sistema.MVC/Properties/launchSettings.json
 /0 - Apresentacao/Sistema.API/log
 node_modules/
+.npm-cache/
 /.vs/Sistema/CopilotIndices/17.14.1347.20289
 artifacts/screenshots/*.png
+artifacts/*.log
 /0 - Apresentacao/Sistema.MVC/App_Data/DataProtectionKeys/

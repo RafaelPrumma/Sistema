@@ -3,18 +3,31 @@
     ViewData["Title"] = Model.Assunto;
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.Assunto,
-    Description = "Thread social da comunicação interna."
-})
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = Model.Assunto,
+        Description = "Thread de comunicacao interna com respostas e reacoes."
+    })
 
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <a href="@Url.Action("Index")" class="btn btn-outline-secondary btn-sm">&larr; Voltar ao feed</a>
-        <a href="@Url.Action("Nova", new { mensagemPaiId = Model.Id, destinatarioId = Model.RemetenteId })" class="btn btn-primary btn-sm">Responder</a>
-    </div>
-    <div class="card-body">
+    <div class="surface-card">
+        <div class="surface-card-header">
+            <div class="d-flex gap-2 flex-wrap">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    Feed
+                </a>
+                <a asp-action="CaixaSaida" class="btn btn-outline-secondary">
+                    <i class="bi bi-send"></i>
+                    Enviadas
+                </a>
+            </div>
+            <a asp-action="Nova" asp-route-mensagemPaiId="@Model.Id" asp-route-destinatarioId="@Model.RemetenteId" class="btn btn-primary">
+                <i class="bi bi-reply"></i>
+                Responder
+            </a>
+        </div>
+
         @await Html.PartialAsync("_MensagemThread", Model)
     </div>
 </div>

@@ -3,44 +3,172 @@
     ViewData["Title"] = "Dashboard";
 }
 
-<div class="row">
-    <div class="col-md-3 mb-3">
-        <div class="card text-bg-primary text-center">
-            <div class="card-body">
-                <h5 class="card-title">Usuários</h5>
-                <p class="display-6">@Model.TotalUsuarios</p>
+<div class="admin-dashboard">
+    @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+    {
+        Title = "Painel do Sistema",
+        Description = "Visao geral operacional, atalhos dos modulos e comunicacoes recentes."
+    })
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="metric-card metric-card--primary">
+                <div class="metric-card-icon"><i class="bi bi-people"></i></div>
+                <div>
+                    <span class="metric-card-label">Usuarios</span>
+                    <strong class="metric-card-value">@Model.TotalUsuarios</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="metric-card metric-card--success">
+                <div class="metric-card-icon"><i class="bi bi-person-vcard"></i></div>
+                <div>
+                    <span class="metric-card-label">Perfis</span>
+                    <strong class="metric-card-value">@Model.TotalPerfis</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="metric-card metric-card--info">
+                <div class="metric-card-icon"><i class="bi bi-grid-1x2"></i></div>
+                <div>
+                    <span class="metric-card-label">Funcionalidades</span>
+                    <strong class="metric-card-value">@Model.TotalFuncionalidades</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="metric-card metric-card--warning">
+                <div class="metric-card-icon"><i class="bi bi-envelope-paper"></i></div>
+                <div>
+                    <span class="metric-card-label">Nao lidas</span>
+                    <strong class="metric-card-value">@Model.TotalMensagensNaoLidas</strong>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-bg-success text-center">
-            <div class="card-body">
-                <h5 class="card-title">Perfis</h5>
-                <p class="display-6">@Model.TotalPerfis</p>
+
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="surface-card h-100">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Central de trabalho</h3>
+                        <p>Modulos mais importantes para operar o sistema no dia a dia.</p>
+                    </div>
+                    <span class="badge text-bg-primary-subtle text-primary-emphasis">Admin workspace</span>
+                </div>
+                <div class="quick-actions-grid">
+                    @foreach (var item in Model.Atalhos)
+                    {
+                        <a class="quick-action quick-action--@item.Variante" asp-controller="@item.Controller" asp-action="@item.Action">
+                            <span class="quick-action-icon"><i class="bi @item.Icone"></i></span>
+                            <span>
+                                <strong>@item.Titulo</strong>
+                                <small>@item.Descricao</small>
+                            </span>
+                        </a>
+                    }
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-bg-info text-center">
-            <div class="card-body">
-                <h5 class="card-title">Funcionalidades</h5>
-                <p class="display-6">@Model.TotalFuncionalidades</p>
+
+        <div class="col-xl-4">
+            <div class="surface-card h-100">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Saude do sistema</h3>
+                        <p>Sinais rapidos para manutencao.</p>
+                    </div>
+                </div>
+                <div class="system-health-list">
+                    <div class="system-health-item">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <div>
+                            <strong>Arquitetura em camadas</strong>
+                            <span>Dominio, aplicacao, infraestrutura e MVC separados.</span>
+                        </div>
+                    </div>
+                    <div class="system-health-item">
+                        <i class="bi bi-shield-check text-primary"></i>
+                        <div>
+                            <strong>Permissoes por funcionalidade</strong>
+                            <span>Claims <code>perm:*</code> controlam acessos principais.</span>
+                        </div>
+                    </div>
+                    <div class="system-health-item">
+                        <i class="bi bi-database-check text-info"></i>
+                        <div>
+                            <strong>@Model.TotalConfiguracoes configuracoes</strong>
+                            <span>Parametros operacionais agrupados por modulo.</span>
+                        </div>
+                    </div>
+                    <div class="system-health-item">
+                        <i class="bi bi-clipboard2-check text-warning"></i>
+                        <div>
+                            <strong>Testes automatizados</strong>
+                            <span>Base existente pronta para crescer com os modulos.</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-bg-warning text-center">
-            <div class="card-body">
-                <h5 class="card-title">Configurações</h5>
-                <p class="display-6">@Model.TotalConfiguracoes</p>
+
+        <div class="col-xl-7">
+            <div class="surface-card">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Comunicacoes recentes</h3>
+                        <p>Ultimas mensagens e avisos do feed interno.</p>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary" asp-controller="Mensagem" asp-action="Index">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                        Abrir feed
+                    </a>
+                </div>
+
+                @if (Model.MensagensRecentes.Count == 0)
+                {
+                    <div class="empty-state">
+                        <i class="bi bi-chat-dots"></i>
+                        <strong>Nenhuma comunicacao recente</strong>
+                        <span>Quando houver mensagens, posts ou avisos, eles aparecem aqui.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="activity-list">
+                        @foreach (var mensagem in Model.MensagensRecentes)
+                        {
+                            <a class="activity-item" asp-controller="Mensagem" asp-action="Detalhe" asp-route-id="@mensagem.Id">
+                                <span class="activity-status @(mensagem.Lida ? "activity-status--read" : "activity-status--new")"></span>
+                                <span class="activity-body">
+                                    <strong>@mensagem.Assunto</strong>
+                                    <small>@mensagem.Tipo por @mensagem.Autor</small>
+                                </span>
+                                <span class="activity-date">@mensagem.DataInclusao.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                            </a>
+                        }
+                    </div>
+                }
             </div>
         </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-bg-secondary text-center">
-            <div class="card-body">
-                <h5 class="card-title">Mensagens</h5>
-                <p class="display-6">@Model.TotalMensagens</p>
+
+        <div class="col-xl-5">
+            <div class="surface-card">
+                <div class="surface-card-header">
+                    <div>
+                        <h3>Proximas evolucoes</h3>
+                        <p>Roteiro curto para deixar o Sistema mais redondo.</p>
+                    </div>
+                </div>
+                <div class="roadmap-list">
+                    <div><span>1</span> Design system e tema com presets</div>
+                    <div><span>2</span> Configuracoes tipadas e auditaveis</div>
+                    <div><span>3</span> Mensagens com fluxo de caixa de entrada</div>
+                    <div><span>4</span> Financas com reconciliacao e alertas</div>
+                </div>
             </div>
         </div>
     </div>

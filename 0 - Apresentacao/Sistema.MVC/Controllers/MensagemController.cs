@@ -82,7 +82,8 @@ namespace Sistema.MVC.Controllers
             };
         }
 
-        [HttpGet]
+        [HttpGet("/Mensagem")]
+        [HttpGet("/Mensagem/Index")]
         public async Task<IActionResult> Index(int page = 1, int pageSize = 20, PublicacaoTipo? tipo = null, int? perfilId = null, bool somenteNaoLidas = false, AvisoPrioridade? prioridadeMinima = null, string? palavraChave = null)
         {
             var userId = ObterUsuarioId();

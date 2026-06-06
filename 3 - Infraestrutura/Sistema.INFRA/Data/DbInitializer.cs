@@ -24,11 +24,7 @@ public static class DbInitializer
             context.SaveChanges();
         }
 
-        if (!context.Configuracoes.Any())
-        {
-            context.Configuracoes.AddRange(ConfiguracaoSeed.Get());
-            context.SaveChanges();
-        }
+        SeedConfiguracoes(context);
     }
 
     private static void SeedFuncionalidades(AppDbContext context)
@@ -39,6 +35,23 @@ public static class DbInitializer
             return;
 
         context.Funcionalidades.AddRange(novas);
+        context.SaveChanges();
+    }
+
+    private static void SeedConfiguracoes(AppDbContext context)
+    {
+        var existentes = context.Configuracoes
+            .Select(c => new { c.Agrupamento, c.Chave })
+            .ToHashSet();
+
+        var novas = ConfiguracaoSeed.Get()
+            .Where(c => !existentes.Contains(new { c.Agrupamento, c.Chave }))
+            .ToList();
+
+        if (novas.Count == 0)
+            return;
+
+        context.Configuracoes.AddRange(novas);
         context.SaveChanges();
     }
 
