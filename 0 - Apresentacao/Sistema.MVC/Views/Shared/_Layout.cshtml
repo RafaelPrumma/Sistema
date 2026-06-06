@@ -86,6 +86,13 @@
                             </a>
                             <button class="menu-arrow" aria-label="Abrir submenu Home"><i class="bi bi-chevron-right"></i></button>
                         </li>
+                        <li class="menu-item" data-panel="menuPanelFinancas">
+                            <a href="#" class="menu-link @leftText @EstaAtivo("MinhasFinancas")">
+                                <i class="bi bi-graph-up-arrow"></i>
+                                <span>Minhas Finanças</span>
+                            </a>
+                            <button class="menu-arrow" aria-label="Abrir submenu Minhas Finanças"><i class="bi bi-chevron-right"></i></button>
+                        </li>
                         <li class="menu-item" data-panel="menuPanelAcesso">
                             <a href="#" class="menu-link @leftText @EstaAtivo("Account")">
                                 <i class="bi bi-shield-lock"></i>
@@ -121,6 +128,7 @@
                     </ul>
                 </div>
                 <div class="menu-panel menu-panel--sub" id="menuPanelHome"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Home</span></div><ul class="menu-list"><li><a asp-controller="Home" asp-action="Index" class="menu-sublink @leftText">Dashboard</a></li><li><a asp-controller="Home" asp-action="Privacy" class="menu-sublink @leftText">Privacidade</a></li></ul></div>
+                <div class="menu-panel menu-panel--sub" id="menuPanelFinancas"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Minhas Finanças</span></div><ul class="menu-list"><li><a asp-controller="MinhasFinancas" asp-action="Index" class="menu-sublink @leftText">Dashboard</a></li><li><a asp-controller="MinhasFinancas" asp-action="Documentos" class="menu-sublink @leftText">Documentos</a></li><li><a asp-controller="MinhasFinancas" asp-action="OperacoesB3" class="menu-sublink @leftText">Operações B3</a></li><li><a asp-controller="MinhasFinancas" asp-action="OperacoesCripto" class="menu-sublink @leftText">Cripto</a></li><li><a asp-controller="MinhasFinancas" asp-action="Posicoes" class="menu-sublink @leftText">Posições estimadas</a></li><li><a asp-controller="MinhasFinancas" asp-action="Alertas" class="menu-sublink @leftText">Alertas</a></li></ul></div>
                 <div class="menu-panel menu-panel--sub" id="menuPanelAcesso"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Acesso</span></div><ul class="menu-list"><li><a asp-controller="Account" asp-action="ChangePassword" class="menu-sublink @leftText">Segurança</a></li><li><a href="/api/log/acesso" class="menu-sublink @leftText">AcessoLog (API)</a></li></ul></div>
                 <div class="menu-panel menu-panel--sub" id="menuPanelMensagens"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Comunicação</span></div><ul class="menu-list"><li><a asp-controller="Mensagem" asp-action="Index" class="menu-sublink @leftText">Feed</a></li><li><a asp-controller="Mensagem" asp-action="CaixaSaida" class="menu-sublink @leftText">Caixa de saída</a></li><li><a asp-controller="Mensagem" asp-action="Nova" class="menu-sublink @leftText">Nova publicação</a></li><li><a href="/api/log/comunicacao" class="menu-sublink @leftText">ComunicacaoLog (API)</a></li></ul></div>
                 <div class="menu-panel menu-panel--sub" id="menuPanelAdmin"><div class="menu-panel-header"><button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button><span class="menu-panel-title">Administração</span></div><ul class="menu-list"><li><a asp-controller="Configuracao" asp-action="Index" class="menu-sublink @leftText">Configurações</a></li><li><a asp-controller="Tema" asp-action="Edit" class="menu-sublink @leftText">Tema</a></li><li><a href="/api/log/administracao" class="menu-sublink @leftText">AdministracaoLog (API)</a></li></ul></div>

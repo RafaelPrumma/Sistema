@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Repositories.Interfaces;
 using Sistema.INFRA.Data;
+using Sistema.INFRA.Importers;
 using Sistema.INFRA.Repositories;
 using Sistema.INFRA.Services;
 
@@ -17,6 +19,9 @@ public static class InfrastructureExtensions
 
         services.AddDbContext<AppDbContext>(options =>
         {
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
+
             var useInMemoryDatabase = configuration.GetValue<bool>("UseInMemoryDatabase");
             if (useInMemoryDatabase)
             {
@@ -35,7 +40,9 @@ public static class InfrastructureExtensions
         services.AddScoped<ITemaRepository, TemaRepository>();
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
         services.AddScoped<IMensagemRepository, MensagemRepository>();
+        services.AddScoped<IMinhasFinancasRepository, MinhasFinancasRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IMinhasFinancasImportador, MinhasFinancasImportador>();
         services.AddScoped<IEmailAppService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
         services.AddScoped<IExecutionContext, HttpExecutionContext>();

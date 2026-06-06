@@ -26,6 +26,16 @@ public class AppDbContext : DbContext
     public DbSet<MensagemReacao> MensagemReacoes => Set<MensagemReacao>();
     public DbSet<MensagemLeitura> MensagemLeituras => Set<MensagemLeitura>();
     public DbSet<MensagemDestinatario> MensagemDestinatarios => Set<MensagemDestinatario>();
+    public DbSet<CargaFinanceira> CargasFinanceiras => Set<CargaFinanceira>();
+    public DbSet<DocumentoFinanceiro> DocumentosFinanceiros => Set<DocumentoFinanceiro>();
+    public DbSet<ConteudoBrutoFinanceiro> ConteudosBrutosFinanceiros => Set<ConteudoBrutoFinanceiro>();
+    public DbSet<AtivoFinanceiro> AtivosFinanceiros => Set<AtivoFinanceiro>();
+    public DbSet<OperacaoB3> OperacoesB3 => Set<OperacaoB3>();
+    public DbSet<TransacaoCripto> TransacoesCripto => Set<TransacaoCripto>();
+    public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();
+    public DbSet<RendimentoInvestimento> RendimentosInvestimento => Set<RendimentoInvestimento>();
+    public DbSet<AgregadoFinanceiro> AgregadosFinanceiros => Set<AgregadoFinanceiro>();
+    public DbSet<AlertaConfiabilidade> AlertasConfiabilidade => Set<AlertaConfiabilidade>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

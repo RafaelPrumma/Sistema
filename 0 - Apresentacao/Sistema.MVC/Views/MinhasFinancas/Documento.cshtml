@@ -1,0 +1,56 @@
+@using Sistema.APP.DTOs
+@model IReadOnlyList<ConteudoBrutoFinanceiroDto>
+@{
+    var documento = (DocumentoFinanceiroDto)ViewBag.Documento;
+    ViewData["Title"] = "Conteúdo Bruto";
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = documento.FileName,
+    Description = "Conteúdo bruto preservado para conferência e auditoria."
+})
+
+<div class="alert alert-warning">
+    Esta tela pode conter dados pessoais presentes nos PDFs e planilhas originais. Use apenas para auditoria.
+</div>
+
+<div class="d-flex justify-content-between mb-3">
+    <a class="btn btn-outline-secondary" asp-action="Documentos"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+    <span class="badge text-bg-secondary align-self-center">@documento.Status</span>
+</div>
+
+<div class="accordion" id="rawAccordion">
+    @foreach (var item in Model)
+    {
+        var headingId = $"h{item.Id}";
+        var collapseId = $"c{item.Id}";
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="@headingId">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                    @item.ContentType
+                    @if (item.PageNumber is not null)
+                    {
+                        <span class="ms-2 text-secondary">Página @item.PageNumber</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.SheetName))
+                    {
+                        <span class="ms-2 text-secondary">@item.SheetName</span>
+                    }
+                </button>
+            </h2>
+            <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headingId" data-bs-parent="#rawAccordion">
+                <div class="accordion-body">
+                    @if (!string.IsNullOrWhiteSpace(item.RawText))
+                    {
+                        <pre class="finance-raw">@item.RawText</pre>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.RawJson))
+                    {
+                        <pre class="finance-raw">@item.RawJson</pre>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

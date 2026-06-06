@@ -1,0 +1,35 @@
+@using Sistema.APP.DTOs
+@model IReadOnlyList<AlertaConfiabilidadeDto>
+@{
+    ViewData["Title"] = "Alertas de Confiabilidade";
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Alertas de Confiabilidade",
+    Description = "Pendências e avisos que impedem interpretar a base como posição final reconciliada."
+})
+
+<div class="card">
+    <div class="card-body">
+        <div class="list-group list-group-flush">
+            @foreach (var item in Model)
+            {
+                <div class="list-group-item px-0">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                        <div>
+                            <strong>@item.Codigo</strong>
+                            <span class="text-secondary small ms-2">@item.Entidade</span>
+                        </div>
+                        <span class="badge @(item.Severidade == "Critico" ? "text-bg-danger" : item.Severidade == "Atencao" ? "text-bg-warning" : "text-bg-secondary")">@item.Severidade</span>
+                    </div>
+                    <div>@item.Mensagem</div>
+                    @if (!string.IsNullOrWhiteSpace(item.Detalhes))
+                    {
+                        <div class="small text-secondary">@item.Detalhes</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

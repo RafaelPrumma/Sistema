@@ -1,0 +1,189 @@
+@using System.Globalization
+@using System.Text.Json
+@using Sistema.APP.DTOs
+@model MinhasFinancasDashboardDto
+@{
+    ViewData["Title"] = "Minhas Finanças";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C", br);
+    var chartPayload = new
+    {
+        b3Ano = Model.B3PorAno.Select(x => new { label = x.Label, compras = x.ValorCompra, vendas = x.ValorVenda }),
+        b3Mes = Model.B3PorMes.Select(x => new { label = x.Label, compras = x.ValorCompra, vendas = x.ValorVenda }),
+        classes = Model.B3PorClasse.Select(x => new { label = x.Label, valor = x.Valor, operacoes = x.Operacoes }),
+        moedas = Model.BinanceMoedas.Select(x => new { label = x.Label, valor = x.Valor, operacoes = x.Operacoes })
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Minhas Finanças",
+    Description = "Histórico financeiro, investimentos e dados importados com rastreabilidade."
+})
+
+<div class="finance-shell">
+    <div class="alert alert-warning d-flex gap-2 align-items-start" role="alert">
+        <i class="bi bi-exclamation-triangle mt-1"></i>
+        <div>
+            <strong>Leitura estimada.</strong> Histórico de compra não é posição atual. As posições abaixo dependem de reconciliação com custódia, eventos corporativos, taxas e validações manuais. Nada nesta tela é recomendação de investimento.
+        </div>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(Model.Fonte))
+    {
+        <div class="alert alert-info">Nenhuma carga financeira foi encontrada. Configure <code>MinhasFinancas:SeedZipPath</code> ou <code>SeedJsonPath</code> para carregar os dados.</div>
+    }
+
+    <div class="row g-3 mb-3">
+        @foreach (var kpi in Model.Kpis)
+        {
+            <div class="col-md-6 col-xl-3">
+                <div class="card finance-kpi h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start justify-content-between gap-3">
+                            <div>
+                                <div class="text-secondary small">@kpi.Titulo</div>
+                                <div class="finance-kpi-value">@(kpi.Monetario ? Money(kpi.Valor) : kpi.Valor.ToString("N0", br))</div>
+                                <div class="small text-secondary">@kpi.Subtitulo</div>
+                            </div>
+                            <span class="finance-kpi-icon"><i class="bi @kpi.Icone"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-xl-8">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                        <div>
+                            <h5 class="mb-0">Movimentação anual B3</h5>
+                            <div class="small text-secondary">Compras e vendas brutas das notas canônicas</div>
+                        </div>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="OperacoesB3"><i class="bi bi-table me-1"></i>Operações</a>
+                    </div>
+                    <div class="finance-chart-wrap"><canvas id="chartB3Ano"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Distribuição por classe</h5>
+                    <div class="small text-secondary mb-3">Saldo histórico líquido, não valor de mercado atual</div>
+                    <div class="finance-bars">
+                        @foreach (var item in Model.B3PorClasse.OrderByDescending(x => x.Valor))
+                        {
+                            var max = Model.B3PorClasse.Count == 0 ? 1 : Model.B3PorClasse.Max(x => x.Valor);
+                            var width = max == 0 ? 0 : Math.Round((item.Valor / max) * 100, 2);
+                            <div class="finance-bar-row">
+                                <div class="d-flex justify-content-between small">
+                                    <span>@item.Label</span>
+                                    <strong>@Money(item.Valor)</strong>
+                                </div>
+                                <div class="progress" role="progressbar" aria-label="@item.Label" aria-valuenow="@width" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="progress-bar" style="width:@width.ToString(CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-xl-7">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Evolução mensal B3</h5>
+                    <div class="finance-chart-wrap finance-chart-wrap--sm"><canvas id="chartB3Mes"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Cripto por moeda</h5>
+                    <div class="small text-secondary mb-3">Saldo operacional importado da Binance</div>
+                    <div class="finance-bars">
+                        @foreach (var item in Model.BinanceMoedas.Where(x => x.Label != "BRL").OrderByDescending(x => Math.Abs(x.Valor)).Take(10))
+                        {
+                            var max = Model.BinanceMoedas.Where(x => x.Label != "BRL").Select(x => Math.Abs(x.Valor)).DefaultIfEmpty(1).Max();
+                            var width = max == 0 ? 0 : Math.Round((Math.Abs(item.Valor) / max) * 100, 2);
+                            <div class="finance-bar-row">
+                                <div class="d-flex justify-content-between small">
+                                    <span>@item.Label</span>
+                                    <strong>@item.Valor.ToString("N8", br)</strong>
+                                </div>
+                                <div class="progress" role="progressbar" aria-label="@item.Label" aria-valuenow="@width" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="progress-bar bg-info" style="width:@width.ToString(CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Posições estimadas em aberto</h5>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Posicoes" asp-route-abertas="true">Ver todas</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>Ativo</th><th>Classe</th><th class="text-end">Qtde</th><th>Confiança</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in Model.PosicoesAbertas)
+                                {
+                                    <tr>
+                                        <td>@item.Ativo</td>
+                                        <td>@item.Classe</td>
+                                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
+                                        <td><span class="badge text-bg-warning">@item.Confianca</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Alertas de confiabilidade</h5>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Alertas">Ver todos</a>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var alerta in Model.Alertas)
+                        {
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong>@alerta.Codigo</strong>
+                                    <span class="badge text-bg-secondary">@alerta.Severidade</span>
+                                </div>
+                                <div class="small text-secondary">@alerta.Mensagem</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="financeChartData">@Html.Raw(JsonSerializer.Serialize(chartPayload))</script>
+
+@section Scripts {
+    <script src="~/js/minhas-financas.js" asp-append-version="true"></script>
+}

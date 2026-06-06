@@ -14,6 +14,7 @@ public class AuthAppServiceTests
     public async Task AutenticarAsyncDeveRetornarTokenQuandoCredenciaisForemValidas()
     {
         var usuarioRepository = new Mock<IUsuarioRepository>();
+        var perfilFuncionalidadeRepository = new Mock<IPerfilFuncionalidadeRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
         var hasher = new Mock<IPasswordHasher<Usuario>>();
         var logService = new Mock<ILogAppService>();
@@ -33,6 +34,10 @@ public class AuthAppServiceTests
             .ReturnsAsync(usuario);
 
         unitOfWork.SetupGet(u => u.Usuarios).Returns(usuarioRepository.Object);
+        unitOfWork.SetupGet(u => u.PerfilFuncionalidades).Returns(perfilFuncionalidadeRepository.Object);
+        perfilFuncionalidadeRepository
+            .Setup(r => r.BuscarPorPerfilIdAsync(usuario.PerfilId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         hasher
             .Setup(h => h.VerifyHashedPassword(usuario, usuario.SenhaHash, "Senha@123"))
             .Returns(PasswordVerificationResult.Success);

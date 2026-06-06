@@ -121,7 +121,7 @@
 
             const $menu = $('#sidebarMenu');
             aplicarClasseTexto($menu, esquerdaClasse);
-            aplicarClasseTexto($menu.find('.nav-link, .nav-header, .menu-brand-text *, .menu-user *'), esquerdaClasse);
+            aplicarClasseTexto($menu.find('.menu-link, .menu-sublink, .menu-arrow, .menu-back, .menu-panel-title, .menu-section-label, .nav-link, .nav-header'), esquerdaClasse);
 
             const $temaPainel = $('#temaSidebar');
             aplicarClasseTexto($temaPainel, direitaClasse);
@@ -197,7 +197,7 @@
 
         const menuController = typeof window.initSistemaMenu === 'function'
             ? window.initSistemaMenu({
-                sidebarSelector: '#sidebarMenu',
+                menuSelector: '#sidebarMenu',
                 hamburgerSelector: '.menu-hamburger',
                 expandedCheckboxSelector: '#MenuLateralExpandido',
                 onMobileStateChange: null

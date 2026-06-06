@@ -1,0 +1,83 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<OperacaoB3Dto>
+@{
+    ViewData["Title"] = "Operações B3";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C", br);
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Operações B3",
+    Description = "Compras e vendas canônicas extraídas das notas NuInvest/Nubank."
+})
+
+<form method="get" class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-lg-6">
+                <input class="form-control" name="termo" value="@ViewBag.Termo" placeholder="Ativo ou arquivo" />
+            </div>
+            <div class="col-6 col-lg-2">
+                <input class="form-control" type="number" name="ano" value="@ViewBag.Ano" placeholder="Ano" />
+            </div>
+            <div class="col-6 col-lg-2">
+                <select class="form-select" name="classe">
+                    <option value="">Classe</option>
+                    @foreach (var classe in new[] { "Acao", "FII", "ETF", "BDR", "RendaFixa", "Cripto", "Outro" })
+                    {
+                        <option value="@classe" selected="@(ViewBag.Classe == classe)">@classe</option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button class="btn btn-primary" type="submit">Filtrar</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Ativo</th>
+                    <th>Classe</th>
+                    <th class="text-end">Qtd</th>
+                    <th class="text-end">Preço</th>
+                    <th class="text-end">Valor</th>
+                    <th>Origem</th>
+                    <th>Confiança</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.TradeDate?.ToString("dd/MM/yyyy")</td>
+                        <td><span class="badge @(item.Tipo == "Compra" ? "text-bg-primary" : "text-bg-success")">@item.Tipo</span></td>
+                        <td>@item.Ativo</td>
+                        <td>@item.Classe</td>
+                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
+                        <td class="text-end">@Money(item.PrecoUnitario)</td>
+                        <td class="text-end">@Money(item.ValorBruto)</td>
+                        <td><span class="small">@item.Arquivo</span></td>
+                        <td><span class="badge text-bg-warning">@item.Confianca</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span>@Model.TotalCount registros canônicos</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo" asp-route-ano="@ViewBag.Ano" asp-route-classe="@ViewBag.Classe">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo" asp-route-ano="@ViewBag.Ano" asp-route-classe="@ViewBag.Classe">Próxima</a>
+        </div>
+    </div>
+</div>

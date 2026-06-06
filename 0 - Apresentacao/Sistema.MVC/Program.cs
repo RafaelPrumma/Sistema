@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Sistema.APP.DependencyInjection;
 using Sistema.INFRA.Data;
 using Sistema.INFRA.DependencyInjection;
@@ -7,10 +8,21 @@ using Sistema.MVC.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.AddEventSourceLogger();
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSecurity();
+if (builder.Environment.IsDevelopment())
+{
+    var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
 

@@ -1,0 +1,68 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<DocumentoFinanceiroDto>
+@{
+    ViewData["Title"] = "Documentos Financeiros";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Documentos Financeiros",
+    Description = "Arquivos importados e conteúdos preservados para auditoria."
+})
+
+<form method="get" class="card mb-3">
+    <div class="card-body">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" name="termo" value="@ViewBag.Termo" placeholder="Buscar por arquivo, origem ou caminho" />
+            <button class="btn btn-primary" type="submit">Buscar</button>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Arquivo</th>
+                    <th>Tipo</th>
+                    <th>Origem</th>
+                    <th>Ano</th>
+                    <th class="text-end">Tamanho</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">@item.FileName</div>
+                            <div class="small text-secondary">@item.Sha256</div>
+                        </td>
+                        <td>@item.FileType</td>
+                        <td>@item.Source</td>
+                        <td>@item.ReferenceYear</td>
+                        <td class="text-end">@((item.SizeBytes / 1024m).ToString("N1", br)) KB</td>
+                        <td><span class="badge text-bg-secondary">@item.Status</span></td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Documento" asp-route-id="@item.Id">Abrir bruto</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span>@Model.TotalCount registros</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo">Próxima</a>
+        </div>
+    </div>
+</div>

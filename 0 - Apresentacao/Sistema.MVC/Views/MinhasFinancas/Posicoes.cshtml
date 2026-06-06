@@ -1,0 +1,60 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model IReadOnlyList<PosicaoFinanceiraDto>
+@{
+    ViewData["Title"] = "Posições Estimadas";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C", br);
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Posições Estimadas",
+    Description = "Separação entre posições em aberto/residuais e posições encerradas por operações."
+})
+
+<div class="alert alert-warning">
+    Posição estimada é cálculo histórico por compra/venda. Ela não considera, sozinha, custódia atual, eventos corporativos, amortizações, subscrições ou troca de ticker.
+</div>
+
+<div class="btn-group mb-3">
+    <a class="btn btn-outline-primary @(ViewBag.Abertas is null ? "active" : "")" asp-action="Posicoes">Todas</a>
+    <a class="btn btn-outline-primary @(ViewBag.Abertas == true ? "active" : "")" asp-action="Posicoes" asp-route-abertas="true">Abertas/residuais</a>
+    <a class="btn btn-outline-primary @(ViewBag.Abertas == false ? "active" : "")" asp-action="Posicoes" asp-route-abertas="false">Encerradas</a>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Ativo</th>
+                    <th>Classe</th>
+                    <th>Status</th>
+                    <th class="text-end">Qtd</th>
+                    <th class="text-end">Preço médio</th>
+                    <th class="text-end">Investido</th>
+                    <th class="text-end">Vendido</th>
+                    <th>Confiança</th>
+                    <th>Última operação</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Ativo</td>
+                        <td>@item.Classe</td>
+                        <td><span class="badge @(item.Status.Contains("Aberta") ? "text-bg-warning" : "text-bg-secondary")">@item.Status</span></td>
+                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
+                        <td class="text-end">@Money(item.PrecoMedio)</td>
+                        <td class="text-end">@Money(item.TotalInvestido)</td>
+                        <td class="text-end">@Money(item.TotalVendido)</td>
+                        <td><span class="badge text-bg-warning">@item.Confianca</span></td>
+                        <td>@item.UltimaOperacao?.ToString("dd/MM/yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,65 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<TransacaoCriptoDto>
+@{
+    ViewData["Title"] = "Operações Cripto";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Operações Cripto",
+    Description = "Transações, trades spot, conversões e depósitos importados da Binance."
+})
+
+<form method="get" class="card mb-3">
+    <div class="card-body">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" name="termo" value="@ViewBag.Termo" placeholder="Moeda, par ou tipo" />
+            <button class="btn btn-primary" type="submit">Buscar</button>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Ativo</th>
+                    <th>Par</th>
+                    <th class="text-end">Quantidade</th>
+                    <th class="text-end">Preço</th>
+                    <th class="text-end">Total</th>
+                    <th>Fonte</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.Data?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td><span class="badge text-bg-secondary">@item.Tipo</span></td>
+                        <td>@item.Ativo</td>
+                        <td>@item.Par</td>
+                        <td class="text-end">@item.Quantidade.ToString("N8", br)</td>
+                        <td class="text-end">@item.Preco?.ToString("N8", br)</td>
+                        <td class="text-end">@item.Total?.ToString("N8", br)</td>
+                        <td><span class="small">@item.Fonte</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span>@Model.TotalCount registros</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo">Próxima</a>
+        </div>
+    </div>
+</div>
