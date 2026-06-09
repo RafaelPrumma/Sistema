@@ -29,6 +29,17 @@
 
     let activePanelId = null;
 
+    const rememberExpandedState = (expanded) => {
+      const value = expanded ? 'true' : 'false';
+      $menu.data('menu-expanded', value);
+      $menu.attr('data-menu-expanded', value);
+      try {
+        window.sessionStorage.setItem('menuExpandedState', expanded ? 'open' : 'closed');
+      } catch {
+        // Storage can be unavailable in private or locked-down browser contexts.
+      }
+    };
+
     const showPanel = (panelId) => {
       const $root = $menu.find('.menu-panel--root');
       const $sub = $menu.find('#' + panelId);
@@ -52,6 +63,8 @@
     const setDesktopExpanded = (expanded) => {
       document.body.classList.toggle(config.collapsedClass, !expanded);
       $hamburger.attr('aria-expanded', expanded ? 'true' : 'false');
+      $checkbox.prop('checked', expanded);
+      rememberExpandedState(expanded);
       if (!expanded) showRoot();
     };
 
@@ -81,7 +94,6 @@
           const isCollapsed = document.body.classList.contains(config.collapsedClass);
           const willExpand = isCollapsed;
           setDesktopExpanded(willExpand);
-          $checkbox.prop('checked', willExpand);
         } else {
           const isOpen = document.body.classList.contains(config.mobileOpenClass);
           setMobileOpen(!isOpen);

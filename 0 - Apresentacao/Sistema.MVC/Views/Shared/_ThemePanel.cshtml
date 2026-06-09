@@ -1,0 +1,129 @@
+@model ThemePanelViewModel
+
+<div id="temaSidebarBackdrop" class="tema-sidebar-backdrop" aria-hidden="true"></div>
+<aside id="temaSidebar" class="tema-sidebar theme-panel @Model.TextClass rightbar-bg" aria-hidden="true">
+    <form asp-controller="Tema" asp-action="Edit" method="post" class="theme-panel-form">
+        <div class="theme-panel-header">
+            <div>
+                <span class="theme-panel-eyebrow">Preferências</span>
+                <h5 class="mb-0">Aparência e layout</h5>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="temaSidebarClose" aria-label="Fechar painel de tema">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="theme-panel-body">
+            <section class="theme-panel-section">
+                <div class="theme-panel-section-title">
+                    <i class="bi bi-stars"></i>
+                    <span>Presets</span>
+                </div>
+                <div class="theme-preset-grid">
+                    <button type="button" class="theme-preset" data-theme-preset="executivo">
+                        <span class="theme-preset-swatches"><i style="background:#0f172a"></i><i style="background:#2563eb"></i><i style="background:#f8fafc"></i></span>
+                        Executivo
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="financeiro">
+                        <span class="theme-preset-swatches"><i style="background:#064e3b"></i><i style="background:#0f766e"></i><i style="background:#ecfdf5"></i></span>
+                        Financeiro
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="grafite">
+                        <span class="theme-preset-swatches"><i style="background:#111827"></i><i style="background:#374151"></i><i style="background:#1f2937"></i></span>
+                        Grafite
+                    </button>
+                    <button type="button" class="theme-preset" data-theme-preset="classico">
+                        <span class="theme-preset-swatches"><i style="background:#0d6efd"></i><i style="background:#0d6efd"></i><i style="background:#f8f9fa"></i></span>
+                        Clássico
+                    </button>
+                </div>
+            </section>
+
+            <section class="theme-panel-section">
+                <div class="theme-panel-section-title">
+                    <i class="bi bi-layout-sidebar"></i>
+                    <span>Preview</span>
+                </div>
+                <div class="theme-mini-preview theme-mini-preview--large" aria-hidden="true">
+                    <span></span>
+                    <strong></strong>
+                    <em></em>
+                </div>
+            </section>
+
+            <section class="theme-panel-section">
+                <div class="theme-panel-section-title">
+                    <i class="bi bi-circle-half"></i>
+                    <span>Modo visual</span>
+                </div>
+                <div class="segmented-control">
+                    <label>
+                        <input type="radio" name="ModoEscuro" value="false" @(Model.DarkMode ? "" : "checked") />
+                        <span><i class="bi bi-sun"></i> Claro</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="ModoEscuro" value="true" @(Model.DarkMode ? "checked" : "") />
+                        <span><i class="bi bi-moon-stars"></i> Escuro</span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="theme-panel-section">
+                <div class="theme-panel-section-title">
+                    <i class="bi bi-droplet"></i>
+                    <span>Cores</span>
+                </div>
+                <div class="theme-color-grid">
+                    <label>
+                        <span>Header</span>
+                        <input type="color" class="form-control form-control-color" name="CorHeader" id="CorHeader" value="@Model.HeaderColor" />
+                    </label>
+                    <label>
+                        <span>Menu</span>
+                        <input type="color" class="form-control form-control-color" name="CorBarraEsquerda" id="CorBarraEsquerda" value="@Model.SidebarColor" />
+                    </label>
+                    <label>
+                        <span>Painel</span>
+                        <input type="color" class="form-control form-control-color" name="CorBarraDireita" id="CorBarraDireita" value="@Model.RightbarColor" />
+                    </label>
+                    <label>
+                        <span>Footer</span>
+                        <input type="color" class="form-control form-control-color" name="CorFooter" id="CorFooter" value="@Model.FooterColor" />
+                    </label>
+                </div>
+            </section>
+
+            <section class="theme-panel-section">
+                <div class="theme-panel-section-title">
+                    <i class="bi bi-toggles"></i>
+                    <span>Comportamento</span>
+                </div>
+                <div class="theme-toggle-list">
+                    <label>
+                        <input class="form-check-input" type="checkbox" name="HeaderFixo" id="HeaderFixo" value="true" @(Model.HeaderFixed ? "checked" : string.Empty) />
+                        <input type="hidden" name="HeaderFixo" value="false" />
+                        <span>Header fixo</span>
+                    </label>
+                    <label>
+                        <input class="form-check-input" type="checkbox" name="FooterFixo" id="FooterFixo" value="true" @(Model.FooterFixed ? "checked" : string.Empty) />
+                        <input type="hidden" name="FooterFixo" value="false" />
+                        <span>Footer fixo</span>
+                    </label>
+                    <label>
+                        <input class="form-check-input" type="checkbox" name="MenuLateralExpandido" id="MenuLateralExpandido" value="true" @(Model.MenuExpanded ? "checked" : string.Empty) />
+                        <input type="hidden" name="MenuLateralExpandido" value="false" />
+                        <span>Menu expandido</span>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <div class="theme-panel-actions">
+            <button type="button" class="btn btn-outline-secondary" data-theme-preset="classico">Restaurar</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check2"></i>
+                Salvar
+            </button>
+        </div>
+    </form>
+</aside>

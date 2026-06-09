@@ -1,0 +1,60 @@
+@model AppHeaderViewModel
+
+<header class="navbar @Model.NavbarClass @Model.FixedClass header-bg">
+    <div class="container-fluid app-topbar">
+        <div class="d-flex align-items-center gap-2 min-w-0">
+            <button class="btn btn-link @Model.TextClass menu-hamburger" aria-label="Abrir/fechar menu" aria-expanded="true" aria-controls="sidebarMenu">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+            <a class="navbar-brand @Model.TextClass text-truncate" asp-controller="Home" asp-action="Index">Sistema.MVC</a>
+        </div>
+        <div class="ms-auto d-flex align-items-center gap-1">
+            <div class="dropdown">
+                <button class="btn btn-link @Model.TextClass topbar-icon" type="button" id="communicationMenu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mensagens e notificações">
+                    <i class="bi bi-bell"></i>
+                    @if (Model.UnreadMessages > 0)
+                    {
+                        <span class="topbar-badge">@Model.UnreadMessages</span>
+                    }
+                </button>
+                <div class="dropdown-menu dropdown-menu-end notification-menu" aria-labelledby="communicationMenu">
+                    <div class="notification-menu-header">
+                        <strong>Comunicação</strong>
+                        <span class="badge text-bg-primary">@Model.UnreadMessages nova(s)</span>
+                    </div>
+                    <a class="notification-action" asp-controller="Mensagem" asp-action="Index" asp-route-somenteNaoLidas="true">
+                        <i class="bi bi-inbox"></i>
+                        <span>
+                            <strong>Mensagens não lidas</strong>
+                            <small>Abra o feed filtrado por pendências.</small>
+                        </span>
+                    </a>
+                    <a class="notification-action" asp-controller="Mensagem" asp-action="Nova">
+                        <i class="bi bi-pencil-square"></i>
+                        <span>
+                            <strong>Nova publicação</strong>
+                            <small>Enviar mensagem, aviso ou post.</small>
+                        </span>
+                    </a>
+                    <a class="dropdown-item text-center small" asp-controller="Mensagem" asp-action="Index">Ver central de comunicação</a>
+                </div>
+            </div>
+            <button class="btn btn-link @Model.TextClass topbar-icon" type="button" id="temaToggle" aria-label="Abrir preferências de tema">
+                <i class="bi bi-palette"></i>
+            </button>
+            <div class="dropdown">
+                <a class="nav-link dropdown-toggle @Model.TextClass user-chip" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="user-avatar">@Model.UserInitial</span>
+                    <span class="user-chip-name">@Model.UserName</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                    <li><h6 class="dropdown-header">@Model.UserName</h6></li>
+                    <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key me-2"></i>Alterar Senha</a></li>
+                    <li><a class="dropdown-item" asp-controller="Tema" asp-action="Edit"><i class="bi bi-sliders me-2"></i>Preferências</a></li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li><a class="dropdown-item" asp-controller="Account" asp-action="Logout"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</header>

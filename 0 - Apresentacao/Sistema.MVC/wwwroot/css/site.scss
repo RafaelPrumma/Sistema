@@ -10,6 +10,9 @@
   --footer-bg:    #0d6efd;
   --sidebar-width: 260px;
   --iconbar-width:  64px;
+  --topbar-height: 58px;
+  --layout-offset-top: 0px;
+  --layout-offset-bottom: 0px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,18 +33,21 @@ body.tema-sidebar-open {
   overflow: hidden;
 }
 
-@media (min-width: 992px) {
-  .layout-main > header.navbar.fixed-top,
-  .layout-main > footer.footer.fixed-bottom {
-    left: var(--sidebar-width);
-    width: calc(100% - var(--sidebar-width));
-  }
+.layout-main > header.navbar.fixed-top {
+  position: sticky !important;
+  top: 0;
+  right: auto;
+  left: auto;
+  width: 100%;
+}
 
-  body.menu-collapsed .layout-main > header.navbar.fixed-top,
-  body.menu-collapsed .layout-main > footer.footer.fixed-bottom {
-    left: var(--iconbar-width);
-    width: calc(100% - var(--iconbar-width));
-  }
+.layout-main > footer.footer.fixed-bottom {
+  position: sticky !important;
+  right: auto;
+  bottom: 0;
+  left: auto;
+  width: 100%;
+  margin-top: auto;
 }
 
 @media (max-width: 991.98px) {
@@ -142,11 +148,28 @@ body.tema-sidebar-open {
 }
 
 .surface-card {
+  position: relative;
+  overflow: hidden;
   padding: 1rem;
   border: 1px solid var(--bs-border-color);
   border-radius: 0.5rem;
   background: var(--bs-body-bg);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.surface-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--bs-primary);
+  opacity: 0.18;
+}
+
+.surface-card:hover {
+  border-color: rgba(13, 110, 253, 0.22);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .surface-card-header {
@@ -178,6 +201,13 @@ body.tema-sidebar-open {
   border: 1px solid var(--bs-border-color);
   border-radius: 0.5rem;
   background: var(--bs-body-bg);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(13, 110, 253, 0.24);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .metric-card-icon {
@@ -469,6 +499,12 @@ body.tema-sidebar-open {
   display: grid;
   grid-template-columns: 4rem 1fr;
   grid-template-rows: 1.25rem 1fr;
+}
+
+.theme-mini-preview--large {
+  height: 6.4rem;
+  grid-template-columns: 4.7rem 1fr;
+  grid-template-rows: 1.45rem 1fr;
 }
 
 .theme-mini-preview span {
