@@ -23,50 +23,50 @@
             <ul class="menu-list">
                 <li class="menu-section-label text-uppercase small">Módulos</li>
                 <li class="menu-item" data-panel="menuPanelHome">
-                    <a href="#" class="menu-link @textClass @IsActive("Home")" title="Home">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Home")" title="Home" aria-label="Abrir submenu Home">
                         <i class="bi bi-house"></i>
                         <span>Home</span>
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Home"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelFinancas">
-                    <a href="#" class="menu-link @textClass @IsActive("MinhasFinancas")" title="Minhas Finanças">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("MinhasFinancas")" title="Minhas Finanças" aria-label="Abrir submenu Minhas Finanças">
                         <i class="bi bi-graph-up-arrow"></i>
                         <span>Minhas Finanças</span>
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Minhas Finanças"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelAcesso">
-                    <a href="#" class="menu-link @textClass @IsActive("Account")" title="Acesso">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Account")" title="Acesso" aria-label="Abrir submenu Acesso">
                         <i class="bi bi-shield-lock"></i>
                         <span>Acesso</span>
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Acesso"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelMensagens">
-                    <a href="#" class="menu-link @textClass @IsActive("Mensagem")" title="Comunicação">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Mensagem")" title="Comunicação" aria-label="Abrir submenu Comunicação">
                         <i class="bi bi-envelope"></i>
                         <span>Comunicação</span>
                         @if (Model.UnreadMessages > 0)
                         {
                             <span class="badge bg-primary ms-auto">@Model.UnreadMessages</span>
                         }
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Comunicação"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelAdmin">
-                    <a href="#" class="menu-link @textClass @IsActive("Configuracao") @IsActive("Tema")" title="Administração">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Configuracao") @IsActive("Tema")" title="Administração" aria-label="Abrir submenu Administração">
                         <i class="bi bi-gear"></i>
                         <span>Administração</span>
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Administração"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelDocs">
-                    <a href="#" class="menu-link @textClass @IsActive("Documentacao")" title="Documentação">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Documentacao")" title="Documentação" aria-label="Abrir submenu Documentação">
                         <i class="bi bi-book"></i>
                         <span>Documentação</span>
-                    </a>
-                    <button class="menu-arrow" aria-label="Abrir submenu Documentação"><i class="bi bi-chevron-right"></i></button>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
                 </li>
             </ul>
         </div>

@@ -23,6 +23,55 @@ html {
   min-height: 100%;
 }
 
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.12), transparent 42%), var(--header-bg);
+  color: #fff;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.app-splash-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  transform: translateY(0);
+  transition: transform 0.28s ease;
+}
+
+.app-splash-logo {
+  width: 4.25rem;
+  height: 4.25rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  font-size: 2rem;
+}
+
+.app-splash-card strong {
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+
+.app-splash-card small {
+  opacity: 0.78;
+}
+
+.app-splash.app-splash--hide {
+  opacity: 0;
+  visibility: hidden;
+}
+.app-splash.app-splash--hide .app-splash-card {
+  transform: translateY(-0.35rem);
+}
+
 .bg-vermelho {
   background-color: #dc3545 !important;
 }
@@ -327,7 +376,6 @@ header.navbar {
   display: flex;
   flex-direction: column;
   z-index: 200;
-  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 1px 0 0 rgba(0, 0, 0, 0.1);
 }
 
@@ -343,6 +391,8 @@ header.navbar {
   white-space: nowrap;
   overflow: hidden;
   flex-shrink: 0;
+  width: 100%;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .app-brand:hover {
   color: inherit;
@@ -370,6 +420,7 @@ header.navbar {
   flex: 1;
   overflow: hidden;
   width: 100%;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .menu-panel {
@@ -456,18 +507,23 @@ header.navbar {
 
 .menu-item {
   position: relative;
-  display: flex;
-  align-items: center;
+  display: block;
+  padding-inline: 0.4rem;
 }
 
 .menu-link {
-  flex: 1;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.65rem;
   padding: 0.7rem 0.75rem 0.7rem 1rem;
   border-radius: 0.6rem;
-  margin-inline: 0.4rem;
+  margin: 0;
   color: inherit;
   text-decoration: none;
   white-space: nowrap;
@@ -475,8 +531,11 @@ header.navbar {
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 .menu-link i {
+  width: 1.35rem;
+  display: inline-grid;
+  place-items: center;
   font-size: 1.1rem;
-  flex-shrink: 0;
+  flex: 0 0 1.35rem;
 }
 .menu-link span {
   flex: 1;
@@ -504,25 +563,15 @@ header.navbar {
   color: var(--bs-primary);
 }
 
-.menu-arrow {
-  border: none;
-  background: transparent;
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-right: 0.4rem;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+.menu-chevron {
+  opacity: 0.72;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.menu-arrow:hover, .menu-arrow:focus-visible {
-  background-color: rgba(255, 255, 255, 0.15);
+
+.menu-link:hover .menu-chevron,
+.menu-link:focus-visible .menu-chevron {
   opacity: 1;
+  transform: translateX(2px);
 }
 
 .menu-sublink {
@@ -574,6 +623,7 @@ header.navbar {
     width: var(--iconbar-width);
   }
   body.menu-collapsed .app-menu .app-brand {
+    width: var(--iconbar-width);
     justify-content: center;
     padding-inline: 0;
   }
@@ -583,19 +633,32 @@ header.navbar {
   }
   body.menu-collapsed .app-menu .menu-link span,
   body.menu-collapsed .app-menu .menu-section-label,
-  body.menu-collapsed .app-menu .menu-arrow {
+  body.menu-collapsed .app-menu .menu-chevron {
     opacity: 0;
     pointer-events: none;
     width: 0;
     overflow: hidden;
   }
+  body.menu-collapsed .app-menu .menu-section-label {
+    height: 0;
+    padding: 0;
+  }
+  body.menu-collapsed .app-menu .menu-panels-track {
+    width: var(--iconbar-width);
+  }
+  body.menu-collapsed .app-menu .menu-item {
+    padding-inline: 0;
+  }
   body.menu-collapsed .app-menu .menu-link {
     justify-content: center;
+    width: var(--iconbar-width);
+    min-height: 2.75rem;
     padding-inline: 0;
-    margin-inline: 0;
     border-radius: 0;
   }
   body.menu-collapsed .app-menu .menu-link i {
+    width: var(--iconbar-width);
+    flex-basis: var(--iconbar-width);
     font-size: 1.25rem;
     margin: 0;
   }
@@ -608,37 +671,46 @@ header.navbar {
     padding: 1px 3px;
   }
   body.menu-collapsed .app-menu:hover {
-    width: var(--sidebar-width);
-    margin-right: calc(var(--iconbar-width) - var(--sidebar-width));
-    position: sticky;
-    top: 0;
-    height: 100vh;
     z-index: 300;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
   }
   body.menu-collapsed .app-menu:hover .app-brand {
+    width: var(--sidebar-width);
     justify-content: flex-start;
     padding-inline: 1rem;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
   }
   body.menu-collapsed .app-menu:hover .app-brand-text {
     opacity: 1;
     width: auto;
   }
+  body.menu-collapsed .app-menu:hover .menu-panels-track {
+    width: var(--sidebar-width);
+    box-shadow: 4px 14px 20px rgba(0, 0, 0, 0.2);
+  }
+  body.menu-collapsed .app-menu:hover .menu-item {
+    padding-inline: 0.4rem;
+  }
   body.menu-collapsed .app-menu:hover .menu-link span,
   body.menu-collapsed .app-menu:hover .menu-section-label,
-  body.menu-collapsed .app-menu:hover .menu-arrow {
+  body.menu-collapsed .app-menu:hover .menu-chevron {
     opacity: 1;
     pointer-events: auto;
     width: auto;
     overflow: visible;
   }
+  body.menu-collapsed .app-menu:hover .menu-section-label {
+    height: auto;
+    padding: 0.75rem 1rem 0.35rem;
+  }
   body.menu-collapsed .app-menu:hover .menu-link {
     justify-content: flex-start;
+    width: 100%;
     padding-inline: 0.75rem 0.4rem;
-    margin-inline: 0.4rem;
     border-radius: 0.6rem;
   }
   body.menu-collapsed .app-menu:hover .menu-link i {
+    width: 1.35rem;
+    flex-basis: 1.35rem;
     font-size: 1.1rem;
   }
 }

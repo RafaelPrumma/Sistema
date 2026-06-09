@@ -100,7 +100,7 @@
         }
       });
 
-      $menu.on('click', '.menu-arrow', function (e) {
+      $menu.on('click', '.menu-arrow, .menu-toggle', function (e) {
         e.preventDefault();
         e.stopPropagation();
         const panelId = $(this).closest('.menu-item').data('panel');
@@ -113,7 +113,7 @@
         }
       });
 
-      $menu.on('click', '.menu-link', function (e) {
+      $menu.on('click', '.menu-link:not(.menu-toggle)', function (e) {
         const $item = $(this).closest('.menu-item');
         const panelId = $item.data('panel');
         if (!panelId) return;

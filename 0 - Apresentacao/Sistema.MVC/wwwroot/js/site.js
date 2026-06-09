@@ -39,6 +39,12 @@
     };
 
     $(function () {
+        const splash = document.getElementById('appSplash');
+        const hideSplash = () => {
+            if (!splash || splash.classList.contains('app-splash--hide')) return;
+            splash.classList.add('app-splash--hide');
+            window.setTimeout(() => splash.remove(), 320);
+        };
         const sidebarMenu = document.getElementById('sidebarMenu');
         const initialMenuExpanded = sidebarMenu?.dataset.menuExpanded === 'true';
         const menuController = typeof window.initSistemaMenu === 'function'
@@ -67,10 +73,13 @@
 
         if (window.AOS && typeof window.AOS.init === 'function') {
             window.AOS.init({
-                duration: 750,
-                easing: 'ease-out-quart',
+                duration: 320,
+                easing: 'ease-out',
                 once: true,
             });
         }
+
+        window.addEventListener('load', () => window.setTimeout(hideSplash, 120), { once: true });
+        window.setTimeout(hideSplash, 1400);
     });
 })();

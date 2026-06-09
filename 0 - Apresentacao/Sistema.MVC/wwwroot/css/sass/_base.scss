@@ -27,6 +27,58 @@ html {
   min-height: 100%;
 }
 
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.12), transparent 42%),
+    var(--header-bg);
+  color: #fff;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.app-splash-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  transform: translateY(0);
+  transition: transform 0.28s ease;
+}
+
+.app-splash-logo {
+  width: 4.25rem;
+  height: 4.25rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  font-size: 2rem;
+}
+
+.app-splash-card strong {
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+
+.app-splash-card small {
+  opacity: 0.78;
+}
+
+.app-splash.app-splash--hide {
+  opacity: 0;
+  visibility: hidden;
+
+  .app-splash-card {
+    transform: translateY(-0.35rem);
+  }
+}
+
 @include mixins.bg-color('vermelho', $vermelho);
 @include mixins.bg-color('roxo', $roxo);
 @include mixins.bg-color('verde', $verde);
