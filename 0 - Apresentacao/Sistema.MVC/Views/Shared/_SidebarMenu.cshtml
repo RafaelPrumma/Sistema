@@ -13,15 +13,14 @@
 }
 
 <aside id="sidebarMenu" class="app-menu sidebar-bg @textClass" data-menu-expanded="@Model.MenuExpanded.ToString().ToLowerInvariant()" aria-label="Menu principal">
-    <a class="app-brand @textClass" asp-controller="Home" asp-action="Index" title="Sistema">
+    <a class="app-brand @textClass" asp-controller="Home" asp-action="Index" title="Sistema" aria-label="Ir para a pagina inicial">
         <span class="app-brand-mark"><i class="bi bi-grid-1x2-fill"></i></span>
-        <span class="app-brand-text">Sistema</span>
     </a>
 
     <div class="menu-panels-track">
         <div class="menu-panel menu-panel--root" id="menuPanelRoot">
             <ul class="menu-list">
-                <li class="menu-section-label text-uppercase small">Módulos</li>
+                <li class="menu-section-label text-uppercase small">Inicio</li>
                 <li class="menu-item" data-panel="menuPanelHome">
                     <button type="button" class="menu-link menu-toggle @textClass @IsActive("Home")" title="Home" aria-label="Abrir submenu Home">
                         <i class="bi bi-house"></i>
@@ -29,10 +28,12 @@
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
+
+                <li class="menu-section-label text-uppercase small">Modulos</li>
                 <li class="menu-item" data-panel="menuPanelFinancas">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("MinhasFinancas")" title="Minhas Finanças" aria-label="Abrir submenu Minhas Finanças">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("MinhasFinancas")" title="Financas" aria-label="Abrir submenu Financas">
                         <i class="bi bi-graph-up-arrow"></i>
-                        <span>Minhas Finanças</span>
+                        <span>Financas</span>
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
@@ -44,9 +45,9 @@
                     </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelMensagens">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Mensagem")" title="Comunicação" aria-label="Abrir submenu Comunicação">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Mensagem")" title="Comunicacao" aria-label="Abrir submenu Comunicacao">
                         <i class="bi bi-envelope"></i>
-                        <span>Comunicação</span>
+                        <span>Comunicacao</span>
                         @if (Model.UnreadMessages > 0)
                         {
                             <span class="badge bg-primary ms-auto">@Model.UnreadMessages</span>
@@ -55,16 +56,16 @@
                     </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelAdmin">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Configuracao") @IsActive("Tema")" title="Administração" aria-label="Abrir submenu Administração">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Configuracao") @IsActive("Tema")" title="Administracao" aria-label="Abrir submenu Administracao">
                         <i class="bi bi-gear"></i>
-                        <span>Administração</span>
+                        <span>Administracao</span>
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
                 <li class="menu-item" data-panel="menuPanelDocs">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Documentacao")" title="Documentação" aria-label="Abrir submenu Documentação">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Documentacao")" title="Documentacao" aria-label="Abrir submenu Documentacao">
                         <i class="bi bi-book"></i>
-                        <span>Documentação</span>
+                        <span>Documentacao</span>
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
@@ -73,7 +74,7 @@
 
         <div class="menu-panel menu-panel--sub" id="menuPanelHome">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
                 <span class="menu-panel-title">Home</span>
             </div>
             <ul class="menu-list">
@@ -84,50 +85,50 @@
 
         <div class="menu-panel menu-panel--sub" id="menuPanelFinancas">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
-                <span class="menu-panel-title">Minhas Finanças</span>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Financas</span>
             </div>
             <ul class="menu-list">
                 <li><a asp-controller="MinhasFinancas" asp-action="Index" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Index")">Dashboard</a></li>
                 <li><a asp-controller="MinhasFinancas" asp-action="Documentos" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Documentos")">Documentos</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="OperacoesB3" class="menu-sublink @textClass @IsActive("MinhasFinancas", "OperacoesB3")">Operações B3</a></li>
+                <li><a asp-controller="MinhasFinancas" asp-action="OperacoesB3" class="menu-sublink @textClass @IsActive("MinhasFinancas", "OperacoesB3")">Operacoes B3</a></li>
                 <li><a asp-controller="MinhasFinancas" asp-action="OperacoesCripto" class="menu-sublink @textClass @IsActive("MinhasFinancas", "OperacoesCripto")">Cripto</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Posicoes" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Posicoes")">Posições estimadas</a></li>
+                <li><a asp-controller="MinhasFinancas" asp-action="Posicoes" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Posicoes")">Posicoes estimadas</a></li>
                 <li><a asp-controller="MinhasFinancas" asp-action="Alertas" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Alertas")">Alertas</a></li>
             </ul>
         </div>
 
         <div class="menu-panel menu-panel--sub" id="menuPanelAcesso">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
                 <span class="menu-panel-title">Acesso</span>
             </div>
             <ul class="menu-list">
-                <li><a asp-controller="Account" asp-action="ChangePassword" class="menu-sublink @textClass @IsActive("Account", "ChangePassword")">Segurança</a></li>
+                <li><a asp-controller="Account" asp-action="ChangePassword" class="menu-sublink @textClass @IsActive("Account", "ChangePassword")">Seguranca</a></li>
                 <li><a href="/api/log/acesso" class="menu-sublink @textClass">AcessoLog (API)</a></li>
             </ul>
         </div>
 
         <div class="menu-panel menu-panel--sub" id="menuPanelMensagens">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
-                <span class="menu-panel-title">Comunicação</span>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Comunicacao</span>
             </div>
             <ul class="menu-list">
                 <li><a asp-controller="Mensagem" asp-action="Index" class="menu-sublink @textClass @IsActive("Mensagem", "Index")">Feed</a></li>
-                <li><a asp-controller="Mensagem" asp-action="CaixaSaida" class="menu-sublink @textClass @IsActive("Mensagem", "CaixaSaida")">Caixa de saída</a></li>
-                <li><a asp-controller="Mensagem" asp-action="Nova" class="menu-sublink @textClass @IsActive("Mensagem", "Nova")">Nova publicação</a></li>
+                <li><a asp-controller="Mensagem" asp-action="CaixaSaida" class="menu-sublink @textClass @IsActive("Mensagem", "CaixaSaida")">Caixa de saida</a></li>
+                <li><a asp-controller="Mensagem" asp-action="Nova" class="menu-sublink @textClass @IsActive("Mensagem", "Nova")">Nova publicacao</a></li>
                 <li><a href="/api/log/comunicacao" class="menu-sublink @textClass">ComunicacaoLog (API)</a></li>
             </ul>
         </div>
 
         <div class="menu-panel menu-panel--sub" id="menuPanelAdmin">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
-                <span class="menu-panel-title">Administração</span>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Administracao</span>
             </div>
             <ul class="menu-list">
-                <li><a asp-controller="Configuracao" asp-action="Index" class="menu-sublink @textClass @IsActive("Configuracao", "Index")">Configurações</a></li>
+                <li><a asp-controller="Configuracao" asp-action="Index" class="menu-sublink @textClass @IsActive("Configuracao", "Index")">Configuracoes</a></li>
                 <li><a asp-controller="Tema" asp-action="Edit" class="menu-sublink @textClass @IsActive("Tema", "Edit")">Tema</a></li>
                 <li><a href="/api/log/administracao" class="menu-sublink @textClass">AdministracaoLog (API)</a></li>
             </ul>
@@ -135,8 +136,8 @@
 
         <div class="menu-panel menu-panel--sub" id="menuPanelDocs">
             <div class="menu-panel-header">
-                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i><span>Voltar</span></button>
-                <span class="menu-panel-title">Documentação</span>
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Documentacao</span>
             </div>
             <ul class="menu-list">
                 <li><a asp-controller="Documentacao" asp-action="Index" asp-fragment="mensagens" class="menu-sublink @textClass">Mensagens</a></li>

@@ -189,6 +189,7 @@
             const footerColor = tema?.corFooter ?? computed.getPropertyValue('--footer-bg').trim();
 
             if (headerColor) root.style.setProperty('--header-bg', headerColor);
+            if (headerColor) root.style.setProperty('--app-accent', headerColor);
             if (leftColor) root.style.setProperty('--sidebar-bg', leftColor);
             if (rightColor) root.style.setProperty('--rightbar-bg', rightColor);
             if (footerColor) root.style.setProperty('--footer-bg', footerColor);

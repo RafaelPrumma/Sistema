@@ -549,18 +549,18 @@ header.navbar {
 }
 .menu-link:hover {
   background-color: rgba(255, 255, 255, 0.1);
-  box-shadow: inset 3px 0 0 var(--bs-primary);
+  box-shadow: inset 3px 0 0 var(--app-accent);
   color: inherit;
 }
 .menu-link.active {
-  background: linear-gradient(90deg, rgba(13, 110, 253, 0.35), rgba(13, 110, 253, 0.15));
-  border: 1px solid rgba(13, 110, 253, 0.45);
-  box-shadow: inset 4px 0 0 var(--bs-primary), 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 34%, transparent), color-mix(in srgb, var(--app-accent) 14%, transparent));
+  border: 1px solid color-mix(in srgb, var(--app-accent) 45%, transparent);
+  box-shadow: inset 4px 0 0 var(--app-accent), 0 4px 12px rgba(0, 0, 0, 0.15);
   font-weight: 600;
 }
 .menu-link.active .badge {
   background-color: #fff;
-  color: var(--bs-primary);
+  color: var(--app-accent);
 }
 
 .menu-chevron {
@@ -591,7 +591,7 @@ header.navbar {
   color: inherit;
 }
 .menu-sublink.active {
-  background-color: rgba(13, 110, 253, 0.2);
+  background-color: color-mix(in srgb, var(--app-accent) 20%, transparent);
   font-weight: 600;
 }
 
@@ -745,6 +745,7 @@ header.navbar {
 }
 :root {
   --header-bg: #0d6efd;
+  --app-accent: #0d6efd;
   --sidebar-bg: #0d6efd;
   --rightbar-bg: #f8f9fa;
   --footer-bg: #0d6efd;
