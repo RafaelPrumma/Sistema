@@ -6,6 +6,8 @@
     ViewData["Title"] = "Minhas Finanças";
     var br = CultureInfo.GetCultureInfo("pt-BR");
     string Money(decimal value) => value.ToString("C", br);
+    string Percent(decimal value) => value.ToString("N2", br) + "%";
+    var resultadoMercadoClass = Model.ResultadoNaoRealizadoTotal >= 0 ? "text-success" : "text-danger";
     var chartPayload = new
     {
         b3Ano = Model.B3PorAno.Select(x => new { label = x.Label, compras = x.ValorCompra, vendas = x.ValorVenda }),
@@ -34,6 +36,81 @@
         <div class="alert alert-info">Nenhuma carga financeira foi encontrada. Configure <code>MinhasFinancas:SeedZipPath</code> ou <code>SeedJsonPath</code> para carregar os dados.</div>
     }
 
+    <div class="finance-command-bar mb-3">
+        <div>
+            <div class="small text-secondary">Pasta monitorada</div>
+            <div class="fw-semibold">@(Model.ImportacaoArquivos?.PastaMonitorada ?? "Nao configurada")</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <form asp-action="ImportarPasta" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-folder-symlink me-1"></i>Importar arquivos
+                </button>
+            </form>
+            <form asp-action="AtualizarCotacoes" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-repeat me-1"></i>Atualizar cotacoes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-market-card h-100">
+                <div class="card-body">
+                    <div class="text-secondary small">Valor de mercado estimado</div>
+                    <div class="finance-kpi-value">@Money(Model.ValorMercadoTotal)</div>
+                    <div class="small text-secondary">Com base nas cotacoes disponiveis.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-market-card h-100">
+                <div class="card-body">
+                    <div class="text-secondary small">Custo estimado</div>
+                    <div class="finance-kpi-value">@Money(Model.CustoEstimadoTotal)</div>
+                    <div class="small text-secondary">Preco medio calculado por compra/venda.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-market-card h-100">
+                <div class="card-body">
+                    <div class="text-secondary small">Resultado nao realizado</div>
+                    <div class="finance-kpi-value @resultadoMercadoClass">@Money(Model.ResultadoNaoRealizadoTotal)</div>
+                    <div class="small text-secondary">Nao inclui reconciliacao completa.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-market-card h-100">
+                <div class="card-body">
+                    <div class="text-secondary small">Ultima atualizacao</div>
+                    <div class="fs-5 fw-semibold">@(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "Pendente")</div>
+                    <div class="small text-secondary">@((Model.ImportacaoArquivos?.DocumentosProcessados ?? 0).ToString("N0", br)) documentos monitorados processados.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Periodos.Any())
+    {
+        <div class="finance-period-strip mb-3" aria-label="Variacao por periodo">
+            @foreach (var periodo in Model.Periodos)
+            {
+                var periodoClass = periodo.VariacaoPercentual >= 0 ? "text-success" : "text-danger";
+                <div class="finance-period-pill">
+                    <span>@periodo.Label</span>
+                    <strong class="@periodoClass">@Percent(periodo.VariacaoPercentual)</strong>
+                    <small>@Money(periodo.VariacaoValor)</small>
+                </div>
+            }
+        </div>
+    }
+
     <div class="row g-3 mb-3">
         @foreach (var kpi in Model.Kpis)
         {
@@ -52,6 +129,88 @@
                 </div>
             </div>
         }
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-xl-5">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <h5 class="mb-0">Carteiras e grupos</h5>
+                            <div class="small text-secondary">Agrupamentos para monitorar setores, teses e classes.</div>
+                        </div>
+                    </div>
+                    <div class="finance-wallet-list">
+                        @foreach (var carteira in Model.Carteiras.OrderByDescending(x => x.ValorMercado).Take(8))
+                        {
+                            var carteiraClass = carteira.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                            <div class="finance-wallet-item">
+                                <div>
+                                    <div class="fw-semibold">@carteira.Nome</div>
+                                    <div class="small text-secondary">@carteira.Tipo · @carteira.Ativos ativos</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-semibold">@Money(carteira.ValorMercado)</div>
+                                    <div class="small @carteiraClass">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-7">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <h5 class="mb-0">Ativos monitorados</h5>
+                            <div class="small text-secondary">Preco atual, custo estimado e variacao diaria quando a API retornar.</div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Ativo</th>
+                                    <th class="text-end">Qtde</th>
+                                    <th class="text-end">Preco</th>
+                                    <th class="text-end">Mercado</th>
+                                    <th class="text-end">Resultado</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ativo in Model.AtivosCotados.OrderByDescending(x => x.ValorMercado).Take(12))
+                                {
+                                    var ativoClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                                    var variacaoClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@ativo.Ativo</div>
+                                            <div class="small text-secondary">@ativo.Classe · @ativo.Symbol</div>
+                                        </td>
+                                        <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
+                                        <td class="text-end">@(ativo.PrecoAtual.HasValue ? Money(ativo.PrecoAtual.Value) : "-")</td>
+                                        <td class="text-end">@Money(ativo.ValorMercado)</td>
+                                        <td class="text-end">
+                                            <div class="@ativoClass">@Money(ativo.ResultadoNaoRealizado)</div>
+                                            <small class="@ativoClass">@Percent(ativo.ResultadoNaoRealizadoPercentual)</small>
+                                            @if (ativo.VariacaoDiaPercentual.HasValue)
+                                            {
+                                                <div><small class="@variacaoClass">Dia @Percent(ativo.VariacaoDiaPercentual.Value)</small></div>
+                                            }
+                                        </td>
+                                        <td><span class="badge text-bg-light border">@ativo.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-3 mb-3">

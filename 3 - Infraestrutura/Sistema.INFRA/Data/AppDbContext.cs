@@ -27,9 +27,14 @@ public class AppDbContext : DbContext
     public DbSet<MensagemLeitura> MensagemLeituras => Set<MensagemLeitura>();
     public DbSet<MensagemDestinatario> MensagemDestinatarios => Set<MensagemDestinatario>();
     public DbSet<CargaFinanceira> CargasFinanceiras => Set<CargaFinanceira>();
+    public DbSet<ImportacaoFinanceiraArquivo> ImportacoesFinanceirasArquivo => Set<ImportacaoFinanceiraArquivo>();
     public DbSet<DocumentoFinanceiro> DocumentosFinanceiros => Set<DocumentoFinanceiro>();
     public DbSet<ConteudoBrutoFinanceiro> ConteudosBrutosFinanceiros => Set<ConteudoBrutoFinanceiro>();
     public DbSet<AtivoFinanceiro> AtivosFinanceiros => Set<AtivoFinanceiro>();
+    public DbSet<CarteiraFinanceira> CarteirasFinanceiras => Set<CarteiraFinanceira>();
+    public DbSet<CarteiraAtivoFinanceiro> CarteirasAtivosFinanceiros => Set<CarteiraAtivoFinanceiro>();
+    public DbSet<CotacaoAtivoFinanceiro> CotacoesAtivosFinanceiros => Set<CotacaoAtivoFinanceiro>();
+    public DbSet<PrecoHistoricoAtivoFinanceiro> PrecosHistoricosAtivosFinanceiros => Set<PrecoHistoricoAtivoFinanceiro>();
     public DbSet<OperacaoB3> OperacoesB3 => Set<OperacaoB3>();
     public DbSet<TransacaoCripto> TransacoesCripto => Set<TransacaoCripto>();
     public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();

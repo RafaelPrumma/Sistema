@@ -19,6 +19,18 @@ public class CargaFinanceiraMap : IEntityTypeConfiguration<CargaFinanceira>
     }
 }
 
+public class ImportacaoFinanceiraArquivoMap : IEntityTypeConfiguration<ImportacaoFinanceiraArquivo>
+{
+    public void Configure(EntityTypeBuilder<ImportacaoFinanceiraArquivo> builder)
+    {
+        builder.ToTable("FinanceiroImportacaoArquivo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.SourceFolder).IsRequired().HasMaxLength(700);
+        builder.Property(x => x.Message).HasMaxLength(2000);
+        builder.HasIndex(x => new { x.SourceFolder, x.StartedAt });
+    }
+}
+
 public class DocumentoFinanceiroMap : IEntityTypeConfiguration<DocumentoFinanceiro>
 {
     public void Configure(EntityTypeBuilder<DocumentoFinanceiro> builder)
@@ -27,13 +39,18 @@ public class DocumentoFinanceiroMap : IEntityTypeConfiguration<DocumentoFinancei
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Colecao).HasMaxLength(40);
         builder.Property(x => x.Path).HasMaxLength(700);
+        builder.Property(x => x.StoredPath).HasMaxLength(700);
         builder.Property(x => x.FileName).IsRequired().HasMaxLength(260);
         builder.Property(x => x.FileType).HasMaxLength(40);
         builder.Property(x => x.Source).HasMaxLength(80);
         builder.Property(x => x.Sha256).HasMaxLength(64);
+        builder.Property(x => x.ParserVersion).HasMaxLength(40);
         builder.Property(x => x.RawMetadataJson).IsRequired();
         builder.HasIndex(x => new { x.CargaFinanceiraId, x.FileName });
+        builder.HasIndex(x => x.Sha256);
+        builder.HasIndex(x => x.DocumentKind);
         builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.ImportacaoFinanceiraArquivo).WithMany().HasForeignKey(x => x.ImportacaoFinanceiraArquivoId).OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -64,6 +81,74 @@ public class AtivoFinanceiroMap : IEntityTypeConfiguration<AtivoFinanceiro>
         builder.Property(x => x.Currency).HasMaxLength(10);
         builder.Property(x => x.ConceptRole).HasMaxLength(80);
         builder.HasIndex(x => x.AssetKey).IsUnique();
+    }
+}
+
+public class CarteiraFinanceiraMap : IEntityTypeConfiguration<CarteiraFinanceira>
+{
+    public void Configure(EntityTypeBuilder<CarteiraFinanceira> builder)
+    {
+        builder.ToTable("FinanceiroCarteira");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Nome).IsRequired().HasMaxLength(120);
+        builder.Property(x => x.Slug).IsRequired().HasMaxLength(140);
+        builder.Property(x => x.Descricao).HasMaxLength(500);
+        builder.Property(x => x.Tipo).IsRequired().HasMaxLength(40);
+        builder.HasIndex(x => x.Slug).IsUnique();
+    }
+}
+
+public class CarteiraAtivoFinanceiroMap : IEntityTypeConfiguration<CarteiraAtivoFinanceiro>
+{
+    public void Configure(EntityTypeBuilder<CarteiraAtivoFinanceiro> builder)
+    {
+        builder.ToTable("FinanceiroCarteiraAtivo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.PesoAlvo).HasPrecision(9, 4);
+        builder.Property(x => x.Observacao).HasMaxLength(500);
+        builder.HasIndex(x => new { x.CarteiraFinanceiraId, x.AtivoFinanceiroId }).IsUnique();
+        builder.HasOne(x => x.CarteiraFinanceira).WithMany(x => x.Ativos).HasForeignKey(x => x.CarteiraFinanceiraId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class CotacaoAtivoFinanceiroMap : IEntityTypeConfiguration<CotacaoAtivoFinanceiro>
+{
+    public void Configure(EntityTypeBuilder<CotacaoAtivoFinanceiro> builder)
+    {
+        builder.ToTable("FinanceiroCotacaoAtivo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Symbol).IsRequired().HasMaxLength(40);
+        builder.Property(x => x.Currency).IsRequired().HasMaxLength(10);
+        builder.Property(x => x.Price).HasPrecision(28, 12);
+        builder.Property(x => x.PriceBRL).HasPrecision(28, 12);
+        builder.Property(x => x.Change).HasPrecision(28, 12);
+        builder.Property(x => x.ChangePercent).HasPrecision(18, 8);
+        builder.Property(x => x.ErrorMessage).HasMaxLength(1000);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Provedor }).IsUnique();
+        builder.HasIndex(x => x.RetrievedAt);
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class PrecoHistoricoAtivoFinanceiroMap : IEntityTypeConfiguration<PrecoHistoricoAtivoFinanceiro>
+{
+    public void Configure(EntityTypeBuilder<PrecoHistoricoAtivoFinanceiro> builder)
+    {
+        builder.ToTable("FinanceiroPrecoHistoricoAtivo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Symbol).IsRequired().HasMaxLength(40);
+        builder.Property(x => x.Interval).IsRequired().HasMaxLength(12);
+        builder.Property(x => x.Open).HasPrecision(28, 12);
+        builder.Property(x => x.High).HasPrecision(28, 12);
+        builder.Property(x => x.Low).HasPrecision(28, 12);
+        builder.Property(x => x.Close).HasPrecision(28, 12);
+        builder.Property(x => x.CloseBRL).HasPrecision(28, 12);
+        builder.Property(x => x.Volume).HasPrecision(28, 8);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Provedor, x.Interval, x.Date }).IsUnique();
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

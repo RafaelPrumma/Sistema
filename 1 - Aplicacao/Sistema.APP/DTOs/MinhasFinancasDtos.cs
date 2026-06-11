@@ -77,6 +77,43 @@ public record AlertaConfiabilidadeDto(
     string? Detalhes,
     DateTime CriadoEm);
 
+public record CotacaoAtivoDto(
+    int AtivoId,
+    string Ativo,
+    string Classe,
+    string Symbol,
+    decimal Quantidade,
+    decimal PrecoMedio,
+    decimal? PrecoAtual,
+    decimal ValorMercado,
+    decimal CustoEstimado,
+    decimal ResultadoNaoRealizado,
+    decimal ResultadoNaoRealizadoPercentual,
+    decimal? VariacaoDiaPercentual,
+    DateTime? AtualizadoEm,
+    string Status,
+    string Confianca);
+
+public record CarteiraFinanceiraResumoDto(
+    int Id,
+    string Nome,
+    string Tipo,
+    decimal ValorMercado,
+    decimal CustoEstimado,
+    decimal ResultadoNaoRealizado,
+    decimal ResultadoNaoRealizadoPercentual,
+    decimal VariacaoDiaPercentual,
+    int Ativos);
+
+public record PeriodoPerformanceDto(string Codigo, string Label, decimal VariacaoPercentual, decimal VariacaoValor);
+
+public record ImportacaoFinanceiraResumoDto(
+    DateTime? UltimaImportacao,
+    int DocumentosMonitorados,
+    int DocumentosProcessados,
+    int DocumentosComAlerta,
+    string? PastaMonitorada);
+
 public class MinhasFinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;
@@ -91,5 +128,13 @@ public class MinhasFinancasDashboardDto
     public IReadOnlyList<PosicaoFinanceiraDto> PosicoesAbertas { get; set; } = [];
     public IReadOnlyList<PosicaoFinanceiraDto> PosicoesEncerradas { get; set; } = [];
     public IReadOnlyList<AlertaConfiabilidadeDto> Alertas { get; set; } = [];
+    public IReadOnlyList<CotacaoAtivoDto> AtivosCotados { get; set; } = [];
+    public IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras { get; set; } = [];
+    public IReadOnlyList<PeriodoPerformanceDto> Periodos { get; set; } = [];
+    public ImportacaoFinanceiraResumoDto? ImportacaoArquivos { get; set; }
+    public DateTime? CotacoesAtualizadasEm { get; set; }
+    public decimal ValorMercadoTotal { get; set; }
+    public decimal CustoEstimadoTotal { get; set; }
+    public decimal ResultadoNaoRealizadoTotal { get; set; }
     public string? DashboardJson { get; set; }
 }

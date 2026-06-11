@@ -6,6 +6,10 @@
 
   const data = JSON.parse(el.textContent || '{}');
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  const styles = () => getComputedStyle(document.body);
+  const accent = () => styles().getPropertyValue('--app-accent').trim() || '#0d6efd';
+  const success = () => styles().getPropertyValue('--bs-success').trim() || '#20c997';
+  const bodyColor = () => styles().getPropertyValue('--bs-body-color').trim() || '#111827';
 
   function setup(canvas) {
     if (!canvas) return null;
@@ -44,7 +48,7 @@
     ctx.clearRect(0, 0, width, height);
     drawAxes(ctx, width, height, padding);
     ctx.font = '12px system-ui, sans-serif';
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#111827';
+    ctx.fillStyle = bodyColor();
     ctx.fillText(money.format(max), 8, padding.top + 8);
 
     rows.forEach((row, index) => {
@@ -52,9 +56,9 @@
       const comprasH = ((row.compras || 0) / max) * plotHeight;
       const vendasH = ((row.vendas || 0) / max) * plotHeight;
       const base = height - padding.bottom;
-      ctx.fillStyle = '#0d6efd';
+      ctx.fillStyle = accent();
       ctx.fillRect(x - barWidth - 2, base - comprasH, barWidth, comprasH);
-      ctx.fillStyle = '#20c997';
+      ctx.fillStyle = success();
       ctx.fillRect(x + 2, base - vendasH, barWidth, vendasH);
       ctx.save();
       ctx.translate(x - 8, height - 16);
@@ -64,13 +68,13 @@
       ctx.restore();
     });
 
-    ctx.fillStyle = '#0d6efd';
+    ctx.fillStyle = accent();
     ctx.fillRect(width - 150, 12, 10, 10);
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#111827';
+    ctx.fillStyle = bodyColor();
     ctx.fillText('Compras', width - 136, 22);
-    ctx.fillStyle = '#20c997';
+    ctx.fillStyle = success();
     ctx.fillRect(width - 78, 12, 10, 10);
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#111827';
+    ctx.fillStyle = bodyColor();
     ctx.fillText('Vendas', width - 64, 22);
   }
 
@@ -105,8 +109,8 @@
       ctx.stroke();
     }
 
-    series('compras', '#0d6efd');
-    series('vendas', '#20c997');
+    series('compras', accent());
+    series('vendas', success());
 
     const step = Math.max(1, Math.ceil(rows.length / 8));
     ctx.fillStyle = 'rgba(108, 117, 125, .95)';

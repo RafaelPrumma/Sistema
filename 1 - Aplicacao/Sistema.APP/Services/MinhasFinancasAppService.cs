@@ -8,10 +8,11 @@ using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador importador) : IMinhasFinancasAppService
+public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador importador, IMinhasFinancasMarketDataService marketData) : IMinhasFinancasAppService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IMinhasFinancasImportador _importador = importador;
+    private readonly IMinhasFinancasMarketDataService _marketData = marketData;
 
     public async Task<MinhasFinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
@@ -19,6 +20,12 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         var carga = await _uow.MinhasFinancas.ObterCargaMaisRecenteAsync(cancellationToken);
         var alertas = await _uow.MinhasFinancas.BuscarAlertasAsync(cancellationToken);
         var posicoes = await _uow.MinhasFinancas.BuscarPosicoesAsync(null, cancellationToken);
+        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var carteiras = await _uow.MinhasFinancas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var historico = await _uow.MinhasFinancas.BuscarHistoricoPrecosAsync(DateTime.UtcNow.Date.AddYears(-1), cancellationToken);
+        var documentosMonitorados = await _uow.MinhasFinancas.BuscarDocumentosMonitoradosAsync(cancellationToken);
+        var ultimaImportacao = await _uow.MinhasFinancas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
+        var ativosCotados = CriarAtivosCotados(posicoes, cotacoes);
 
         var dashboard = new MinhasFinancasDashboardDto
         {
@@ -34,7 +41,20 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             UltimasTransacoesCripto = (await _uow.MinhasFinancas.BuscarUltimasTransacoesCriptoAsync(12, cancellationToken)).Select(MapTransacaoCripto).ToList(),
             PosicoesAbertas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.AbertaOuResidual).Take(12).Select(MapPosicao).ToList(),
             PosicoesEncerradas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.EncerradaPorOperacoes).Take(8).Select(MapPosicao).ToList(),
-            Alertas = alertas.Take(8).Select(MapAlerta).ToList()
+            Alertas = alertas.Take(8).Select(MapAlerta).ToList(),
+            AtivosCotados = ativosCotados,
+            Carteiras = CriarResumoCarteiras(carteiras, ativosCotados),
+            Periodos = CriarPeriodos(posicoes, cotacoes, historico),
+            ImportacaoArquivos = new ImportacaoFinanceiraResumoDto(
+                ultimaImportacao?.FinishedAt ?? ultimaImportacao?.StartedAt,
+                documentosMonitorados.Count,
+                documentosMonitorados.Count(x => x.ParseStatus == StatusParseDocumentoFinanceiro.Processado || x.ParseStatus == StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
+                documentosMonitorados.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
+                ultimaImportacao?.SourceFolder),
+            CotacoesAtualizadasEm = cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault(),
+            ValorMercadoTotal = ativosCotados.Sum(x => x.ValorMercado),
+            CustoEstimadoTotal = ativosCotados.Sum(x => x.CustoEstimado),
+            ResultadoNaoRealizadoTotal = ativosCotados.Sum(x => x.ResultadoNaoRealizado)
         };
 
         return dashboard;
@@ -85,6 +105,12 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         var result = await _uow.MinhasFinancas.BuscarAlertasAsync(cancellationToken);
         return result.Select(MapAlerta).ToList();
     }
+
+    public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
+        => await _importador.ImportarPastaMonitoradaAsync(cancellationToken);
+
+    public async Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default)
+        => await _marketData.AtualizarCotacoesAsync(force: true, cancellationToken);
 
     private static IReadOnlyList<FinanceiroKpiDto> CriarKpis(CargaFinanceira? carga)
     {
@@ -148,4 +174,115 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
 
     private static AlertaConfiabilidadeDto MapAlerta(AlertaConfiabilidade alerta)
         => new(alerta.Id, alerta.EntityType, alerta.Severity.ToString(), alerta.Code, alerta.Message, alerta.Details, alerta.CreatedAt);
+
+    private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotados(IReadOnlyList<EstimativaPosicaoCarteira> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
+    {
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+
+        return posicoes
+            .Where(x => x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.Asset is not null)
+            .Select(posicao =>
+            {
+                cotacaoPorAtivo.TryGetValue(posicao.AssetId, out var cotacao);
+                var precoAtual = cotacao?.PriceBRL;
+                var custo = posicao.Quantity * posicao.AveragePrice;
+                var valorMercado = precoAtual.HasValue ? posicao.Quantity * precoAtual.Value : posicao.EstimatedCurrentPosition;
+                var resultado = valorMercado - custo;
+                var percentual = custo == 0 ? 0 : resultado / custo * 100m;
+
+                return new CotacaoAtivoDto(
+                    posicao.AssetId,
+                    posicao.Asset?.Ticker ?? posicao.Asset?.AssetKey ?? posicao.Asset?.Name ?? string.Empty,
+                    posicao.Asset?.AssetClass.ToString() ?? string.Empty,
+                    cotacao?.Symbol ?? posicao.Asset?.Ticker ?? posicao.Asset?.AssetKey ?? string.Empty,
+                    posicao.Quantity,
+                    posicao.AveragePrice,
+                    precoAtual,
+                    valorMercado,
+                    custo,
+                    resultado,
+                    percentual,
+                    cotacao?.ChangePercent,
+                    cotacao?.RetrievedAt,
+                    cotacao?.Status.ToString() ?? "SemCotacao",
+                    posicao.ConfidenceLevel.ToString());
+            })
+            .OrderByDescending(x => x.ValorMercado)
+            .ToList();
+    }
+
+    private static IReadOnlyList<CarteiraFinanceiraResumoDto> CriarResumoCarteiras(IReadOnlyList<CarteiraFinanceira> carteiras, IReadOnlyList<CotacaoAtivoDto> ativos)
+    {
+        var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
+        return carteiras
+            .Select(carteira =>
+            {
+                var itens = carteira.Ativos
+                    .Where(x => x.AtivoFinanceiroId > 0 && ativosPorId.ContainsKey(x.AtivoFinanceiroId))
+                    .Select(x => ativosPorId[x.AtivoFinanceiroId])
+                    .ToList();
+                var valor = itens.Sum(x => x.ValorMercado);
+                var custo = itens.Sum(x => x.CustoEstimado);
+                var resultado = valor - custo;
+                var variacaoDiaValor = itens.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m));
+
+                return new CarteiraFinanceiraResumoDto(
+                    carteira.Id,
+                    carteira.Nome,
+                    carteira.Tipo,
+                    valor,
+                    custo,
+                    resultado,
+                    custo == 0 ? 0 : resultado / custo * 100m,
+                    valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
+                    itens.Count);
+            })
+            .Where(x => x.Ativos > 0)
+            .OrderByDescending(x => x.ValorMercado)
+            .ToList();
+    }
+
+    private static IReadOnlyList<PeriodoPerformanceDto> CriarPeriodos(
+        IReadOnlyList<EstimativaPosicaoCarteira> posicoes,
+        IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes,
+        IReadOnlyList<PrecoHistoricoAtivoFinanceiro> historico)
+    {
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+        var historicoPorAtivo = historico
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(x => x.Key, x => x.OrderBy(h => h.Date).ToList());
+
+        var periodos = new (string Codigo, string Label, DateTime Inicio)[]
+        {
+            ("1D", "1 dia", DateTime.UtcNow.Date.AddDays(-1)),
+            ("5D", "5 dias", DateTime.UtcNow.Date.AddDays(-5)),
+            ("1W", "1 semana", DateTime.UtcNow.Date.AddDays(-7)),
+            ("1M", "1 mês", DateTime.UtcNow.Date.AddMonths(-1)),
+            ("3M", "3 meses", DateTime.UtcNow.Date.AddMonths(-3)),
+            ("YTD", "No ano", new DateTime(DateTime.UtcNow.Year, 1, 1)),
+            ("1Y", "1 ano", DateTime.UtcNow.Date.AddYears(-1))
+        };
+
+        var abertas = posicoes.Where(x => x.Status == StatusEstimativaPosicao.AbertaOuResidual).ToList();
+        var atual = abertas.Sum(x => cotacaoPorAtivo.TryGetValue(x.AssetId, out var c) ? x.Quantity * c.PriceBRL : x.EstimatedCurrentPosition);
+
+        return periodos.Select(periodo =>
+        {
+            var baseValor = abertas.Sum(posicao =>
+            {
+                if (!historicoPorAtivo.TryGetValue(posicao.AssetId, out var serie))
+                    return 0m;
+
+                var precoBase = serie.LastOrDefault(x => x.Date.Date <= periodo.Inicio.Date) ?? serie.FirstOrDefault();
+                return precoBase is null ? 0m : posicao.Quantity * precoBase.CloseBRL;
+            });
+
+            var variacao = baseValor == 0 ? 0 : atual - baseValor;
+            return new PeriodoPerformanceDto(periodo.Codigo, periodo.Label, baseValor == 0 ? 0 : variacao / baseValor * 100m, variacao);
+        }).ToList();
+    }
 }

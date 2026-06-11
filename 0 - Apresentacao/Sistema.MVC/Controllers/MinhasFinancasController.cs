@@ -12,8 +12,27 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
 
     [HttpGet("/MinhasFinancas")]
     [HttpGet("/MinhasFinancas/Index")]
+    [HttpGet("/Financas")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
         => View(await _service.ObterDashboardAsync(cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportarPasta(CancellationToken cancellationToken)
+    {
+        await _service.ImportarPastaMonitoradaAsync(cancellationToken);
+        TempData["MensagemSucesso"] = "Pasta financeira monitorada importada.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarCotacoes(CancellationToken cancellationToken)
+    {
+        await _service.AtualizarCotacoesAsync(cancellationToken);
+        TempData["MensagemSucesso"] = "Atualização de cotações solicitada.";
+        return RedirectToAction(nameof(Index));
+    }
 
     [HttpGet]
     public async Task<IActionResult> Documentos(string? termo, int page = 1, CancellationToken cancellationToken = default)

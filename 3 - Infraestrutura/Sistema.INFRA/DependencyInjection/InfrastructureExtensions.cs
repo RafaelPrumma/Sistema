@@ -43,6 +43,10 @@ public static class InfrastructureExtensions
         services.AddScoped<IMinhasFinancasRepository, MinhasFinancasRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMinhasFinancasImportador, MinhasFinancasImportador>();
+        services.AddScoped<IMinhasFinancasMarketDataService, MinhasFinancasMarketDataService>();
+        services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));
+        services.AddHttpClient("Binance", client => client.BaseAddress = new Uri("https://api.binance.com/"));
+        services.AddHostedService<MinhasFinancasMarketDataBackgroundService>();
         services.AddScoped<IEmailAppService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
         services.AddScoped<IExecutionContext, HttpExecutionContext>();

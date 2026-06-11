@@ -811,6 +811,60 @@ body.tema-sidebar-open {
   border-radius: 0.5rem;
 }
 
+.finance-command-bar,
+.finance-period-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-body-bg);
+}
+
+.finance-command-bar {
+  flex-wrap: wrap;
+}
+
+.finance-market-card {
+  border-left: 3px solid var(--app-accent);
+}
+
+.finance-period-strip {
+  flex-wrap: wrap;
+}
+
+.finance-period-pill {
+  min-width: 8rem;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  background: var(--bs-tertiary-bg);
+}
+
+.finance-period-pill span,
+.finance-period-pill small {
+  color: var(--bs-secondary-color);
+}
+
+.finance-wallet-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.finance-wallet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-tertiary-bg);
+}
+
 .finance-kpi {
   overflow: hidden;
 }
@@ -826,8 +880,8 @@ body.tema-sidebar-open {
   display: inline-grid;
   place-items: center;
   border-radius: 0.5rem;
-  background: rgba(13, 110, 253, 0.12);
-  color: var(--bs-primary);
+  background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+  color: var(--app-accent);
   flex: 0 0 auto;
 }
 

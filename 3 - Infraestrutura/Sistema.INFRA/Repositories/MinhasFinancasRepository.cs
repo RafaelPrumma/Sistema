@@ -146,6 +146,56 @@ public class MinhasFinancasRepository(AppDbContext context) : IMinhasFinancasRep
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AtivoFinanceiro>> BuscarAtivosComPosicaoAbertaAsync(CancellationToken cancellationToken = default)
+    {
+        var cargaId = await ObterCargaIdAsync(cancellationToken);
+        return await _context.EstimativasPosicaoCarteira
+            .AsNoTracking()
+            .Where(x => x.CargaFinanceiraId == cargaId && x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.Asset != null)
+            .Select(x => x.Asset!)
+            .Distinct()
+            .OrderBy(x => x.AssetClass)
+            .ThenBy(x => x.Ticker ?? x.AssetKey)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CotacaoAtivoFinanceiro>> BuscarCotacoesAtuaisAsync(CancellationToken cancellationToken = default)
+        => await _context.CotacoesAtivosFinanceiros
+            .AsNoTracking()
+            .Include(x => x.AtivoFinanceiro)
+            .OrderByDescending(x => x.RetrievedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default)
+        => await _context.PrecosHistoricosAtivosFinanceiros
+            .AsNoTracking()
+            .Where(x => x.Date >= inicio)
+            .OrderBy(x => x.Date)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CarteiraFinanceira>> BuscarCarteirasComAtivosAsync(CancellationToken cancellationToken = default)
+        => await _context.CarteirasFinanceiras
+            .AsNoTracking()
+            .Include(x => x.Ativos.Where(a => a.Ativo))
+                .ThenInclude(x => x.AtivoFinanceiro)
+            .Where(x => x.Ativo)
+            .OrderBy(x => x.Ordem)
+            .ThenBy(x => x.Nome)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default)
+        => await _context.DocumentosFinanceiros
+            .AsNoTracking()
+            .Where(x => x.ImportacaoFinanceiraArquivoId != null)
+            .OrderByDescending(x => x.DataInclusao)
+            .ToListAsync(cancellationToken);
+
+    public Task<ImportacaoFinanceiraArquivo?> ObterUltimaImportacaoArquivoAsync(CancellationToken cancellationToken = default)
+        => _context.ImportacoesFinanceirasArquivo
+            .AsNoTracking()
+            .OrderByDescending(x => x.StartedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     private async Task<int> ObterCargaIdAsync(CancellationToken cancellationToken)
     {
         var carga = await _context.CargasFinanceiras.AsNoTracking().OrderByDescending(x => x.ImportedAt).Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);

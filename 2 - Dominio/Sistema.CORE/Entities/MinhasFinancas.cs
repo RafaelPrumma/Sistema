@@ -66,6 +66,54 @@ public enum SeveridadeAlerta
     Critico = 3
 }
 
+public enum TipoDocumentoFinanceiro
+{
+    Desconhecido = 0,
+    JsonConsolidado = 1,
+    NotaNegociacaoB3 = 2,
+    ExtratoInvestimentosNubank = 3,
+    ExtratoContaNubank = 4,
+    BinanceTransactions = 5,
+    BinanceSpotTrades = 6,
+    BinanceSpotOrders = 7,
+    BinanceConvertOrders = 8,
+    BinanceDeposits = 9,
+    CsvBinance = 10
+}
+
+public enum StatusParseDocumentoFinanceiro
+{
+    Pendente = 0,
+    Processado = 1,
+    ParcialmenteProcessado = 2,
+    SemDadosEstruturados = 3,
+    Falhou = 4
+}
+
+public enum StatusImportacaoFinanceira
+{
+    Iniciada = 1,
+    Concluida = 2,
+    ConcluidaComAlertas = 3,
+    Falhou = 4
+}
+
+public enum ProvedorCotacao
+{
+    Manual = 0,
+    Brapi = 1,
+    Binance = 2
+}
+
+public enum StatusCotacao
+{
+    Atual = 1,
+    Desatualizada = 2,
+    Falhou = 3,
+    SemToken = 4,
+    NaoSuportada = 5
+}
+
 public class CargaFinanceira : AuditableEntity
 {
     public int Id { get; set; }
@@ -79,13 +127,30 @@ public class CargaFinanceira : AuditableEntity
     public string? DashboardJson { get; set; }
 }
 
+public class ImportacaoFinanceiraArquivo : AuditableEntity
+{
+    public int Id { get; set; }
+    public string SourceFolder { get; set; } = string.Empty;
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? FinishedAt { get; set; }
+    public StatusImportacaoFinanceira Status { get; set; } = StatusImportacaoFinanceira.Iniciada;
+    public int FilesDiscovered { get; set; }
+    public int FilesImported { get; set; }
+    public int FilesSkipped { get; set; }
+    public int StructuredRowsImported { get; set; }
+    public string? Message { get; set; }
+}
+
 public class DocumentoFinanceiro : AuditableEntity
 {
     public int Id { get; set; }
     public int CargaFinanceiraId { get; set; }
     public CargaFinanceira? CargaFinanceira { get; set; }
+    public int? ImportacaoFinanceiraArquivoId { get; set; }
+    public ImportacaoFinanceiraArquivo? ImportacaoFinanceiraArquivo { get; set; }
     public string Colecao { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
+    public string? StoredPath { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string FileType { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
@@ -93,6 +158,9 @@ public class DocumentoFinanceiro : AuditableEntity
     public long SizeBytes { get; set; }
     public int? ReferenceYear { get; set; }
     public int? PageCount { get; set; }
+    public TipoDocumentoFinanceiro DocumentKind { get; set; } = TipoDocumentoFinanceiro.Desconhecido;
+    public StatusParseDocumentoFinanceiro ParseStatus { get; set; } = StatusParseDocumentoFinanceiro.Pendente;
+    public string ParserVersion { get; set; } = string.Empty;
     public StatusDocumentoFinanceiro Status { get; set; } = StatusDocumentoFinanceiro.Importado;
     public string RawMetadataJson { get; set; } = "{}";
     public ICollection<ConteudoBrutoFinanceiro> ConteudosBrutos { get; set; } = new List<ConteudoBrutoFinanceiro>();
@@ -123,6 +191,69 @@ public class AtivoFinanceiro : AuditableEntity
     public bool IsCrypto { get; set; }
     public bool IsActive { get; set; } = true;
     public string? ConceptRole { get; set; }
+}
+
+public class CarteiraFinanceira : AuditableEntity
+{
+    public int Id { get; set; }
+    public string Nome { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Descricao { get; set; }
+    public string Tipo { get; set; } = "Carteira";
+    public bool IsSistema { get; set; }
+    public bool Ativo { get; set; } = true;
+    public int Ordem { get; set; }
+    public ICollection<CarteiraAtivoFinanceiro> Ativos { get; set; } = new List<CarteiraAtivoFinanceiro>();
+}
+
+public class CarteiraAtivoFinanceiro : AuditableEntity
+{
+    public int Id { get; set; }
+    public int CarteiraFinanceiraId { get; set; }
+    public CarteiraFinanceira? CarteiraFinanceira { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public decimal? PesoAlvo { get; set; }
+    public string? Observacao { get; set; }
+    public bool Ativo { get; set; } = true;
+}
+
+public class CotacaoAtivoFinanceiro : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public ProvedorCotacao Provedor { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public string Currency { get; set; } = "BRL";
+    public decimal Price { get; set; }
+    public decimal PriceBRL { get; set; }
+    public decimal? Change { get; set; }
+    public decimal? ChangePercent { get; set; }
+    public DateTime? MarketTime { get; set; }
+    public DateTime RetrievedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+    public StatusCotacao Status { get; set; } = StatusCotacao.Atual;
+    public string? ErrorMessage { get; set; }
+    public string RawJson { get; set; } = "{}";
+}
+
+public class PrecoHistoricoAtivoFinanceiro : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public ProvedorCotacao Provedor { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public string Interval { get; set; } = "1d";
+    public decimal Open { get; set; }
+    public decimal High { get; set; }
+    public decimal Low { get; set; }
+    public decimal Close { get; set; }
+    public decimal CloseBRL { get; set; }
+    public decimal? Volume { get; set; }
+    public string RawJson { get; set; } = "{}";
 }
 
 public class OperacaoB3 : AuditableEntity

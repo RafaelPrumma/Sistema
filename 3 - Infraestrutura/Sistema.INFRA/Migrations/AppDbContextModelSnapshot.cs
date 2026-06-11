@@ -304,6 +304,123 @@ namespace Sistema.INFRA.Migrations
                     b.ToTable("FinanceiroCarga", (string)null);
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.CarteiraAtivoFinanceiro", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("AtivoFinanceiroId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CarteiraFinanceiraId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DataAlteracao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataExclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("PesoAlvo")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<string>("UsuarioAlteracao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioExclusao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioInclusao")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtivoFinanceiroId");
+
+                    b.HasIndex("CarteiraFinanceiraId", "AtivoFinanceiroId")
+                        .IsUnique();
+
+                    b.ToTable("FinanceiroCarteiraAtivo", (string)null);
+                });
+
+            modelBuilder.Entity("Sistema.CORE.Entities.CarteiraFinanceira", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("DataAlteracao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataExclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsSistema")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(140)
+                        .HasColumnType("nvarchar(140)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("UsuarioAlteracao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioExclusao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioInclusao")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("FinanceiroCarteira", (string)null);
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.Configuracao", b =>
                 {
                     b.Property<int>("Id")
@@ -419,6 +536,95 @@ namespace Sistema.INFRA.Migrations
                     b.ToTable("FinanceiroConteudoBruto", (string)null);
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.CotacaoAtivoFinanceiro", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AtivoFinanceiroId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Change")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<decimal?>("ChangePercent")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("DataAlteracao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataExclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MarketTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<decimal>("PriceBRL")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<int>("Provedor")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RetrievedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("UsuarioAlteracao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioExclusao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioInclusao")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtivoFinanceiroId", "Provedor")
+                        .IsUnique();
+
+                    b.HasIndex("RetrievedAt");
+
+                    b.ToTable("FinanceiroCotacaoAtivo", (string)null);
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.DocumentoFinanceiro", b =>
                 {
                     b.Property<int>("Id")
@@ -454,8 +660,22 @@ namespace Sistema.INFRA.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
 
+                    b.Property<int?>("ImportacaoFinanceiraArquivoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentKind")
+                        .HasColumnType("int");
+
                     b.Property<int?>("PageCount")
                         .HasColumnType("int");
+
+                    b.Property<int>("ParseStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ParserVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("Path")
                         .IsRequired()
@@ -485,6 +705,10 @@ namespace Sistema.INFRA.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<string>("StoredPath")
+                        .HasMaxLength(700)
+                        .HasColumnType("nvarchar(700)");
+
                     b.Property<string>("UsuarioAlteracao")
                         .HasColumnType("nvarchar(max)");
 
@@ -498,6 +722,12 @@ namespace Sistema.INFRA.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CargaFinanceiraId", "FileName");
+
+                    b.HasIndex("DocumentKind");
+
+                    b.HasIndex("ImportacaoFinanceiraArquivoId");
+
+                    b.HasIndex("Sha256");
 
                     b.ToTable("FinanceiroDocumento", (string)null);
                 });
@@ -621,6 +851,70 @@ namespace Sistema.INFRA.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Funcionalidade", (string)null);
+                });
+
+            modelBuilder.Entity("Sistema.CORE.Entities.ImportacaoFinanceiraArquivo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("DataAlteracao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataExclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FilesDiscovered")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FilesImported")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FilesSkipped")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("SourceFolder")
+                        .IsRequired()
+                        .HasMaxLength(700)
+                        .HasColumnType("nvarchar(700)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StructuredRowsImported")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioAlteracao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioExclusao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioInclusao")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceFolder", "StartedAt");
+
+                    b.ToTable("FinanceiroImportacaoArquivo", (string)null);
                 });
 
             modelBuilder.Entity("Sistema.CORE.Entities.Log", b =>
@@ -1041,6 +1335,88 @@ namespace Sistema.INFRA.Migrations
                     b.ToTable("PerfilFuncionalidade", (string)null);
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.PrecoHistoricoAtivoFinanceiro", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AtivoFinanceiroId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Close")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<decimal>("CloseBRL")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<DateTime?>("DataAlteracao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataExclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DataInclusao")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("High")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<string>("Interval")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<decimal>("Low")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<decimal>("Open")
+                        .HasPrecision(28, 12)
+                        .HasColumnType("decimal(28,12)");
+
+                    b.Property<int>("Provedor")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("UsuarioAlteracao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioExclusao")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UsuarioInclusao")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("Volume")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("decimal(28,8)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtivoFinanceiroId", "Provedor", "Interval", "Date")
+                        .IsUnique();
+
+                    b.ToTable("FinanceiroPrecoHistoricoAtivo", (string)null);
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.RendimentoInvestimento", b =>
                 {
                     b.Property<int>("Id")
@@ -1394,6 +1770,25 @@ namespace Sistema.INFRA.Migrations
                     b.Navigation("CargaFinanceira");
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.CarteiraAtivoFinanceiro", b =>
+                {
+                    b.HasOne("Sistema.CORE.Entities.AtivoFinanceiro", "AtivoFinanceiro")
+                        .WithMany()
+                        .HasForeignKey("AtivoFinanceiroId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sistema.CORE.Entities.CarteiraFinanceira", "CarteiraFinanceira")
+                        .WithMany("Ativos")
+                        .HasForeignKey("CarteiraFinanceiraId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AtivoFinanceiro");
+
+                    b.Navigation("CarteiraFinanceira");
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.ConteudoBrutoFinanceiro", b =>
                 {
                     b.HasOne("Sistema.CORE.Entities.DocumentoFinanceiro", "DocumentoFinanceiro")
@@ -1405,6 +1800,17 @@ namespace Sistema.INFRA.Migrations
                     b.Navigation("DocumentoFinanceiro");
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.CotacaoAtivoFinanceiro", b =>
+                {
+                    b.HasOne("Sistema.CORE.Entities.AtivoFinanceiro", "AtivoFinanceiro")
+                        .WithMany()
+                        .HasForeignKey("AtivoFinanceiroId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AtivoFinanceiro");
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.DocumentoFinanceiro", b =>
                 {
                     b.HasOne("Sistema.CORE.Entities.CargaFinanceira", "CargaFinanceira")
@@ -1413,7 +1819,14 @@ namespace Sistema.INFRA.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Sistema.CORE.Entities.ImportacaoFinanceiraArquivo", "ImportacaoFinanceiraArquivo")
+                        .WithMany()
+                        .HasForeignKey("ImportacaoFinanceiraArquivoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("CargaFinanceira");
+
+                    b.Navigation("ImportacaoFinanceiraArquivo");
                 });
 
             modelBuilder.Entity("Sistema.CORE.Entities.EstimativaPosicaoCarteira", b =>
@@ -1574,6 +1987,17 @@ namespace Sistema.INFRA.Migrations
                     b.Navigation("Perfil");
                 });
 
+            modelBuilder.Entity("Sistema.CORE.Entities.PrecoHistoricoAtivoFinanceiro", b =>
+                {
+                    b.HasOne("Sistema.CORE.Entities.AtivoFinanceiro", "AtivoFinanceiro")
+                        .WithMany()
+                        .HasForeignKey("AtivoFinanceiroId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AtivoFinanceiro");
+                });
+
             modelBuilder.Entity("Sistema.CORE.Entities.RendimentoInvestimento", b =>
                 {
                     b.HasOne("Sistema.CORE.Entities.AtivoFinanceiro", "Asset")
@@ -1630,6 +2054,11 @@ namespace Sistema.INFRA.Migrations
                         .IsRequired();
 
                     b.Navigation("Perfil");
+                });
+
+            modelBuilder.Entity("Sistema.CORE.Entities.CarteiraFinanceira", b =>
+                {
+                    b.Navigation("Ativos");
                 });
 
             modelBuilder.Entity("Sistema.CORE.Entities.DocumentoFinanceiro", b =>
