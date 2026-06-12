@@ -13,6 +13,6 @@ public interface IUnitOfWork
     ITemaRepository Temas { get; }
     IConfiguracaoRepository Configuracoes { get; }
     IMensagemRepository Mensagens { get; }
-    IMinhasFinancasRepository MinhasFinancas { get; }
+    IFinancasRepository Financas { get; }
     Task<int> ConfirmarAsync(CancellationToken cancellationToken = default);
 }

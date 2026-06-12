@@ -21,4 +21,5 @@ node_modules/
 /.vs/Sistema/CopilotIndices/17.14.1347.20289
 artifacts/screenshots/*.png
 artifacts/*.log
+artifacts/build/
 /0 - Apresentacao/Sistema.MVC/App_Data/DataProtectionKeys/

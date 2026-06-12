@@ -6,7 +6,7 @@ using Sistema.INFRA.Data;
 
 namespace Sistema.INFRA.Repositories;
 
-public class MinhasFinancasRepository(AppDbContext context) : IMinhasFinancasRepository
+public class FinancasRepository(AppDbContext context) : IFinancasRepository
 {
     private readonly AppDbContext _context = context;
 

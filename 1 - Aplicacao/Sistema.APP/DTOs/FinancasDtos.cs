@@ -206,7 +206,7 @@ public record ImportacaoFinanceiraResumoDto(
     int DocumentosComAlerta,
     string? PastaMonitorada);
 
-public class MinhasFinancasDashboardDto
+public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;
     public string Fonte { get; set; } = string.Empty;

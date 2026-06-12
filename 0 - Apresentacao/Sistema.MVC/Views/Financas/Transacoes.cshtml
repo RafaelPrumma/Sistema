@@ -111,7 +111,7 @@
         function esc(v) { return (v == null ? '' : String(v)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
         var tabela = window.initDataTable('#tabelaTransacoes', {
-            url: '@Url.Action("TransacoesData", "MinhasFinancas")',
+            url: '@Url.Action("TransacoesData", "Financas")',
             order: [[0, 'desc']],
             columns: [
                 { data: 'data', render: function (d) { return d ? new Date(d).toLocaleDateString('pt-BR') : ''; } },

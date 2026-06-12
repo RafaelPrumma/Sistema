@@ -8,7 +8,7 @@
         new { Nome = "AzureAd", Icone = "bi-microsoft", Descricao = "Email, autenticacao externa e Graph." },
         new { Nome = "LogsRetencao", Icone = "bi-clock-history", Descricao = "Politicas de retencao por modulo." },
         new { Nome = "Mensagens", Icone = "bi-chat-left-text", Descricao = "Comunicacao interna, avisos e feed." },
-        new { Nome = "MinhasFinancas", Icone = "bi-graph-up-arrow", Descricao = "Importacao, dashboards e reconciliacao financeira." }
+        new { Nome = "Financas", Icone = "bi-graph-up-arrow", Descricao = "Importacao, dashboards e reconciliacao financeira." }
     };
     var grupoAtual = grupos.FirstOrDefault(g => string.Equals(g.Nome, Model.Agrupamento, StringComparison.OrdinalIgnoreCase)) ?? grupos[0];
 }

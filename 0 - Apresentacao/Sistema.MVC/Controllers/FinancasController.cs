@@ -9,14 +9,13 @@ using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
-[AuthorizePermission("MinhasFinancas", Permissao.Visualizar)]
-public class MinhasFinancasController(IMinhasFinancasAppService service) : Controller
+[AuthorizePermission("Financas", Permissao.Visualizar)]
+public class FinancasController(IFinancasAppService service) : Controller
 {
-    private readonly IMinhasFinancasAppService _service = service;
+    private readonly IFinancasAppService _service = service;
 
-    [HttpGet("/MinhasFinancas")]
-    [HttpGet("/MinhasFinancas/Index")]
     [HttpGet("/Financas")]
+    [HttpGet("/Financas/Index")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
         => View(await _service.ObterDashboardAsync(cancellationToken));
 
@@ -29,7 +28,7 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
         {
             // Roda em segundo plano (Hangfire) para não travar a requisição com PDFs grandes.
             // O usuarioId é capturado agora e usado para notificar quem disparou ao concluir.
-            BackgroundJob.Enqueue<IMinhasFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(usuarioId, CancellationToken.None));
+            BackgroundJob.Enqueue<IFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(usuarioId, CancellationToken.None));
             TempData["MensagemSucesso"] = "Importação iniciada em segundo plano. Você será notificado ao concluir — acompanhe na tela de Fila.";
         }
         catch
@@ -112,7 +111,7 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
         return View();
     }
 
-    [HttpGet("/MinhasFinancas/TransacoesData")]
+    [HttpGet("/Financas/TransacoesData")]
     public async Task<IActionResult> TransacoesData([FromQuery] DataTablesRequest request, string? origem, CancellationToken cancellationToken)
         => Json(await _service.BuscarTransacoesDataTableAsync(request, origem, cancellationToken));
 
@@ -132,11 +131,11 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
         return View(await _service.ObterResumoAnaliticoAsync(inicio, fim, cancellationToken));
     }
 
-    [HttpGet("/MinhasFinancas/ValidarAtivo")]
+    [HttpGet("/Financas/ValidarAtivo")]
     public async Task<IActionResult> ValidarAtivo(string ticker, CancellationToken cancellationToken)
         => Json(await _service.ValidarAtivoAsync(ticker ?? string.Empty, cancellationToken));
 
-    [HttpGet("/MinhasFinancas/Evolucao")]
+    [HttpGet("/Financas/Evolucao")]
     public async Task<IActionResult> Evolucao(CancellationToken cancellationToken)
         => Json(await _service.ObterEvolucaoPatrimonioAsync(cancellationToken));
 

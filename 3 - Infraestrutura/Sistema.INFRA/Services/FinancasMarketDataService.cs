@@ -11,17 +11,17 @@ using Sistema.INFRA.Data;
 
 namespace Sistema.INFRA.Services;
 
-public class MinhasFinancasMarketDataService(
+public class FinancasMarketDataService(
     AppDbContext context,
     IHttpClientFactory httpClientFactory,
     IConfiguracaoLeitura config,
-    ILogger<MinhasFinancasMarketDataService> logger) : IMinhasFinancasMarketDataService
+    ILogger<FinancasMarketDataService> logger) : IFinancasMarketDataService
 {
     private const string UsuarioSistema = "market-data";
     private readonly AppDbContext _context = context;
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly IConfiguracaoLeitura _config = config;
-    private readonly ILogger<MinhasFinancasMarketDataService> _logger = logger;
+    private readonly ILogger<FinancasMarketDataService> _logger = logger;
 
     public async Task AtualizarCotacoesAsync(bool force = false, CancellationToken cancellationToken = default)
     {
@@ -81,7 +81,7 @@ public class MinhasFinancasMarketDataService(
     private async Task<ValidacaoAtivoResultado?> ValidarB3Async(string symbol, CancellationToken cancellationToken)
     {
         var pareceB3 = System.Text.RegularExpressions.Regex.IsMatch(symbol, @"^[A-Z]{4}\d{1,2}$");
-        var token = await _config.ObterTextoAsync("MinhasFinancas", "MarketData:BrapiToken", null, cancellationToken);
+        var token = await _config.ObterTextoAsync("Financas", "MarketData:BrapiToken", null, cancellationToken);
         var client = _httpClientFactory.CreateClient("Brapi");
 
         try
@@ -124,7 +124,7 @@ public class MinhasFinancasMarketDataService(
         }
         catch (Exception ex)
         {
-            MinhasFinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/validação", ex.Message);
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/validação", ex.Message);
             return null;
         }
     }
@@ -181,10 +181,14 @@ public class MinhasFinancasMarketDataService(
         var t = (ticker ?? string.Empty).ToUpperInvariant();
         var n = (nome ?? string.Empty).ToUpperInvariant();
 
-        if (t.EndsWith("34") || t.EndsWith("35") || t.EndsWith("32") || t.EndsWith("33") || t.EndsWith("39"))
+        if (t.EndsWith("34", StringComparison.Ordinal) ||
+            t.EndsWith("35", StringComparison.Ordinal) ||
+            t.EndsWith("32", StringComparison.Ordinal) ||
+            t.EndsWith("33", StringComparison.Ordinal) ||
+            t.EndsWith("39", StringComparison.Ordinal))
             return ClasseAtivo.BDR;
 
-        if (t.EndsWith("11"))
+        if (t.EndsWith("11", StringComparison.Ordinal))
         {
             if (n.Contains("FII") || n.Contains("FDO") || n.Contains("IMOB") || n.Contains("RECEB") || n.Contains("FUNDO") && n.Contains("INVEST IMOB"))
                 return ClasseAtivo.FII;
@@ -225,7 +229,7 @@ public class MinhasFinancasMarketDataService(
         if (staleSymbols.Count == 0)
             return;
 
-        var token = await _config.ObterTextoAsync("MinhasFinancas", "MarketData:BrapiToken", null, cancellationToken);
+        var token = await _config.ObterTextoAsync("Financas", "MarketData:BrapiToken", null, cancellationToken);
         if (string.IsNullOrWhiteSpace(token) && staleSymbols.Any(x => !IsBrapiFreeTicker(x)))
         {
             await MarcarSemTokenAsync(ativos, ProvedorCotacao.Brapi, staleSymbols, cancellationToken);
@@ -268,7 +272,7 @@ public class MinhasFinancasMarketDataService(
         }
         catch (Exception ex)
         {
-            MinhasFinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi", ex.Message);
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi", ex.Message);
             await MarcarFalhaAsync(ativos, ProvedorCotacao.Brapi, staleSymbols, ex.Message, cancellationToken);
         }
     }
@@ -467,7 +471,7 @@ public class MinhasFinancasMarketDataService(
     private async Task MarcarSemTokenAsync(IReadOnlyList<AtivoFinanceiro> ativos, ProvedorCotacao provedor, IReadOnlyList<string> symbols, CancellationToken cancellationToken)
     {
         foreach (var ativo in ativos.Where(x => symbols.Contains(ResolverTickerB3(x), StringComparer.OrdinalIgnoreCase)))
-            UpsertCotacao(ativo.Id, provedor, ResolverTickerB3(ativo), "BRL", 0m, 0m, null, null, null, StatusCotacao.SemToken, "Configure MinhasFinancas:MarketData:BrapiToken para cotações B3 completas.", "{}", TimeSpan.FromMinutes(5));
+            UpsertCotacao(ativo.Id, provedor, ResolverTickerB3(ativo), "BRL", 0m, 0m, null, null, null, StatusCotacao.SemToken, "Configure Financas:MarketData:BrapiToken para cotações B3 completas.", "{}", TimeSpan.FromMinutes(5));
 
         await Task.CompletedTask;
     }
@@ -517,7 +521,7 @@ public class MinhasFinancasMarketDataService(
     private sealed record BinanceTicker(string Symbol, decimal Price, decimal? Change, decimal? ChangePercent, DateTime? MarketTime, string RawJson);
 }
 
-internal static partial class MinhasFinancasMarketDataLogMessages
+internal static partial class FinancasMarketDataLogMessages
 {
     [LoggerMessage(EventId = 41, Level = LogLevel.Warning, Message = "Falha ao atualizar cotações via {Provider}: {Message}")]
     public static partial void FalhaCotacao(ILogger logger, string provider, string message);

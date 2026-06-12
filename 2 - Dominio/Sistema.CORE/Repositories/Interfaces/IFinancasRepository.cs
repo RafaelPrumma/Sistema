@@ -3,7 +3,7 @@ using Sistema.CORE.Entities;
 
 namespace Sistema.CORE.Repositories.Interfaces;
 
-public interface IMinhasFinancasRepository
+public interface IFinancasRepository
 {
     Task<bool> ExisteCargaComShaAsync(string sha256, CancellationToken cancellationToken = default);
     Task<CargaFinanceira?> ObterCargaMaisRecenteAsync(CancellationToken cancellationToken = default);

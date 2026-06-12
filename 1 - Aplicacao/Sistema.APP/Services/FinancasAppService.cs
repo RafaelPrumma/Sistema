@@ -8,44 +8,44 @@ using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador importador, IMinhasFinancasMarketDataService marketData, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IMinhasFinancasAppService
+public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador, IFinancasMarketDataService marketData, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IFinancasAppService
 {
     private readonly IUnitOfWork _uow = uow;
-    private readonly IMinhasFinancasImportador _importador = importador;
-    private readonly IMinhasFinancasMarketDataService _marketData = marketData;
+    private readonly IFinancasImportador _importador = importador;
+    private readonly IFinancasMarketDataService _marketData = marketData;
     private readonly ILogAppService _log = log;
     private readonly IMensagemAppService _mensagem = mensagem;
     private readonly IExecutionContext _execution = execution;
 
     private string UsuarioAtual => string.IsNullOrWhiteSpace(_execution.Usuario) ? "sistema" : _execution.Usuario!;
 
-    public async Task<MinhasFinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
+    public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var carga = await _uow.MinhasFinancas.ObterCargaMaisRecenteAsync(cancellationToken);
-        var alertas = await _uow.MinhasFinancas.BuscarAlertasAsync(cancellationToken);
-        var posicoes = await _uow.MinhasFinancas.BuscarPosicoesAsync(null, cancellationToken);
-        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
-        var carteiras = await _uow.MinhasFinancas.BuscarCarteirasComAtivosAsync(cancellationToken);
-        var historico = await _uow.MinhasFinancas.BuscarHistoricoPrecosAsync(DateTime.UtcNow.Date.AddYears(-1), cancellationToken);
-        var documentosMonitorados = await _uow.MinhasFinancas.BuscarDocumentosMonitoradosAsync(cancellationToken);
-        var ultimaImportacao = await _uow.MinhasFinancas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
-        var transacoes = await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken);
+        var carga = await _uow.Financas.ObterCargaMaisRecenteAsync(cancellationToken);
+        var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
+        var posicoes = await _uow.Financas.BuscarPosicoesAsync(null, cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(DateTime.UtcNow.Date.AddYears(-1), cancellationToken);
+        var documentosMonitorados = await _uow.Financas.BuscarDocumentosMonitoradosAsync(cancellationToken);
+        var ultimaImportacao = await _uow.Financas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
         var posicoesTabela = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > 0.000000001m).ToList();
         var ativosCotados = CriarAtivosCotadosDaTabela(posicoesTabela, cotacoes);
 
-        var dashboard = new MinhasFinancasDashboardDto
+        var dashboard = new FinancasDashboardDto
         {
             GeradoEm = carga?.GeneratedAt?.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR")) ?? string.Empty,
             Fonte = carga?.SourcePath ?? string.Empty,
             DashboardJson = carga?.DashboardJson,
             Kpis = CriarKpis(carga),
-            B3PorAno = (await _uow.MinhasFinancas.BuscarAgregadosAsync("b3-year", cancellationToken)).Select(MapSerie).ToList(),
-            B3PorMes = (await _uow.MinhasFinancas.BuscarAgregadosAsync("b3-month", cancellationToken)).Select(MapSerie).ToList(),
-            B3PorClasse = (await _uow.MinhasFinancas.BuscarAgregadosAsync("b3-class", cancellationToken)).Select(MapDistribuicao).ToList(),
-            BinanceMoedas = (await _uow.MinhasFinancas.BuscarAgregadosAsync("binance-coin", cancellationToken)).Select(MapDistribuicao).Take(12).ToList(),
-            UltimasOperacoesB3 = (await _uow.MinhasFinancas.BuscarUltimasOperacoesB3Async(12, cancellationToken)).Select(MapOperacaoB3).ToList(),
-            UltimasTransacoesCripto = (await _uow.MinhasFinancas.BuscarUltimasTransacoesCriptoAsync(12, cancellationToken)).Select(MapTransacaoCripto).ToList(),
+            B3PorAno = (await _uow.Financas.BuscarAgregadosAsync("b3-year", cancellationToken)).Select(MapSerie).ToList(),
+            B3PorMes = (await _uow.Financas.BuscarAgregadosAsync("b3-month", cancellationToken)).Select(MapSerie).ToList(),
+            B3PorClasse = (await _uow.Financas.BuscarAgregadosAsync("b3-class", cancellationToken)).Select(MapDistribuicao).ToList(),
+            BinanceMoedas = (await _uow.Financas.BuscarAgregadosAsync("binance-coin", cancellationToken)).Select(MapDistribuicao).Take(12).ToList(),
+            UltimasOperacoesB3 = (await _uow.Financas.BuscarUltimasOperacoesB3Async(12, cancellationToken)).Select(MapOperacaoB3).ToList(),
+            UltimasTransacoesCripto = (await _uow.Financas.BuscarUltimasTransacoesCriptoAsync(12, cancellationToken)).Select(MapTransacaoCripto).ToList(),
             PosicoesAbertas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.AbertaOuResidual).Take(12).Select(MapPosicao).ToList(),
             PosicoesEncerradas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.EncerradaPorOperacoes).Take(8).Select(MapPosicao).ToList(),
             Alertas = alertas.Take(8).Select(MapAlerta).ToList(),
@@ -70,46 +70,46 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
     public async Task<PagedResult<DocumentoFinanceiroDto>> BuscarDocumentosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var result = await _uow.MinhasFinancas.BuscarDocumentosAsync(page, pageSize, termo, cancellationToken);
+        var result = await _uow.Financas.BuscarDocumentosAsync(page, pageSize, termo, cancellationToken);
         return new PagedResult<DocumentoFinanceiroDto>(result.Items.Select(MapDocumento).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
     public async Task<(DocumentoFinanceiroDto? Documento, IReadOnlyList<ConteudoBrutoFinanceiroDto> Conteudos)> ObterDocumentoAsync(int id, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var documento = await _uow.MinhasFinancas.ObterDocumentoAsync(id, cancellationToken);
+        var documento = await _uow.Financas.ObterDocumentoAsync(id, cancellationToken);
         if (documento is null)
             return (null, []);
 
-        var conteudos = await _uow.MinhasFinancas.BuscarConteudosDocumentoAsync(id, cancellationToken);
+        var conteudos = await _uow.Financas.BuscarConteudosDocumentoAsync(id, cancellationToken);
         return (MapDocumento(documento), conteudos.Select(MapConteudo).ToList());
     }
 
     public async Task<PagedResult<OperacaoB3Dto>> BuscarOperacoesB3Async(int page, int pageSize, string? termo, int? ano, string? classe, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var result = await _uow.MinhasFinancas.BuscarOperacoesB3Async(page, pageSize, termo, ano, classe, cancellationToken);
+        var result = await _uow.Financas.BuscarOperacoesB3Async(page, pageSize, termo, ano, classe, cancellationToken);
         return new PagedResult<OperacaoB3Dto>(result.Items.Select(MapOperacaoB3).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
     public async Task<PagedResult<TransacaoCriptoDto>> BuscarTransacoesCriptoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var result = await _uow.MinhasFinancas.BuscarTransacoesCriptoAsync(page, pageSize, termo, cancellationToken);
+        var result = await _uow.Financas.BuscarTransacoesCriptoAsync(page, pageSize, termo, cancellationToken);
         return new PagedResult<TransacaoCriptoDto>(result.Items.Select(MapTransacaoCripto).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
     public async Task<IReadOnlyList<PosicaoFinanceiraDto>> BuscarPosicoesAsync(bool? somenteAbertas, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var result = await _uow.MinhasFinancas.BuscarPosicoesAsync(somenteAbertas, cancellationToken);
+        var result = await _uow.Financas.BuscarPosicoesAsync(somenteAbertas, cancellationToken);
         return result.Select(MapPosicao).ToList();
     }
 
     public async Task<IReadOnlyList<AlertaConfiabilidadeDto>> BuscarAlertasAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
-        var result = await _uow.MinhasFinancas.BuscarAlertasAsync(cancellationToken);
+        var result = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
         return result.Select(MapAlerta).ToList();
     }
 
@@ -120,7 +120,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         await _log.RegistrarFinanceiroAsync(
             "Importacao", "ImportarPasta", true,
             "Importação da pasta monitorada concluída.",
-            LogTipo.Sucesso, usuarioId?.ToString() ?? "sistema", null, cancellationToken);
+            LogTipo.Sucesso, usuarioId?.ToString(CultureInfo.InvariantCulture) ?? "sistema", null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
 
         // Notifica quem disparou a importação (aparece no badge de não-lidas / tela de avisos).
@@ -129,7 +129,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             await _mensagem.EnviarAsync(
                 null, usuarioId.Value,
                 "Importação financeira concluída",
-                "Seus relatórios foram importados e a carteira foi atualizada. Confira o dashboard de Minhas Finanças.",
+                "Seus relatórios foram importados e a carteira foi atualizada. Confira o dashboard de Finanças.",
                 null, cancellationToken);
         }
     }
@@ -149,9 +149,9 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         var totalDias = (hoje - inicio).Days + 1;
         var datas = Enumerable.Range(0, totalDias).Select(i => inicio.AddDays(i)).ToList();
 
-        var transacoes = await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken);
-        var historico = await _uow.MinhasFinancas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
-        var carteiras = await _uow.MinhasFinancas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
+        var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
 
         // Agrupa por carteira/grupo (Setor, Tese de cripto, Classe de FII...). Cada ativo cai na
         // primeira carteira que o contém, na ordem definida. Ativos sem grupo vão para "Outros".
@@ -230,7 +230,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         };
 
         // Variação do dia por setor e total, a partir das cotações ao vivo (não do histórico diário).
-        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var cotacaoPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());
@@ -266,7 +266,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         var variacaoDiaTotal = valorVivoTotal == 0m ? 0m : Math.Round(varDiaValorTotal / valorVivoTotal * 100m, 2);
 
         return new EvolucaoPatrimonioDto(
-            datas.Select(d => d.ToString("yyyy-MM-dd")).ToList(),
+            datas.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList(),
             total.Select(v => Math.Round(v, 2)).ToList(),
             variacaoDiaTotal,
             Math.Round(valorVivoTotal, 2),
@@ -274,20 +274,20 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             periodos);
     }
 
-    public async Task<ResumoAnaliticoDto> ObterResumoAnaliticoAsync(DateTime? inicioOpt, DateTime? fimOpt, CancellationToken cancellationToken = default)
+    public async Task<ResumoAnaliticoDto> ObterResumoAnaliticoAsync(DateTime? inicio, DateTime? fim, CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
 
-        var fim = (fimOpt ?? DateTime.UtcNow.Date).Date;
-        var inicio = (inicioOpt ?? new DateTime(fim.Year, fim.Month, 1)).Date;
+        var fimPeriodo = (fim ?? DateTime.UtcNow.Date).Date;
+        var inicioPeriodo = (inicio ?? new DateTime(fimPeriodo.Year, fimPeriodo.Month, 1)).Date;
 
-        var transacoes = (await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken))
-            .Where(t => t.Date.Date <= fim && t.Asset is not null)
+        var transacoes = (await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken))
+            .Where(t => t.Date.Date <= fimPeriodo && t.Asset is not null)
             .OrderBy(t => t.Date)
             .ThenBy(t => t.Id)
             .ToList();
 
-        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var precoAtualPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
@@ -305,7 +305,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
                 estado[t.AssetId] = pos;
             }
 
-            var noPeriodo = t.Date.Date >= inicio && t.Date.Date <= fim;
+            var noPeriodo = t.Date.Date >= inicioPeriodo && t.Date.Date <= fimPeriodo;
             var delta = DeltaQuantidade(t);
 
             if (delta > 0)
@@ -376,9 +376,9 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         }
 
         return new ResumoAnaliticoDto(
-            $"{inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}",
-            inicio,
-            fim,
+            $"{inicioPeriodo:dd/MM/yyyy} a {fimPeriodo:dd/MM/yyyy}",
+            inicioPeriodo,
+            fimPeriodo,
             Math.Round(totalComprado, 2),
             Math.Round(totalVendido, 2),
             Math.Round(totalComprado - totalVendido, 2),
@@ -416,7 +416,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
         OrigemTransacao? origemFiltro = Enum.TryParse<OrigemTransacao>(origem, true, out var o) ? o : null;
-        var result = await _uow.MinhasFinancas.BuscarTransacoesAsync(page, pageSize, termo, origemFiltro, cancellationToken);
+        var result = await _uow.Financas.BuscarTransacoesAsync(page, pageSize, termo, origemFiltro, cancellationToken);
         return new PagedResult<TransacaoFinanceiraDto>(result.Items.Select(MapTransacao).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
@@ -424,7 +424,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
         OrigemTransacao? origemFiltro = Enum.TryParse<OrigemTransacao>(origem, true, out var o) ? o : null;
-        var resposta = await _uow.MinhasFinancas.BuscarTransacoesDataTableAsync(request, origemFiltro, cancellationToken);
+        var resposta = await _uow.Financas.BuscarTransacoesDataTableAsync(request, origemFiltro, cancellationToken);
         return resposta.Map(MapTransacao);
     }
 
@@ -440,7 +440,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             return new ResultadoOperacao(false, "Tipo deve ser Compra ou Venda.");
 
         var ticker = input.Ticker.Trim().ToUpperInvariant();
-        var ativo = await _uow.MinhasFinancas.ObterAtivoPorChaveOuTickerAsync(ticker, cancellationToken);
+        var ativo = await _uow.Financas.ObterAtivoPorChaveOuTickerAsync(ticker, cancellationToken);
         if (ativo is null)
         {
             var validacao = await _marketData.ValidarAtivoAsync(ticker, cancellationToken);
@@ -458,9 +458,9 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
                 Currency = "BRL",
                 IsCrypto = validacao.IsCrypto,
                 IsActive = true,
-                UsuarioInclusao = "minhas-financas-manual"
+                UsuarioInclusao = "financas-manual"
             };
-            await _uow.MinhasFinancas.AdicionarAtivoAsync(ativo, cancellationToken);
+            await _uow.Financas.AdicionarAtivoAsync(ativo, cancellationToken);
             await _uow.ConfirmarAsync(cancellationToken);
             await _marketData.GarantirCotacaoAtivoAsync(ativo.Id, cancellationToken);
         }
@@ -482,9 +482,9 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             IsCanonical = true,
             ConfidenceLevel = NivelConfianca.Alta,
             RawJson = "{}",
-            UsuarioInclusao = "minhas-financas-manual"
+            UsuarioInclusao = "financas-manual"
         };
-        await _uow.MinhasFinancas.AdicionarTransacaoAsync(transacao, cancellationToken);
+        await _uow.Financas.AdicionarTransacaoAsync(transacao, cancellationToken);
         await _log.RegistrarFinanceiroAsync(
             "TransacaoFinanceira", "CriarManual", true,
             $"Transação manual {tipo} de {input.Quantidade} {ticker} a {input.PrecoUnitario}",
@@ -495,7 +495,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
 
     public async Task<ResultadoOperacao> EditarTransacaoAsync(int id, NovaTransacaoInput input, CancellationToken cancellationToken = default)
     {
-        var transacao = await _uow.MinhasFinancas.ObterTransacaoAsync(id, cancellationToken);
+        var transacao = await _uow.Financas.ObterTransacaoAsync(id, cancellationToken);
         if (transacao is null)
             return new ResultadoOperacao(false, "Transação não encontrada.");
         if (input.Quantidade <= 0)
@@ -511,7 +511,7 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         transacao.Date = input.Data.Date;
         transacao.Broker = string.IsNullOrWhiteSpace(input.Corretora) ? transacao.Broker : input.Corretora!.Trim();
         transacao.Observacao = input.Observacao;
-        _uow.MinhasFinancas.AtualizarTransacao(transacao);
+        _uow.Financas.AtualizarTransacao(transacao);
         await _log.RegistrarFinanceiroAsync(
             "TransacaoFinanceira", "Editar", true,
             $"Transação #{transacao.Id} editada ({tipo} {input.Quantidade})",
@@ -522,11 +522,11 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
 
     public async Task<ResultadoOperacao> ExcluirTransacaoAsync(int id, CancellationToken cancellationToken = default)
     {
-        var transacao = await _uow.MinhasFinancas.ObterTransacaoAsync(id, cancellationToken);
+        var transacao = await _uow.Financas.ObterTransacaoAsync(id, cancellationToken);
         if (transacao is null)
             return new ResultadoOperacao(false, "Transação não encontrada.");
 
-        _uow.MinhasFinancas.RemoverTransacao(transacao);
+        _uow.Financas.RemoverTransacao(transacao);
         await _log.RegistrarFinanceiroAsync(
             "TransacaoFinanceira", "Excluir", true,
             $"Transação #{transacao.Id} excluída ({transacao.OperationType} {transacao.Quantity})",

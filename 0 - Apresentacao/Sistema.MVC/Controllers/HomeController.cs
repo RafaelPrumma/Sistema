@@ -54,10 +54,10 @@ namespace Sistema.MVC.Controllers
                         [
                                 new DashboardAtalhoViewModel
                                 {
-                                        Titulo = "Minhas Financas",
+                                        Titulo = "Finanças",
                                         Descricao = "Dashboard financeiro, documentos, B3, cripto e alertas.",
                                         Icone = "bi-graph-up-arrow",
-                                        Controller = "MinhasFinancas",
+                                        Controller = "Financas",
                                         Action = "Index",
                                         Variante = "success"
                                 },

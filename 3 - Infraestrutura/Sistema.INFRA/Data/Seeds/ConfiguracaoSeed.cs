@@ -1,4 +1,4 @@
-﻿using Sistema.CORE.Entities;
+using Sistema.CORE.Entities;
 
 namespace Sistema.INFRA.Data.Seeds;
 
@@ -123,7 +123,7 @@ public static class ConfiguracaoSeed
             },
             new()
             {
-                Agrupamento = "MinhasFinancas",
+                Agrupamento = "Financas",
                 Chave = "ImportacaoAutomaticaHabilitada",
                 Valor = "true",
                 Tipo = ConfiguracaoTipo.Texto,
@@ -132,7 +132,7 @@ public static class ConfiguracaoSeed
             },
             new()
             {
-                Agrupamento = "MinhasFinancas",
+                Agrupamento = "Financas",
                 Chave = "MarketData:RefreshSeconds",
                 Valor = "60",
                 Tipo = ConfiguracaoTipo.Texto,
@@ -141,7 +141,7 @@ public static class ConfiguracaoSeed
             },
             new()
             {
-                Agrupamento = "MinhasFinancas",
+                Agrupamento = "Financas",
                 Chave = "MarketData:BackgroundEnabled",
                 Valor = "true",
                 Tipo = ConfiguracaoTipo.Texto,
@@ -150,7 +150,7 @@ public static class ConfiguracaoSeed
             },
             new()
             {
-                Agrupamento = "MinhasFinancas",
+                Agrupamento = "Financas",
                 Chave = "MarketData:BrapiToken",
                 Valor = "",
                 Tipo = ConfiguracaoTipo.Password,
@@ -159,7 +159,7 @@ public static class ConfiguracaoSeed
             },
             new()
             {
-                Agrupamento = "MinhasFinancas",
+                Agrupamento = "Financas",
                 Chave = "WatchedFolderPath",
                 Valor = "",
                 Tipo = ConfiguracaoTipo.Texto,

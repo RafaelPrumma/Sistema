@@ -80,7 +80,7 @@ public class HomeControllerTests
         Assert.Equal(2, model.TotalConfiguracoes);
         Assert.Equal(1, model.TotalMensagens);
         Assert.Equal(4, model.TotalMensagensNaoLidas);
-        Assert.Contains(model.Atalhos, a => a.Controller == "MinhasFinancas");
+        Assert.Contains(model.Atalhos, a => a.Controller == "Financas");
         Assert.Contains(model.MensagensRecentes, m => m.Id == 99 && !m.Lida);
     }
 }

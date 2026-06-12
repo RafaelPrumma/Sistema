@@ -15,7 +15,7 @@ using UglyToad.PdfPig;
 
 namespace Sistema.INFRA.Importers;
 
-public partial class MinhasFinancasImportador(AppDbContext context, IConfiguration configuration, IConfiguracaoLeitura config, IHostEnvironment hostEnvironment, ILogger<MinhasFinancasImportador> logger) : IMinhasFinancasImportador
+public partial class FinancasImportador(AppDbContext context, IConfiguration configuration, IConfiguracaoLeitura config, IHostEnvironment hostEnvironment, ILogger<FinancasImportador> logger) : IFinancasImportador
 {
     private static readonly string[] CryptoQuotes = ["BRL", "USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB"];
     private const string ParserVersion = "financeiro-v1";
@@ -24,7 +24,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
     private readonly IConfiguration _configuration = configuration;
     private readonly IConfiguracaoLeitura _config = config;
     private readonly IHostEnvironment _hostEnvironment = hostEnvironment;
-    private readonly ILogger<MinhasFinancasImportador> _logger = logger;
+    private readonly ILogger<FinancasImportador> _logger = logger;
 
     public async Task GarantirCargaInicialAsync(CancellationToken cancellationToken = default)
     {
@@ -38,7 +38,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
         await GarantirCarteirasPadraoAsync(cancellationToken);
 
-        var watchedFolder = await _config.ObterTextoAsync("MinhasFinancas", "WatchedFolderPath", null, cancellationToken);
+        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
         if (!string.IsNullOrWhiteSpace(watchedFolder)
             && Directory.Exists(watchedFolder)
             && !await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == watchedFolder, cancellationToken))
@@ -53,7 +53,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
     {
-        var watchedFolder = await _config.ObterTextoAsync("MinhasFinancas", "WatchedFolderPath", null, cancellationToken);
+        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
         if (string.IsNullOrWhiteSpace(watchedFolder) || !Directory.Exists(watchedFolder))
             return;
 
@@ -73,7 +73,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 ImportedAt = DateTime.UtcNow,
                 Status = StatusDocumentoFinanceiro.Processado,
                 SummaryJson = "{}",
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             };
             _context.CargasFinanceiras.Add(carga);
         }
@@ -83,7 +83,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             SourceFolder = watchedFolder,
             StartedAt = DateTime.UtcNow,
             FilesDiscovered = files.Count,
-            UsuarioInclusao = "minhas-financas-importador"
+            UsuarioInclusao = "financas-importador"
         };
         _context.ImportacoesFinanceirasArquivo.Add(batch);
 
@@ -118,7 +118,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 ParseStatus = StatusParseDocumentoFinanceiro.Pendente,
                 Status = StatusDocumentoFinanceiro.Importado,
                 RawMetadataJson = JsonSerializer.Serialize(new { path = file, sha256 = sha, documentKind }),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             };
             _context.DocumentosFinanceiros.Add(documento);
 
@@ -187,7 +187,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 IsCanonical = true,
                 ConfidenceLevel = op.ConfidenceLevel,
                 RawJson = "{}",
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
 
@@ -240,7 +240,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     IsCanonical = true,
                     ConfidenceLevel = NivelConfianca.Media,
                     RawJson = "{}",
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -255,7 +255,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
     // Apaga e refaz as transações de importação quando a regra de materialização muda de versão.
     private async Task RessincronizarPorVersaoAsync(CancellationToken cancellationToken)
     {
-        const string agrupamento = "MinhasFinancas";
+        const string agrupamento = "Financas";
         const string chave = "MaterializacaoVersao";
         var config = await _context.Configuracoes
             .FirstOrDefaultAsync(x => x.Agrupamento == agrupamento && x.Chave == chave, cancellationToken);
@@ -274,15 +274,15 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             {
                 Agrupamento = agrupamento,
                 Chave = chave,
-                Valor = MaterializacaoVersao.ToString(),
+                Valor = MaterializacaoVersao.ToString(CultureInfo.InvariantCulture),
                 Descricao = "Versão interna da materialização de transações financeiras.",
                 Ativo = true,
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
         else
         {
-            config.Valor = MaterializacaoVersao.ToString();
+            config.Valor = MaterializacaoVersao.ToString(CultureInfo.InvariantCulture);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -306,7 +306,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             Status = StatusDocumentoFinanceiro.Processado,
             SummaryJson = summaryJson,
             DashboardJson = dashboardJson,
-            UsuarioInclusao = "minhas-financas-importador"
+            UsuarioInclusao = "financas-importador"
         };
 
         await _context.CargasFinanceiras.AddAsync(carga, cancellationToken);
@@ -320,7 +320,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
         await _context.SaveChangesAsync(cancellationToken);
         await SincronizarTransacoesCanonicasAsync(cancellationToken);
-        MinhasFinancasImportadorLogMessages.CargaFinanceiraImportada(_logger, sourcePath, sha);
+        FinancasImportadorLogMessages.CargaFinanceiraImportada(_logger, sourcePath, sha);
     }
 
     private Dictionary<string, DocumentoFinanceiro> ImportarDocumentos(JsonElement root, CargaFinanceira carga)
@@ -357,7 +357,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 PageCount = GetInt(metadata.Value, "pageCount"),
                 Status = MapStatusDocumento(GetString(metadata.Value, "status")),
                 RawMetadataJson = metadata.Value.GetRawText(),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             };
 
             _context.DocumentosFinanceiros.Add(documento);
@@ -380,7 +380,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     PageNumber = GetInt(page, "page"),
                     RawText = GetString(page, "text"),
                     RawJson = page.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -396,7 +396,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     ContentType = TipoConteudoBrutoFinanceiro.Planilha,
                     SheetName = GetString(sheet, "sheetName"),
                     RawJson = sheet.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -447,7 +447,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     ConfidenceLevel = isDuplicate ? NivelConfianca.Baixa : NivelConfianca.Media,
                     SourceFile = sourceFile,
                     RawJson = op.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -475,7 +475,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     ConfidenceLevel = NivelConfianca.PendenteValidacao,
                     LastOperationDate = TryParseDate(GetString(item, "lastDate")),
                     RawJson = item.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -536,7 +536,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 RawType = GetString(row, "Operação") ?? GetString(row, "Operation") ?? tipo,
                 SourceFile = source,
                 RawJson = row.GetRawText(),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
     }
@@ -563,7 +563,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     Quantidade = GetDecimal(coin, "netChange"),
                     Contagem = GetInt(coin, "rowCount"),
                     RawJson = coin.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -592,7 +592,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Saldo = compras - vendas,
                 Contagem = GetInt(row, countField),
                 RawJson = row.GetRawText(),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
     }
@@ -617,7 +617,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     Amount = GetDecimal(income, "valor") ?? 0m,
                     Taxation = GetString(income, "tributacao") ?? string.Empty,
                     RawJson = income.GetRawText(),
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
             }
         }
@@ -637,7 +637,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             Code = "NO_INVESTMENT_ADVICE",
             Message = "As análises financeiras são informativas e não constituem recomendação de investimento.",
             Details = "As posições exibidas são estimadas quando não houver reconciliação completa com custódia atual.",
-            UsuarioInclusao = "minhas-financas-importador"
+            UsuarioInclusao = "financas-importador"
         });
     }
 
@@ -655,7 +655,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Severity = severidade,
                 Code = code,
                 Message = row.ValueKind == JsonValueKind.String ? row.GetString() ?? string.Empty : row.GetRawText(),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
     }
@@ -689,7 +689,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Code = "DOCUMENT_PARSE_FAILED",
                 Message = $"Falha ao processar {documento.FileName}.",
                 Details = ex.Message,
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
             return 0;
         }
@@ -720,7 +720,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 SheetName = "csv",
                 RowNumber = i + 1,
                 RawJson = JsonSerializer.Serialize(row),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
 
             imported += ImportarTransacaoBinanceRow(row, documento, carga, ativos, "transaction");
@@ -771,7 +771,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 SheetName = "Sheet0",
                 RowNumber = i + 1,
                 RawJson = JsonSerializer.Serialize(row),
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
 
             imported += ImportarTransacaoBinanceRow(row, documento, carga, ativos, tipo);
@@ -797,7 +797,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                     ContentType = TipoConteudoBrutoFinanceiro.TextoPagina,
                     PageNumber = page.Number,
                     RawText = text,
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 });
 
                 if (documento.DocumentKind == TipoDocumentoFinanceiro.NotaNegociacaoB3)
@@ -815,7 +815,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Code = "PDF_TEXT_EXTRACTION_FAILED",
                 Message = $"Não foi possível extrair texto do PDF {documento.FileName}.",
                 Details = ex.Message,
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
             return 0;
         }
@@ -830,7 +830,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Severity = SeveridadeAlerta.Informacao,
                 Code = "NUBANK_STATEMENT_STORED_RAW",
                 Message = $"O extrato {documento.FileName} foi armazenado para auditoria e processamento financeiro futuro.",
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             });
         }
 
@@ -892,7 +892,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                             ConfidenceLevel = NivelConfianca.Media,
                             SourceFile = documento.FileName,
                             RawJson = JsonSerializer.Serialize(new { rawBlock, parser = ParserVersion }),
-                            UsuarioInclusao = "minhas-financas-importador"
+                            UsuarioInclusao = "financas-importador"
                         });
                         imported++;
                         break;
@@ -948,7 +948,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             RawType = GetValue(row, "Operação") ?? GetValue(row, "Operation") ?? tipo,
             SourceFile = documento.FileName,
             RawJson = JsonSerializer.Serialize(row),
-            UsuarioInclusao = "minhas-financas-importador"
+            UsuarioInclusao = "financas-importador"
         });
 
         return 1;
@@ -974,7 +974,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             Currency = isCrypto ? "USD/BRL" : "BRL",
             IsCrypto = isCrypto,
             ConceptRole = isCrypto ? MapPapelCripto(assetKey) : null,
-            UsuarioInclusao = "minhas-financas-importador"
+            UsuarioInclusao = "financas-importador"
         };
 
         _context.AtivosFinanceiros.Add(ativo);
@@ -1028,7 +1028,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 Tipo = spec.Tipo,
                 Ordem = spec.Ordem,
                 IsSistema = true,
-                UsuarioInclusao = "minhas-financas-importador"
+                UsuarioInclusao = "financas-importador"
             };
             _context.CarteirasFinanceiras.Add(carteira);
             carteiras.Add(carteira);
@@ -1050,7 +1050,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 {
                     CarteiraFinanceiraId = carteira.Id,
                     AtivoFinanceiroId = ativo.Id,
-                    UsuarioInclusao = "minhas-financas-importador"
+                    UsuarioInclusao = "financas-importador"
                 };
                 _context.CarteirasAtivosFinanceiros.Add(link);
                 links.Add(link);
@@ -1254,7 +1254,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
     private (byte[] JsonBytes, string SourcePath)? ResolverFonteJson()
     {
-        var zipPath = _configuration["MinhasFinancas:SeedZipPath"];
+        var zipPath = _configuration["Financas:SeedZipPath"];
         if (!string.IsNullOrWhiteSpace(zipPath) && File.Exists(zipPath))
         {
             using var zip = ZipFile.OpenRead(zipPath);
@@ -1273,7 +1273,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             }
         }
 
-        var jsonPath = _configuration["MinhasFinancas:SeedJsonPath"];
+        var jsonPath = _configuration["Financas:SeedJsonPath"];
         return !string.IsNullOrWhiteSpace(jsonPath) && File.Exists(jsonPath)
             ? (File.ReadAllBytes(jsonPath), jsonPath)
             : null;
@@ -1281,7 +1281,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
     private string? CarregarDashboardJson()
     {
-        var htmlPath = _configuration["MinhasFinancas:DashboardHtmlPath"];
+        var htmlPath = _configuration["Financas:DashboardHtmlPath"];
         if (string.IsNullOrWhiteSpace(htmlPath) || !File.Exists(htmlPath))
             return null;
 
@@ -1477,7 +1477,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
     private static partial Regex MoneyRegex();
 }
 
-internal static partial class MinhasFinancasImportadorLogMessages
+internal static partial class FinancasImportadorLogMessages
 {
     [LoggerMessage(EventId = 20, Level = LogLevel.Information, Message = "Carga financeira importada. Fonte={Fonte}, Sha={Sha}")]
     public static partial void CargaFinanceiraImportada(ILogger logger, string fonte, string sha);

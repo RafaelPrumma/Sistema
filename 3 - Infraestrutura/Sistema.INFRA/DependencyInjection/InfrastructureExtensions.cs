@@ -42,10 +42,10 @@ public static class InfrastructureExtensions
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
         services.AddScoped<IConfiguracaoLeitura, ConfiguracaoLeitura>();
         services.AddScoped<IMensagemRepository, MensagemRepository>();
-        services.AddScoped<IMinhasFinancasRepository, MinhasFinancasRepository>();
+        services.AddScoped<IFinancasRepository, FinancasRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<IMinhasFinancasImportador, MinhasFinancasImportador>();
-        services.AddScoped<IMinhasFinancasMarketDataService, MinhasFinancasMarketDataService>();
+        services.AddScoped<IFinancasImportador, FinancasImportador>();
+        services.AddScoped<IFinancasMarketDataService, FinancasMarketDataService>();
         services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));
         services.AddHttpClient("Binance", client => client.BaseAddress = new Uri("https://api.binance.com/"));
         services.AddScoped<IEmailAppService, EmailService>();

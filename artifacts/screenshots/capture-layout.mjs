@@ -117,10 +117,10 @@ try {
     ['/Mensagem/CaixaSaida', 'mensagem-saida', '09-mensagem-saida.png'],
     ['/Mensagem/Nova', 'mensagem-nova', '10-mensagem-nova.png'],
     ['/Documentacao', 'documentacao', '11-documentacao.png'],
-    ['/MinhasFinancas', 'financas-dashboard', '12-financas-dashboard.png'],
-    ['/MinhasFinancas/Documentos', 'financas-documentos', '13-financas-documentos.png'],
-    ['/MinhasFinancas/OperacoesB3', 'financas-b3', '14-financas-b3.png'],
-    ['/MinhasFinancas/OperacoesCripto', 'financas-cripto', '15-financas-cripto.png']
+    ['/Financas', 'financas-dashboard', '12-financas-dashboard.png'],
+    ['/Financas/Documentos', 'financas-documentos', '13-financas-documentos.png'],
+    ['/Financas/OperacoesB3', 'financas-b3', '14-financas-b3.png'],
+    ['/Financas/OperacoesCripto', 'financas-cripto', '15-financas-cripto.png']
   ];
 
   for (const [url, name, file] of routes) {

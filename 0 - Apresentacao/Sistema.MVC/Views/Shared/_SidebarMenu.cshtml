@@ -31,9 +31,9 @@
 
                 <li class="menu-section-label text-uppercase small">Modulos</li>
                 <li class="menu-item" data-panel="menuPanelFinancas">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("MinhasFinancas")" title="Financas" aria-label="Abrir submenu Financas">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Financas")" title="Finanças" aria-label="Abrir submenu Finanças">
                         <i class="bi bi-graph-up-arrow"></i>
-                        <span>Financas</span>
+                        <span>Finanças</span>
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
@@ -86,17 +86,17 @@
         <div class="menu-panel menu-panel--sub" id="menuPanelFinancas">
             <div class="menu-panel-header">
                 <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
-                <span class="menu-panel-title">Financas</span>
+                <span class="menu-panel-title">Finanças</span>
             </div>
             <ul class="menu-list">
-                <li><a asp-controller="MinhasFinancas" asp-action="Index" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Index")">Dashboard</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Transacoes" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Transacoes")">Transações</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Resumo" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Resumo")">Resumo analítico</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Documentos" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Documentos")">Documentos</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="OperacoesB3" class="menu-sublink @textClass @IsActive("MinhasFinancas", "OperacoesB3")">Operacoes B3</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="OperacoesCripto" class="menu-sublink @textClass @IsActive("MinhasFinancas", "OperacoesCripto")">Cripto</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Posicoes" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Posicoes")">Posicoes estimadas</a></li>
-                <li><a asp-controller="MinhasFinancas" asp-action="Alertas" class="menu-sublink @textClass @IsActive("MinhasFinancas", "Alertas")">Alertas</a></li>
+                <li><a asp-controller="Financas" asp-action="Index" class="menu-sublink @textClass @IsActive("Financas", "Index")">Dashboard</a></li>
+                <li><a asp-controller="Financas" asp-action="Transacoes" class="menu-sublink @textClass @IsActive("Financas", "Transacoes")">Transações</a></li>
+                <li><a asp-controller="Financas" asp-action="Resumo" class="menu-sublink @textClass @IsActive("Financas", "Resumo")">Resumo analítico</a></li>
+                <li><a asp-controller="Financas" asp-action="Documentos" class="menu-sublink @textClass @IsActive("Financas", "Documentos")">Documentos</a></li>
+                <li><a asp-controller="Financas" asp-action="OperacoesB3" class="menu-sublink @textClass @IsActive("Financas", "OperacoesB3")">Operacoes B3</a></li>
+                <li><a asp-controller="Financas" asp-action="OperacoesCripto" class="menu-sublink @textClass @IsActive("Financas", "OperacoesCripto")">Cripto</a></li>
+                <li><a asp-controller="Financas" asp-action="Posicoes" class="menu-sublink @textClass @IsActive("Financas", "Posicoes")">Posicoes estimadas</a></li>
+                <li><a asp-controller="Financas" asp-action="Alertas" class="menu-sublink @textClass @IsActive("Financas", "Alertas")">Alertas</a></li>
             </ul>
         </div>
 
