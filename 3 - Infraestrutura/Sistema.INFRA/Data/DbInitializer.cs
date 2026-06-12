@@ -15,6 +15,7 @@ public static class DbInitializer
             context.SaveChanges();
         }
 
+        RenomearFinancasLegadas(context);
         SeedFuncionalidades(context);
         SeedPerfilFuncionalidades(context);
 
@@ -25,6 +26,26 @@ public static class DbInitializer
         }
 
         SeedConfiguracoes(context);
+    }
+
+    private static void RenomearFinancasLegadas(AppDbContext context)
+    {
+        var funcionalidadeLegada = context.Funcionalidades.FirstOrDefault(f => f.Nome == "MinhasFinancas");
+        var funcionalidadeAtual = context.Funcionalidades.FirstOrDefault(f => f.Nome == "Financas");
+        if (funcionalidadeLegada is not null && funcionalidadeAtual is null)
+        {
+            funcionalidadeLegada.Nome = "Financas";
+        }
+
+        var configuracoesLegadas = context.Configuracoes
+            .Where(c => c.Agrupamento == "MinhasFinancas")
+            .ToList();
+
+        foreach (var configuracao in configuracoesLegadas)
+            configuracao.Agrupamento = "Financas";
+
+        if ((funcionalidadeLegada is not null && funcionalidadeAtual is null) || configuracoesLegadas.Count > 0)
+            context.SaveChanges();
     }
 
     private static void SeedFuncionalidades(AppDbContext context)
@@ -68,12 +89,12 @@ public static class DbInitializer
 
         var admin = context.Perfis.FirstOrDefault(p => p.Nome == "Admin");
         var comercial = context.Perfis.FirstOrDefault(p => p.Nome == "Comercial");
-        var minhasFinancas = context.Funcionalidades.FirstOrDefault(f => f.Nome == "MinhasFinancas");
-        if (minhasFinancas is null)
+        var financas = context.Funcionalidades.FirstOrDefault(f => f.Nome == "Financas");
+        if (financas is null)
             return;
 
-        AddPerfilFuncionalidadeSeAusente(context, admin, minhasFinancas, Permissao.Administrar);
-        AddPerfilFuncionalidadeSeAusente(context, comercial, minhasFinancas, Permissao.Visualizar);
+        AddPerfilFuncionalidadeSeAusente(context, admin, financas, Permissao.Administrar);
+        AddPerfilFuncionalidadeSeAusente(context, comercial, financas, Permissao.Visualizar);
         context.SaveChanges();
     }
 

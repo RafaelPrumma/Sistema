@@ -2,7 +2,7 @@ using Sistema.APP.DTOs;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IMinhasFinancasMarketDataService
+public interface IFinancasMarketDataService
 {
     Task AtualizarCotacoesAsync(bool force = false, CancellationToken cancellationToken = default);
 

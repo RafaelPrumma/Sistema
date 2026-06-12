@@ -80,7 +80,7 @@
         feedback.textContent = 'Validando ' + valor + '...';
         salvar.disabled = true;
         try {
-            var resp = await fetch('@Url.Action("ValidarAtivo", "MinhasFinancas")?ticker=' + encodeURIComponent(valor));
+            var resp = await fetch('@Url.Action("ValidarAtivo", "Financas")?ticker=' + encodeURIComponent(valor));
             var data = await resp.json();
             if (data.valido) {
                 validado = (data.ticker || valor).toUpperCase();

@@ -1,8 +1,8 @@
 @using System.Globalization
 @using Sistema.APP.DTOs
-@model MinhasFinancasDashboardDto
+@model FinancasDashboardDto
 @{
-    ViewData["Title"] = "Minhas Finanças";
+    ViewData["Title"] = "Finanças";
     var br = CultureInfo.GetCultureInfo("pt-BR");
     string Money(decimal value) => value.ToString("C", br);
     string Percent(decimal value) => value.ToString("N2", br) + "%";
@@ -10,7 +10,7 @@
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
-    Title = "Minhas Finanças",
+    Title = "Finanças",
     Description = "Acompanhe a evolução do patrimônio, o desempenho por setor e seus ativos — estilo Google Finance."
 })
 
@@ -46,7 +46,7 @@
             </div>
 
             <div class="finance-period-bar" id="financePeriodos"></div>
-            <div id="financeEvolucao" class="finance-chart" data-evolucao-url="@Url.Action("Evolucao", "MinhasFinancas")"></div>
+            <div id="financeEvolucao" class="finance-chart" data-evolucao-url="@Url.Action("Evolucao", "Financas")"></div>
             <div class="small text-secondary mt-2">
                 <i class="bi bi-info-circle me-1"></i>Leitura estimada a partir das suas transações e cotações públicas. Não é recomendação de investimento.
             </div>
@@ -208,5 +208,5 @@
 
 @section Scripts {
     <script src="~/lib/apexcharts/apexcharts.min.js" asp-append-version="true"></script>
-    <script src="~/js/minhas-financas.js" asp-append-version="true"></script>
+    <script src="~/js/financas.js" asp-append-version="true"></script>
 }

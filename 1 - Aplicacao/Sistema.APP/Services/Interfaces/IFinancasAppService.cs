@@ -3,9 +3,9 @@ using Sistema.CORE.Common;
 
 namespace Sistema.APP.Services.Interfaces;
 
-public interface IMinhasFinancasAppService
+public interface IFinancasAppService
 {
-    Task<MinhasFinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<DocumentoFinanceiroDto>> BuscarDocumentosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<(DocumentoFinanceiroDto? Documento, IReadOnlyList<ConteudoBrutoFinanceiroDto> Conteudos)> ObterDocumentoAsync(int id, CancellationToken cancellationToken = default);
     Task<PagedResult<OperacaoB3Dto>> BuscarOperacoesB3Async(int page, int pageSize, string? termo, int? ano, string? classe, CancellationToken cancellationToken = default);

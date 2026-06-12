@@ -4,7 +4,7 @@
   const container = document.getElementById('financeEvolucao');
   if (!container || typeof ApexCharts === 'undefined') return;
 
-  const url = container.dataset.evolucaoUrl || '/MinhasFinancas/Evolucao';
+  const url = container.dataset.evolucaoUrl || '/Financas/Evolucao';
   const elPeriodos = document.getElementById('financePeriodos');
   const elValor = document.getElementById('financeHeaderValor');
   const elDelta = document.getElementById('financeHeaderDelta');

@@ -34,11 +34,11 @@
         <div class="col-xl-9">
             <section id="visao-geral" class="surface-card doc-section">
                 <h2>Visao geral</h2>
-                <p>O Sistema e uma aplicacao .NET 8 em camadas para operacao pessoal/corporativa, com autenticacao, configuracoes, comunicacao interna, auditoria e o modulo Minhas Financas.</p>
+                <p>O Sistema e uma aplicacao .NET 8 em camadas para operacao pessoal/corporativa, com autenticacao, configuracoes, comunicacao interna, auditoria e o modulo Finanças.</p>
                 <div class="quick-actions-grid mt-3">
                     <div class="system-health-item"><i class="bi bi-layers text-primary"></i><div><strong>DDD em camadas</strong><span>MVC/API, Application, Domain e Infrastructure.</span></div></div>
                     <div class="system-health-item"><i class="bi bi-palette text-info"></i><div><strong>Admin UI</strong><span>Layout com sidebar, tema, cards e superficies reutilizaveis.</span></div></div>
-                    <div class="system-health-item"><i class="bi bi-graph-up-arrow text-success"></i><div><strong>Financas</strong><span>Importacao auditavel, B3, cripto, posicoes estimadas e alertas.</span></div></div>
+                    <div class="system-health-item"><i class="bi bi-graph-up-arrow text-success"></i><div><strong>Finanças</strong><span>Importacao auditavel, B3, cripto, posicoes estimadas e alertas.</span></div></div>
                 </div>
             </section>
 
@@ -70,7 +70,7 @@
                     <div><span>1</span> Home: painel operacional, atalhos e comunicacoes recentes.</div>
                     <div><span>2</span> Configuracoes: parametros por grupo e operacao.</div>
                     <div><span>3</span> Mensagens: feed, caixa de saida, avisos, posts e threads.</div>
-                    <div><span>4</span> Minhas Financas: carteira pessoal estilo Google Finance.</div>
+                    <div><span>4</span> Finanças: carteira pessoal estilo Google Finance.</div>
                 </div>
                 <p class="mt-3">O modulo gira em torno de uma <strong>tabela unica de transacoes</strong> (<code>FinanceiroTransacao</code>), que e a fonte de verdade tanto para a importacao (notas B3 em PDF e relatorios Binance em CSV/XLSX, materializados a partir do staging bruto) quanto para o <strong>lancamento manual</strong>. No manual, o ticker e validado pela API (Brapi para acao/FII/ETF/BDR, Binance para cripto) antes de ser aceito, e o ativo e criado/cotado na hora. Cada transacao guarda sua <strong>Fonte</strong> (Binance, Nubank B3, Manual...). Da Binance entram apenas os negocios com preco (spot/convert); o restante do extrato (Earn, staking, juros, airdrops) fica so no staging para auditoria.</p>
                 <ul>
@@ -79,7 +79,7 @@
                     <li><strong>Resumo analitico</strong>: por periodo (mes/ano/intervalo) mostra comprado, vendido, aporte liquido, resultado realizado, preco medio e L/P por ativo, melhores/piores e o resultado de cada venda (acima ou abaixo do preco medio).</li>
                     <li><strong>Dados &amp; importacao</strong> (secao recolhida no dashboard): importacao de pasta, atualizacao de cotacoes, KPIs de IR, posicoes estimadas e alertas de confiabilidade. A importacao roda em <strong>segundo plano via Hangfire</strong> (painel em <code>/jobs</code>, so para usuarios logados) e nao copia os arquivos — apenas le e grava na tabela.</li>
                 </ul>
-                <p class="small text-secondary">Limites: historico de precos e diario (1D/5D ficam em granularidade de dia); acoes B3 no Brapi gratis tem historico curto (configure <code>MinhasFinancas:MarketData:BrapiToken</code> para series longas); FII vs ETF (sufixo 11) pode precisar de ajuste manual de classe.</p>
+                <p class="small text-secondary">Limites: historico de precos e diario (1D/5D ficam em granularidade de dia); acoes B3 no Brapi gratis tem historico curto (configure <code>Financas:MarketData:BrapiToken</code> para series longas); FII vs ETF (sufixo 11) pode precisar de ajuste manual de classe.</p>
             </section>
 
             <section id="seguranca" class="surface-card doc-section">
@@ -97,7 +97,7 @@
                     <li><code>AzureAd</code>: email e Microsoft Graph.</li>
                     <li><code>LogsRetencao</code>: retencao de logs por modulo.</li>
                     <li><code>Mensagens</code>: padroes do feed.</li>
-                    <li><code>MinhasFinancas</code>: importacao e analises financeiras.</li>
+                    <li><code>Financas</code>: importacao e analises financeiras.</li>
                 </ul>
             </section>
 
@@ -107,7 +107,7 @@
                 <pre><code>dotnet build
 dotnet test
 npm run test:layout</code></pre>
-                <p>O teste de layout com Playwright deve cobrir login, dashboard, tema, mensagens, configuracoes e Minhas Financas nos breakpoints principais.</p>
+                <p>O teste de layout com Playwright deve cobrir login, dashboard, tema, mensagens, configuracoes e Finanças nos breakpoints principais.</p>
             </section>
 
             <section id="operacao" class="surface-card doc-section">

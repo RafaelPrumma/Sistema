@@ -14,7 +14,7 @@ public static class FuncionalidadeSeed
             new() { Nome = "Mensagem", UsuarioInclusao = "seed" },
             new() { Nome = "Configuracao", UsuarioInclusao = "seed" },
             new() { Nome = "Documentacao", UsuarioInclusao = "seed" },
-            new() { Nome = "MinhasFinancas", UsuarioInclusao = "seed" }
+            new() { Nome = "Financas", UsuarioInclusao = "seed" }
         };
     }
 }

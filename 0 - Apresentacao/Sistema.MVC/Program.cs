@@ -104,12 +104,12 @@ using (var scope = app.Services.CreateScope())
     if (hangfireEnabled)
     {
         var leitura = scope.ServiceProvider.GetRequiredService<IConfiguracaoLeitura>();
-        if (await leitura.ObterBoolAsync("MinhasFinancas", "MarketData:BackgroundEnabled", true))
+        if (await leitura.ObterBoolAsync("Financas", "MarketData:BackgroundEnabled", true))
         {
-            var segundos = await leitura.ObterIntAsync("MinhasFinancas", "MarketData:RefreshSeconds", 60);
+            var segundos = await leitura.ObterIntAsync("Financas", "MarketData:RefreshSeconds", 60);
             var minutos = Math.Max(1, (int)Math.Round(segundos / 60.0));
             var cron = minutos <= 1 ? "* * * * *" : $"*/{minutos} * * * *";
-            RecurringJob.AddOrUpdate<IMinhasFinancasMarketDataService>(
+            RecurringJob.AddOrUpdate<IFinancasMarketDataService>(
                 "financas-cotacoes",
                 s => s.AtualizarCotacoesAsync(false, CancellationToken.None),
                 cron);
