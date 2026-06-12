@@ -16,6 +16,7 @@ public static class InfrastructureExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpContextAccessor();
+        services.AddMemoryCache();
 
         services.AddDbContext<AppDbContext>(options =>
         {
@@ -39,6 +40,7 @@ public static class InfrastructureExtensions
         services.AddScoped<IPerfilFuncionalidadeRepository, PerfilFuncionalidadeRepository>();
         services.AddScoped<ITemaRepository, TemaRepository>();
         services.AddScoped<IConfiguracaoRepository, ConfiguracaoRepository>();
+        services.AddScoped<IConfiguracaoLeitura, ConfiguracaoLeitura>();
         services.AddScoped<IMensagemRepository, MensagemRepository>();
         services.AddScoped<IMinhasFinancasRepository, MinhasFinancasRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -46,7 +48,6 @@ public static class InfrastructureExtensions
         services.AddScoped<IMinhasFinancasMarketDataService, MinhasFinancasMarketDataService>();
         services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));
         services.AddHttpClient("Binance", client => client.BaseAddress = new Uri("https://api.binance.com/"));
-        services.AddHostedService<MinhasFinancasMarketDataBackgroundService>();
         services.AddScoped<IEmailAppService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
         services.AddScoped<IExecutionContext, HttpExecutionContext>();

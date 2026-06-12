@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
+using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
+using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using System.Diagnostics;
@@ -14,6 +16,7 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
     private const string ChaveAcessoMeses = "AcessoMeses";
     private const string ChaveComunicacaoMeses = "ComunicacaoMeses";
     private const string ChaveAdministracaoMeses = "AdministracaoMeses";
+    private const string ChaveFinanceiroMeses = "FinanceiroMeses";
     private const string ChaveGeralMeses = "GeralMeses";
     private static readonly string FallbackDirectory = Path.Combine(AppContext.BaseDirectory, "log-fallback");
     private static readonly string FallbackFilePath = Path.Combine(FallbackDirectory, "audit-fallback.ndjson");
@@ -24,6 +27,14 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
     public Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo = null, CancellationToken cancellationToken = default)
         => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, modulo, cancellationToken);
 
+    public async Task<DataTablesResponse<LogDto>> BuscarDataTableAsync(DataTablesRequest request, DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo, CancellationToken cancellationToken = default)
+    {
+        var resposta = await _uow.Logs.BuscarDataTableAsync(request, inicio, fim, tipo, modulo, cancellationToken);
+        return resposta.Map(l => new LogDto(
+            l.Id, l.DataOperacao, l.Modulo.ToString(), l.Tipo.ToString(),
+            l.Entidade, l.Operacao, l.Sucesso, l.Usuario, l.Mensagem));
+    }
+
     public Task<IEnumerable<Log>> BuscarAcessoAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default)
         => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, LogModulo.Acesso, cancellationToken);
 
@@ -32,6 +43,9 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
 
     public Task<IEnumerable<Log>> BuscarAdministracaoAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default)
         => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, LogModulo.Administracao, cancellationToken);
+
+    public Task<IEnumerable<Log>> BuscarFinanceiroAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default)
+        => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, LogModulo.Financeiro, cancellationToken);
 
     public Task RegistrarAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, string? detalhe = null, CancellationToken cancellationToken = default)
         => RegistrarPorModuloAsync(entidade, operacao, sucesso, mensagem, tipo, usuario, LogModulo.Administracao, detalhe, cancellationToken);
@@ -79,16 +93,21 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
     public Task RegistrarAdministracaoAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, string? detalhe = null, CancellationToken cancellationToken = default)
         => RegistrarPorModuloAsync(entidade, operacao, sucesso, mensagem, tipo, usuario, LogModulo.Administracao, detalhe, cancellationToken);
 
+    public Task RegistrarFinanceiroAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, string? detalhe = null, CancellationToken cancellationToken = default)
+        => RegistrarPorModuloAsync(entidade, operacao, sucesso, mensagem, tipo, usuario, LogModulo.Financeiro, detalhe, cancellationToken);
+
     private async Task AplicarPoliticaRetencaoAsync(CancellationToken cancellationToken)
     {
         var mesesAcesso = await ObterMesesRetencaoAsync(ChaveAcessoMeses, 3, cancellationToken);
         var mesesComunicacao = await ObterMesesRetencaoAsync(ChaveComunicacaoMeses, 6, cancellationToken);
         var mesesAdministracao = await ObterMesesRetencaoAsync(ChaveAdministracaoMeses, 12, cancellationToken);
+        var mesesFinanceiro = await ObterMesesRetencaoAsync(ChaveFinanceiroMeses, 24, cancellationToken);
         var mesesGeral = await ObterMesesRetencaoAsync(ChaveGeralMeses, 12, cancellationToken);
 
         await _uow.Logs.RemoverAntesDeAsync(LogModulo.Acesso, DateTime.UtcNow.AddMonths(-mesesAcesso), cancellationToken);
         await _uow.Logs.RemoverAntesDeAsync(LogModulo.Comunicacao, DateTime.UtcNow.AddMonths(-mesesComunicacao), cancellationToken);
         await _uow.Logs.RemoverAntesDeAsync(LogModulo.Administracao, DateTime.UtcNow.AddMonths(-mesesAdministracao), cancellationToken);
+        await _uow.Logs.RemoverAntesDeAsync(LogModulo.Financeiro, DateTime.UtcNow.AddMonths(-mesesFinanceiro), cancellationToken);
         await _uow.Logs.RemoverAntesDeAsync(LogModulo.Geral, DateTime.UtcNow.AddMonths(-mesesGeral), cancellationToken);
     }
 

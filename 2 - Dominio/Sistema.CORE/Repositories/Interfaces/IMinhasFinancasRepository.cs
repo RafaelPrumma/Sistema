@@ -33,6 +33,7 @@ public interface IMinhasFinancasRepository
     // Tabela única de transações (fonte de verdade): importação materializada + lançamentos manuais.
     Task<IReadOnlyList<TransacaoFinanceira>> BuscarTodasTransacoesAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<TransacaoFinanceira>> BuscarTransacoesAsync(int page, int pageSize, string? termo, OrigemTransacao? origem, CancellationToken cancellationToken = default);
+    Task<DataTablesResponse<TransacaoFinanceira>> BuscarTransacoesDataTableAsync(DataTablesRequest request, OrigemTransacao? origem, CancellationToken cancellationToken = default);
     Task<TransacaoFinanceira?> ObterTransacaoAsync(int id, CancellationToken cancellationToken = default);
     Task<bool> TransacaoExisteAsync(string duplicateGroupKey, CancellationToken cancellationToken = default);
     Task AdicionarTransacaoAsync(TransacaoFinanceira transacao, CancellationToken cancellationToken = default);

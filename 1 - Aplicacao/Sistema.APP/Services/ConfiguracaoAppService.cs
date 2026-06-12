@@ -4,9 +4,10 @@ using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class ConfiguracaoAppService(IUnitOfWork uow) : IConfiguracaoAppService
+public class ConfiguracaoAppService(IUnitOfWork uow, IConfiguracaoLeitura leitura) : IConfiguracaoAppService
 {
     private readonly IUnitOfWork _uow = uow;
+    private readonly IConfiguracaoLeitura _leitura = leitura;
 
     public Task<IEnumerable<Configuracao>> BuscarPorAgrupamentoAsync(string agrupamento, CancellationToken cancellationToken = default) =>
         _uow.Configuracoes.BuscarPorAgrupamentoAsync(agrupamento, cancellationToken);
@@ -18,6 +19,7 @@ public class ConfiguracaoAppService(IUnitOfWork uow) : IConfiguracaoAppService
     {
         var result = await _uow.Configuracoes.AdicionarAsync(config, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        _leitura.InvalidarCache(config.Agrupamento, config.Chave);
         return result;
     }
 
@@ -25,6 +27,7 @@ public class ConfiguracaoAppService(IUnitOfWork uow) : IConfiguracaoAppService
     {
         await _uow.Configuracoes.AtualizarAsync(config);
         await _uow.ConfirmarAsync(cancellationToken);
+        _leitura.InvalidarCache(config.Agrupamento, config.Chave);
     }
 
     public async Task RemoverAsync(int id, CancellationToken cancellationToken = default)

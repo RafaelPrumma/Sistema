@@ -70,6 +70,15 @@ public static class ConfiguracaoSeed
             new()
             {
                 Agrupamento = "LogsRetencao",
+                Chave = "FinanceiroMeses",
+                Valor = "24",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Tempo de retenção do log financeiro, em meses.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "LogsRetencao",
                 Chave = "GeralMeses",
                 Valor = "12",
                 Tipo = ConfiguracaoTipo.Texto,
@@ -119,6 +128,42 @@ public static class ConfiguracaoSeed
                 Valor = "true",
                 Tipo = ConfiguracaoTipo.Texto,
                 Descricao = "Permite carregar a base financeira configurada no ambiente de desenvolvimento.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "MinhasFinancas",
+                Chave = "MarketData:RefreshSeconds",
+                Valor = "60",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Intervalo (em segundos) entre as atualizacoes automaticas de cotacoes.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "MinhasFinancas",
+                Chave = "MarketData:BackgroundEnabled",
+                Valor = "true",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Liga/desliga o job recorrente de atualizacao de cotacoes.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "MinhasFinancas",
+                Chave = "MarketData:BrapiToken",
+                Valor = "",
+                Tipo = ConfiguracaoTipo.Password,
+                Descricao = "Token da Brapi para cotacoes e historico completos de acoes B3.",
+                UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "MinhasFinancas",
+                Chave = "WatchedFolderPath",
+                Valor = "",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Pasta monitorada de onde os relatorios financeiros sao lidos na importacao.",
                 UsuarioInclusao = "seed"
             }
         };

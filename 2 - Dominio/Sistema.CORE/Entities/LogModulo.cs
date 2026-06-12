@@ -5,5 +5,6 @@ public enum LogModulo
     Geral = 0,
     Acesso = 1,
     Comunicacao = 2,
-    Administracao = 3
+    Administracao = 3,
+    Financeiro = 4
 }

@@ -1,0 +1,132 @@
+@using System.Globalization
+@model FilaViewModel
+@{
+    ViewData["Title"] = "Fila de jobs";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Quando(DateTime? d) => d.HasValue ? d.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss", br) : "-";
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Fila de jobs",
+    Description = "Processamento em segundo plano (Hangfire): importações, cotações e demais tarefas."
+})
+
+@await Html.PartialAsync("_FlashMessages")
+
+@if (!Model.HangfireDisponivel)
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1"></i>Hangfire não está disponível neste ambiente (sem banco relacional configurado).</div>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        @{
+            var cards = new (string Label, long Valor, string Icone, string Cor)[]
+            {
+                ("Enfileirados", Model.Enfileirados, "bi-inbox", "text-bg-secondary"),
+                ("Processando", Model.Processando, "bi-arrow-repeat", "text-bg-primary"),
+                ("Agendados", Model.Agendados, "bi-clock", "text-bg-info"),
+                ("Sucesso", Model.Sucesso, "bi-check-circle", "text-bg-success"),
+                ("Falhas", Model.Falhas, "bi-x-circle", "text-bg-danger"),
+                ("Recorrentes", Model.Recorrentes, "bi-arrow-clockwise", "text-bg-dark"),
+            };
+        }
+        @foreach (var c in cards)
+        {
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card h-100"><div class="card-body text-center">
+                    <span class="badge @c.Cor mb-2"><i class="bi @c.Icone"></i></span>
+                    <div class="fs-4 fw-semibold">@c.Valor.ToString("N0", br)</div>
+                    <div class="small text-secondary">@c.Label</div>
+                </div></div>
+            </div>
+        }
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="mb-3">Jobs recorrentes</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Job</th><th>Cron</th><th>Última execução</th><th>Próxima</th><th>Estado</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in Model.JobsRecorrentes)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@r.Id</td>
+                                <td><code>@r.Cron</code></td>
+                                <td>@Quando(r.UltimaExecucao)</td>
+                                <td>@Quando(r.ProximaExecucao)</td>
+                                <td><span class="badge text-bg-light border">@(r.UltimoEstado ?? "-")</span></td>
+                            </tr>
+                        }
+                        @if (Model.JobsRecorrentes.Count == 0)
+                        {
+                            <tr><td colspan="5" class="text-secondary text-center py-3">Nenhum job recorrente.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-6">
+            <div class="card h-100"><div class="card-body">
+                <h6 class="text-danger mb-3"><i class="bi bi-x-circle me-1"></i>Últimas falhas</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Job</th><th>Quando</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var f in Model.UltimasFalhas)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@f.Job</div>
+                                        <div class="small text-secondary text-truncate" style="max-width: 320px">@f.Info</div>
+                                    </td>
+                                    <td class="small">@Quando(f.Quando)</td>
+                                    <td>
+                                        <form method="post" asp-action="Reprocessar" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@f.Id" />
+                                            <button class="btn btn-sm btn-outline-primary" type="submit" title="Reprocessar"><i class="bi bi-arrow-repeat"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            @if (Model.UltimasFalhas.Count == 0)
+                            {
+                                <tr><td colspan="3" class="text-secondary text-center py-3">Sem falhas recentes.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div></div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card h-100"><div class="card-body">
+                <h6 class="text-success mb-3"><i class="bi bi-check-circle me-1"></i>Últimos sucessos</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Job</th><th>Quando</th></tr></thead>
+                        <tbody>
+                            @foreach (var s in Model.UltimosSucessos)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@s.Job</td>
+                                    <td class="small">@Quando(s.Quando)</td>
+                                </tr>
+                            }
+                            @if (Model.UltimosSucessos.Count == 0)
+                            {
+                                <tr><td colspan="2" class="text-secondary text-center py-3">Sem execuções recentes.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div></div>
+        </div>
+    </div>
+}

@@ -8,11 +8,16 @@ using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador importador, IMinhasFinancasMarketDataService marketData) : IMinhasFinancasAppService
+public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador importador, IMinhasFinancasMarketDataService marketData, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IMinhasFinancasAppService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IMinhasFinancasImportador _importador = importador;
     private readonly IMinhasFinancasMarketDataService _marketData = marketData;
+    private readonly ILogAppService _log = log;
+    private readonly IMensagemAppService _mensagem = mensagem;
+    private readonly IExecutionContext _execution = execution;
+
+    private string UsuarioAtual => string.IsNullOrWhiteSpace(_execution.Usuario) ? "sistema" : _execution.Usuario!;
 
     public async Task<MinhasFinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
@@ -108,8 +113,26 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         return result.Select(MapAlerta).ToList();
     }
 
-    public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
-        => await _importador.ImportarPastaMonitoradaAsync(cancellationToken);
+    public async Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default)
+    {
+        await _importador.ImportarPastaMonitoradaAsync(cancellationToken);
+
+        await _log.RegistrarFinanceiroAsync(
+            "Importacao", "ImportarPasta", true,
+            "Importação da pasta monitorada concluída.",
+            LogTipo.Sucesso, usuarioId?.ToString() ?? "sistema", null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+
+        // Notifica quem disparou a importação (aparece no badge de não-lidas / tela de avisos).
+        if (usuarioId is > 0)
+        {
+            await _mensagem.EnviarAsync(
+                null, usuarioId.Value,
+                "Importação financeira concluída",
+                "Seus relatórios foram importados e a carteira foi atualizada. Confira o dashboard de Minhas Finanças.",
+                null, cancellationToken);
+        }
+    }
 
     public async Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default)
         => await _marketData.AtualizarCotacoesAsync(force: true, cancellationToken);
@@ -397,6 +420,14 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         return new PagedResult<TransacaoFinanceiraDto>(result.Items.Select(MapTransacao).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
+    public async Task<DataTablesResponse<TransacaoFinanceiraDto>> BuscarTransacoesDataTableAsync(DataTablesRequest request, string? origem, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        OrigemTransacao? origemFiltro = Enum.TryParse<OrigemTransacao>(origem, true, out var o) ? o : null;
+        var resposta = await _uow.MinhasFinancas.BuscarTransacoesDataTableAsync(request, origemFiltro, cancellationToken);
+        return resposta.Map(MapTransacao);
+    }
+
     public async Task<ResultadoOperacao> RegistrarTransacaoManualAsync(NovaTransacaoInput input, CancellationToken cancellationToken = default)
     {
         if (input is null || string.IsNullOrWhiteSpace(input.Ticker))
@@ -454,6 +485,10 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             UsuarioInclusao = "minhas-financas-manual"
         };
         await _uow.MinhasFinancas.AdicionarTransacaoAsync(transacao, cancellationToken);
+        await _log.RegistrarFinanceiroAsync(
+            "TransacaoFinanceira", "CriarManual", true,
+            $"Transação manual {tipo} de {input.Quantidade} {ticker} a {input.PrecoUnitario}",
+            LogTipo.Sucesso, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação registrada.", transacao.Id);
     }
@@ -477,6 +512,10 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         transacao.Broker = string.IsNullOrWhiteSpace(input.Corretora) ? transacao.Broker : input.Corretora!.Trim();
         transacao.Observacao = input.Observacao;
         _uow.MinhasFinancas.AtualizarTransacao(transacao);
+        await _log.RegistrarFinanceiroAsync(
+            "TransacaoFinanceira", "Editar", true,
+            $"Transação #{transacao.Id} editada ({tipo} {input.Quantidade})",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação atualizada.", transacao.Id);
     }
@@ -488,6 +527,10 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
             return new ResultadoOperacao(false, "Transação não encontrada.");
 
         _uow.MinhasFinancas.RemoverTransacao(transacao);
+        await _log.RegistrarFinanceiroAsync(
+            "TransacaoFinanceira", "Excluir", true,
+            $"Transação #{transacao.Id} excluída ({transacao.OperationType} {transacao.Quantity})",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação excluída.");
     }

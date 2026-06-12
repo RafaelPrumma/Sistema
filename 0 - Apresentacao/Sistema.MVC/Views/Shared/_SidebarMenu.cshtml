@@ -132,7 +132,8 @@
             <ul class="menu-list">
                 <li><a asp-controller="Configuracao" asp-action="Index" class="menu-sublink @textClass @IsActive("Configuracao", "Index")">Configuracoes</a></li>
                 <li><a asp-controller="Tema" asp-action="Edit" class="menu-sublink @textClass @IsActive("Tema", "Edit")">Tema</a></li>
-                <li><a href="/api/log/administracao" class="menu-sublink @textClass">AdministracaoLog (API)</a></li>
+                <li><a asp-controller="Log" asp-action="Index" class="menu-sublink @textClass @IsActive("Log", "Index")">Logs</a></li>
+                <li><a asp-controller="Fila" asp-action="Index" class="menu-sublink @textClass @IsActive("Fila", "Index")">Fila de jobs</a></li>
             </ul>
         </div>
 

@@ -3,65 +3,56 @@
     var brNow = DateTime.Now.ToString("yyyy-MM-dd");
 }
 
-<div class="modal fade" id="novaTransacaoModal" tabindex="-1" aria-labelledby="novaTransacaoLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="post" asp-action="Transacoes" id="formNovaTransacao">
-                @Html.AntiForgeryToken()
-                <div class="modal-header">
-                    <h5 class="modal-title" id="novaTransacaoLabel"><i class="bi bi-plus-circle me-2"></i>Adicionar transação</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Ativo (ticker)</label>
-                        <div class="input-group">
-                            <input class="form-control text-uppercase" name="Ticker" id="txTicker" placeholder="Ex.: PETR4, SANB11, BTC, ADA" autocomplete="off" required />
-                            <button class="btn btn-outline-secondary" type="button" id="txValidar">Validar</button>
-                        </div>
-                        <div class="form-text" id="txFeedback">Digite o ticker e valide — aceita ação, FII, ETF, BDR (B3) ou cripto (Binance).</div>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label">Operação</label>
-                            <select class="form-select" name="Tipo" required>
-                                <option value="Compra">Compra</option>
-                                <option value="Venda">Venda</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Data</label>
-                            <input class="form-control" type="date" name="Data" value="@brNow" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Quantidade</label>
-                            <input class="form-control" type="number" step="any" min="0" name="Quantidade" placeholder="0" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Preço unitário (R$)</label>
-                            <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" placeholder="0,00" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Taxas (R$)</label>
-                            <input class="form-control" type="number" step="any" min="0" name="Taxas" value="0" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Corretora</label>
-                            <input class="form-control" name="Corretora" placeholder="Manual, NU Invest, Binance..." />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Observação</label>
-                            <input class="form-control" name="Observacao" placeholder="Opcional" />
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" id="txSalvar" disabled>Salvar transação</button>
-                </div>
-            </form>
+@* Modal no padrão iziModal do projeto: container simples (display:none) + init/open via abrirModal/fecharModal. *@
+<div id="novaTransacaoModal" data-titulo="Adicionar transação" data-icone="bi bi-plus-circle" data-largura="640" style="display:none">
+    <form method="post" asp-action="Transacoes" id="formNovaTransacao" class="p-3">
+        @Html.AntiForgeryToken()
+        <div class="mb-3">
+            <label class="form-label">Ativo (ticker)</label>
+            <div class="input-group">
+                <input class="form-control text-uppercase" name="Ticker" id="txTicker" placeholder="Ex.: PETR4, SANB11, BTC, ADA" autocomplete="off" required />
+                <button class="btn btn-outline-secondary" type="button" id="txValidar">Validar</button>
+            </div>
+            <div class="form-text" id="txFeedback">Digite o ticker e valide — aceita ação, FII, ETF, BDR (B3) ou cripto (Binance).</div>
         </div>
-    </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Operação</label>
+                <select class="form-select" name="Tipo" required>
+                    <option value="Compra">Compra</option>
+                    <option value="Venda">Venda</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Data</label>
+                <input class="form-control" type="date" name="Data" value="@brNow" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Quantidade</label>
+                <input class="form-control" type="number" step="any" min="0" name="Quantidade" placeholder="0" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Preço unitário (R$)</label>
+                <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" placeholder="0,00" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Taxas (R$)</label>
+                <input class="form-control" type="number" step="any" min="0" name="Taxas" value="0" />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Corretora</label>
+                <input class="form-control" name="Corretora" placeholder="Manual, NU Invest, Binance..." />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observação</label>
+                <input class="form-control" name="Observacao" placeholder="Opcional" />
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="txCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="txSalvar" disabled>Salvar transação</button>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -70,6 +61,7 @@
     var validar = document.getElementById('txValidar');
     var feedback = document.getElementById('txFeedback');
     var salvar = document.getElementById('txSalvar');
+    var cancelar = document.getElementById('txCancelar');
     if (!ticker || !validar) return;
 
     var validado = '';
@@ -114,5 +106,6 @@
     validar.addEventListener('click', validarTicker);
     ticker.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); validarTicker(); } });
     ticker.addEventListener('input', bloquear);
+    if (cancelar) cancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('novaTransacaoModal'); });
 })();
 </script>
