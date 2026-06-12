@@ -1,5 +1,4 @@
 @using System.Globalization
-@using System.Text.Json
 @using Sistema.APP.DTOs
 @model MinhasFinancasDashboardDto
 @{
@@ -7,333 +6,197 @@
     var br = CultureInfo.GetCultureInfo("pt-BR");
     string Money(decimal value) => value.ToString("C", br);
     string Percent(decimal value) => value.ToString("N2", br) + "%";
-    var resultadoMercadoClass = Model.ResultadoNaoRealizadoTotal >= 0 ? "text-success" : "text-danger";
-    var chartPayload = new
-    {
-        b3Ano = Model.B3PorAno.Select(x => new { label = x.Label, compras = x.ValorCompra, vendas = x.ValorVenda }),
-        b3Mes = Model.B3PorMes.Select(x => new { label = x.Label, compras = x.ValorCompra, vendas = x.ValorVenda }),
-        classes = Model.B3PorClasse.Select(x => new { label = x.Label, valor = x.Valor, operacoes = x.Operacoes }),
-        moedas = Model.BinanceMoedas.Select(x => new { label = x.Label, valor = x.Valor, operacoes = x.Operacoes })
-    };
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
     Title = "Minhas Finanças",
-    Description = "Histórico financeiro, investimentos e dados importados com rastreabilidade."
+    Description = "Acompanhe a evolução do patrimônio, o desempenho por setor e seus ativos — estilo Google Finance."
 })
 
+@await Html.PartialAsync("_FlashMessages")
+
 <div class="finance-shell">
-    <div class="alert alert-warning d-flex gap-2 align-items-start" role="alert">
-        <i class="bi bi-exclamation-triangle mt-1"></i>
-        <div>
-            <strong>Leitura estimada.</strong> Histórico de compra não é posição atual. As posições abaixo dependem de reconciliação com custódia, eventos corporativos, taxas e validações manuais. Nada nesta tela é recomendação de investimento.
-        </div>
-    </div>
-
-    @if (string.IsNullOrWhiteSpace(Model.Fonte))
+    @if (string.IsNullOrWhiteSpace(Model.Fonte) && !Model.AtivosCotados.Any())
     {
-        <div class="alert alert-info">Nenhuma carga financeira foi encontrada. Configure <code>MinhasFinancas:SeedZipPath</code> ou <code>SeedJsonPath</code> para carregar os dados.</div>
-    }
-
-    <div class="finance-command-bar mb-3">
-        <div>
-            <div class="small text-secondary">Pasta monitorada</div>
-            <div class="fw-semibold">@(Model.ImportacaoArquivos?.PastaMonitorada ?? "Nao configurada")</div>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-            <form asp-action="ImportarPasta" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-outline-primary">
-                    <i class="bi bi-folder-symlink me-1"></i>Importar arquivos
-                </button>
-            </form>
-            <form asp-action="AtualizarCotacoes" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-arrow-repeat me-1"></i>Atualizar cotacoes
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-market-card h-100">
-                <div class="card-body">
-                    <div class="text-secondary small">Valor de mercado estimado</div>
-                    <div class="finance-kpi-value">@Money(Model.ValorMercadoTotal)</div>
-                    <div class="small text-secondary">Com base nas cotacoes disponiveis.</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-market-card h-100">
-                <div class="card-body">
-                    <div class="text-secondary small">Custo estimado</div>
-                    <div class="finance-kpi-value">@Money(Model.CustoEstimadoTotal)</div>
-                    <div class="small text-secondary">Preco medio calculado por compra/venda.</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-market-card h-100">
-                <div class="card-body">
-                    <div class="text-secondary small">Resultado nao realizado</div>
-                    <div class="finance-kpi-value @resultadoMercadoClass">@Money(Model.ResultadoNaoRealizadoTotal)</div>
-                    <div class="small text-secondary">Nao inclui reconciliacao completa.</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-market-card h-100">
-                <div class="card-body">
-                    <div class="text-secondary small">Ultima atualizacao</div>
-                    <div class="fs-5 fw-semibold">@(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "Pendente")</div>
-                    <div class="small text-secondary">@((Model.ImportacaoArquivos?.DocumentosProcessados ?? 0).ToString("N0", br)) documentos monitorados processados.</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    @if (Model.Periodos.Any())
-    {
-        <div class="finance-period-strip mb-3" aria-label="Variacao por periodo">
-            @foreach (var periodo in Model.Periodos)
-            {
-                var periodoClass = periodo.VariacaoPercentual >= 0 ? "text-success" : "text-danger";
-                <div class="finance-period-pill">
-                    <span>@periodo.Label</span>
-                    <strong class="@periodoClass">@Percent(periodo.VariacaoPercentual)</strong>
-                    <small>@Money(periodo.VariacaoValor)</small>
-                </div>
-            }
+        <div class="alert alert-info d-flex align-items-center gap-2">
+            <i class="bi bi-info-circle"></i>
+            <div>Comece <strong>adicionando uma transação</strong> ou importando seus relatórios da B3/Binance. O gráfico e os setores aparecem assim que houver dados e cotações.</div>
         </div>
     }
 
-    <div class="row g-3 mb-3">
-        @foreach (var kpi in Model.Kpis)
-        {
-            <div class="col-md-6 col-xl-3">
-                <div class="card finance-kpi h-100">
-                    <div class="card-body">
-                        <div class="d-flex align-items-start justify-content-between gap-3">
-                            <div>
+    <div class="card finance-hero mb-3">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
+                <div>
+                    <div class="text-secondary small" id="financeHeaderTitulo">Patrimônio total</div>
+                    <div class="finance-hero-value" id="financeHeaderValor">@Money(Model.ValorMercadoTotal)</div>
+                    <div class="finance-hero-delta @(Model.ResultadoNaoRealizadoTotal >= 0 ? "text-success" : "text-danger")" id="financeHeaderDelta">
+                        @Money(Model.ResultadoNaoRealizadoTotal)
+                    </div>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-2">
+                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#novaTransacaoModal">
+                        <i class="bi bi-plus-circle me-1"></i>Adicionar transação
+                    </button>
+                    <a class="btn btn-outline-secondary btn-sm" asp-action="Resumo" asp-route-preset="mes">
+                        <i class="bi bi-clipboard-data me-1"></i>Resumo do período
+                    </a>
+                </div>
+            </div>
+
+            <div class="finance-period-bar" id="financePeriodos"></div>
+            <div id="financeEvolucao" class="finance-chart" data-evolucao-url="@Url.Action("Evolucao", "MinhasFinancas")"></div>
+            <div class="small text-secondary mt-2">
+                <i class="bi bi-info-circle me-1"></i>Leitura estimada a partir das suas transações e cotações públicas. Não é recomendação de investimento.
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-2">Setores</h5>
+    <div class="finance-sectors mb-4" id="financeSetores">
+        <div class="text-secondary small">Carregando setores...</div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h5 class="mb-0">Ativos monitorados</h5>
+                <a class="btn btn-sm btn-outline-primary" asp-action="Transacoes"><i class="bi bi-list-ul me-1"></i>Ver transações</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle finance-assets">
+                    <thead>
+                        <tr>
+                            <th>Ativo</th>
+                            <th class="text-end">Qtde</th>
+                            <th class="text-end">Preço médio</th>
+                            <th class="text-end">Preço atual</th>
+                            <th class="text-end">Dia</th>
+                            <th class="text-end">Mercado</th>
+                            <th class="text-end">Retorno total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ativo in Model.AtivosCotados.OrderByDescending(x => x.ValorMercado))
+                        {
+                            var retClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                            var diaClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@ativo.Ativo</div>
+                                    <div class="small text-secondary">@ativo.Classe · @ativo.Symbol</div>
+                                </td>
+                                <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
+                                <td class="text-end">@Money(ativo.PrecoMedio)</td>
+                                <td class="text-end">@(ativo.PrecoAtual.HasValue ? Money(ativo.PrecoAtual.Value) : "-")</td>
+                                <td class="text-end @diaClass">@(ativo.VariacaoDiaPercentual.HasValue ? Percent(ativo.VariacaoDiaPercentual.Value) : "-")</td>
+                                <td class="text-end">@Money(ativo.ValorMercado)</td>
+                                <td class="text-end @retClass">
+                                    @Money(ativo.ResultadoNaoRealizado)
+                                    <div class="small @retClass">@Percent(ativo.ResultadoNaoRealizadoPercentual)</div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.AtivosCotados.Any())
+                        {
+                            <tr><td colspan="7" class="text-center text-secondary py-3">Nenhum ativo com posição aberta. Adicione transações ou importe seus relatórios.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card finance-data-section">
+        <div class="card-body">
+            <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#financeDados" aria-expanded="false">
+                <i class="bi bi-database"></i><span class="fw-semibold">Dados &amp; importação</span>
+                <i class="bi bi-chevron-down small"></i>
+            </button>
+            <div class="collapse mt-3" id="financeDados">
+                <div class="finance-command-bar mb-3">
+                    <div>
+                        <div class="small text-secondary">Pasta monitorada</div>
+                        <div class="fw-semibold">@(Model.ImportacaoArquivos?.PastaMonitorada ?? "Não configurada")</div>
+                        <div class="small text-secondary">
+                            @((Model.ImportacaoArquivos?.DocumentosProcessados ?? 0).ToString("N0", br)) documentos processados ·
+                            Cotações: @(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "pendente")
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <form asp-action="ImportarPasta" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-primary"><i class="bi bi-folder-symlink me-1"></i>Importar arquivos</button>
+                        </form>
+                        <form asp-action="AtualizarCotacoes" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Atualizar cotações</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    @foreach (var kpi in Model.Kpis)
+                    {
+                        <div class="col-md-6 col-xl-3">
+                            <div class="card h-100"><div class="card-body">
                                 <div class="text-secondary small">@kpi.Titulo</div>
-                                <div class="finance-kpi-value">@(kpi.Monetario ? Money(kpi.Valor) : kpi.Valor.ToString("N0", br))</div>
+                                <div class="fs-5 fw-semibold">@(kpi.Monetario ? Money(kpi.Valor) : kpi.Valor.ToString("N0", br))</div>
                                 <div class="small text-secondary">@kpi.Subtitulo</div>
-                            </div>
-                            <span class="finance-kpi-icon"><i class="bi @kpi.Icone"></i></span>
+                            </div></div>
                         </div>
-                    </div>
+                    }
                 </div>
-            </div>
-        }
-    </div>
 
-    <div class="row g-3 mb-3">
-        <div class="col-xl-5">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <h5 class="mb-0">Carteiras e grupos</h5>
-                            <div class="small text-secondary">Agrupamentos para monitorar setores, teses e classes.</div>
-                        </div>
-                    </div>
-                    <div class="finance-wallet-list">
-                        @foreach (var carteira in Model.Carteiras.OrderByDescending(x => x.ValorMercado).Take(8))
-                        {
-                            var carteiraClass = carteira.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
-                            <div class="finance-wallet-item">
-                                <div>
-                                    <div class="fw-semibold">@carteira.Nome</div>
-                                    <div class="small text-secondary">@carteira.Tipo · @carteira.Ativos ativos</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-semibold">@Money(carteira.ValorMercado)</div>
-                                    <div class="small @carteiraClass">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>
-                                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-xl-6">
+                        <div class="card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Posições estimadas (importação)</h6>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Posicoes" asp-route-abertas="true">Ver todas</a>
                             </div>
-                        }
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead><tr><th>Ativo</th><th>Classe</th><th class="text-end">Qtde</th><th>Confiança</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var item in Model.PosicoesAbertas)
+                                        {
+                                            <tr>
+                                                <td>@item.Ativo</td>
+                                                <td>@item.Classe</td>
+                                                <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
+                                                <td><span class="badge text-bg-warning">@item.Confianca</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div></div>
                     </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-7">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <div>
-                            <h5 class="mb-0">Ativos monitorados</h5>
-                            <div class="small text-secondary">Preco atual, custo estimado e variacao diaria quando a API retornar.</div>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Ativo</th>
-                                    <th class="text-end">Qtde</th>
-                                    <th class="text-end">Preco</th>
-                                    <th class="text-end">Mercado</th>
-                                    <th class="text-end">Resultado</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var ativo in Model.AtivosCotados.OrderByDescending(x => x.ValorMercado).Take(12))
+                    <div class="col-xl-6">
+                        <div class="card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Alertas de confiabilidade</h6>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Alertas">Ver todos</a>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                @foreach (var alerta in Model.Alertas)
                                 {
-                                    var ativoClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
-                                    var variacaoClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">@ativo.Ativo</div>
-                                            <div class="small text-secondary">@ativo.Classe · @ativo.Symbol</div>
-                                        </td>
-                                        <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
-                                        <td class="text-end">@(ativo.PrecoAtual.HasValue ? Money(ativo.PrecoAtual.Value) : "-")</td>
-                                        <td class="text-end">@Money(ativo.ValorMercado)</td>
-                                        <td class="text-end">
-                                            <div class="@ativoClass">@Money(ativo.ResultadoNaoRealizado)</div>
-                                            <small class="@ativoClass">@Percent(ativo.ResultadoNaoRealizadoPercentual)</small>
-                                            @if (ativo.VariacaoDiaPercentual.HasValue)
-                                            {
-                                                <div><small class="@variacaoClass">Dia @Percent(ativo.VariacaoDiaPercentual.Value)</small></div>
-                                            }
-                                        </td>
-                                        <td><span class="badge text-bg-light border">@ativo.Status</span></td>
-                                    </tr>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <strong>@alerta.Codigo</strong>
+                                            <span class="badge text-bg-secondary">@alerta.Severidade</span>
+                                        </div>
+                                        <div class="small text-secondary">@alerta.Mensagem</div>
+                                    </div>
                                 }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-xl-8">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                        <div>
-                            <h5 class="mb-0">Movimentação anual B3</h5>
-                            <div class="small text-secondary">Compras e vendas brutas das notas canônicas</div>
-                        </div>
-                        <a class="btn btn-sm btn-outline-primary" asp-action="OperacoesB3"><i class="bi bi-table me-1"></i>Operações</a>
-                    </div>
-                    <div class="finance-chart-wrap"><canvas id="chartB3Ano"></canvas></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-4">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5>Distribuição por classe</h5>
-                    <div class="small text-secondary mb-3">Saldo histórico líquido, não valor de mercado atual</div>
-                    <div class="finance-bars">
-                        @foreach (var item in Model.B3PorClasse.OrderByDescending(x => x.Valor))
-                        {
-                            var max = Model.B3PorClasse.Count == 0 ? 1 : Model.B3PorClasse.Max(x => x.Valor);
-                            var width = max == 0 ? 0 : Math.Round((item.Valor / max) * 100, 2);
-                            <div class="finance-bar-row">
-                                <div class="d-flex justify-content-between small">
-                                    <span>@item.Label</span>
-                                    <strong>@Money(item.Valor)</strong>
-                                </div>
-                                <div class="progress" role="progressbar" aria-label="@item.Label" aria-valuenow="@width" aria-valuemin="0" aria-valuemax="100">
-                                    <div class="progress-bar" style="width:@width.ToString(CultureInfo.InvariantCulture)%"></div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-xl-7">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5>Evolução mensal B3</h5>
-                    <div class="finance-chart-wrap finance-chart-wrap--sm"><canvas id="chartB3Mes"></canvas></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-5">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5>Cripto por moeda</h5>
-                    <div class="small text-secondary mb-3">Saldo operacional importado da Binance</div>
-                    <div class="finance-bars">
-                        @foreach (var item in Model.BinanceMoedas.Where(x => x.Label != "BRL").OrderByDescending(x => Math.Abs(x.Valor)).Take(10))
-                        {
-                            var max = Model.BinanceMoedas.Where(x => x.Label != "BRL").Select(x => Math.Abs(x.Valor)).DefaultIfEmpty(1).Max();
-                            var width = max == 0 ? 0 : Math.Round((Math.Abs(item.Valor) / max) * 100, 2);
-                            <div class="finance-bar-row">
-                                <div class="d-flex justify-content-between small">
-                                    <span>@item.Label</span>
-                                    <strong>@item.Valor.ToString("N8", br)</strong>
-                                </div>
-                                <div class="progress" role="progressbar" aria-label="@item.Label" aria-valuenow="@width" aria-valuemin="0" aria-valuemax="100">
-                                    <div class="progress-bar bg-info" style="width:@width.ToString(CultureInfo.InvariantCulture)%"></div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3">
-        <div class="col-xl-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="mb-0">Posições estimadas em aberto</h5>
-                        <a class="btn btn-sm btn-outline-primary" asp-action="Posicoes" asp-route-abertas="true">Ver todas</a>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle">
-                            <thead><tr><th>Ativo</th><th>Classe</th><th class="text-end">Qtde</th><th>Confiança</th></tr></thead>
-                            <tbody>
-                                @foreach (var item in Model.PosicoesAbertas)
+                                @if (!Model.Alertas.Any())
                                 {
-                                    <tr>
-                                        <td>@item.Ativo</td>
-                                        <td>@item.Classe</td>
-                                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
-                                        <td><span class="badge text-bg-warning">@item.Confianca</span></td>
-                                    </tr>
+                                    <div class="text-secondary small">Sem alertas.</div>
                                 }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="mb-0">Alertas de confiabilidade</h5>
-                        <a class="btn btn-sm btn-outline-primary" asp-action="Alertas">Ver todos</a>
-                    </div>
-                    <div class="list-group list-group-flush">
-                        @foreach (var alerta in Model.Alertas)
-                        {
-                            <div class="list-group-item px-0">
-                                <div class="d-flex justify-content-between gap-2">
-                                    <strong>@alerta.Codigo</strong>
-                                    <span class="badge text-bg-secondary">@alerta.Severidade</span>
-                                </div>
-                                <div class="small text-secondary">@alerta.Mensagem</div>
                             </div>
-                        }
+                        </div></div>
                     </div>
                 </div>
             </div>
@@ -341,8 +204,9 @@
     </div>
 </div>
 
-<script type="application/json" id="financeChartData">@Html.Raw(JsonSerializer.Serialize(chartPayload))</script>
+@await Html.PartialAsync("_NovaTransacaoModal")
 
 @section Scripts {
+    <script src="~/lib/apexcharts/apexcharts.min.js" asp-append-version="true"></script>
     <script src="~/js/minhas-financas.js" asp-append-version="true"></script>
 }

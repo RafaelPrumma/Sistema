@@ -1,135 +1,208 @@
 (function () {
   'use strict';
 
-  const el = document.getElementById('financeChartData');
-  if (!el) return;
+  const container = document.getElementById('financeEvolucao');
+  if (!container || typeof ApexCharts === 'undefined') return;
 
-  const data = JSON.parse(el.textContent || '{}');
-  const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-  const styles = () => getComputedStyle(document.body);
-  const accent = () => styles().getPropertyValue('--app-accent').trim() || '#0d6efd';
-  const success = () => styles().getPropertyValue('--bs-success').trim() || '#20c997';
-  const bodyColor = () => styles().getPropertyValue('--bs-body-color').trim() || '#111827';
+  const url = container.dataset.evolucaoUrl || '/MinhasFinancas/Evolucao';
+  const elPeriodos = document.getElementById('financePeriodos');
+  const elValor = document.getElementById('financeHeaderValor');
+  const elDelta = document.getElementById('financeHeaderDelta');
+  const elTitulo = document.getElementById('financeHeaderTitulo');
+  const elSetores = document.getElementById('financeSetores');
 
-  function setup(canvas) {
-    if (!canvas) return null;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.max(320, rect.width) * ratio;
-    canvas.height = Math.max(220, rect.height) * ratio;
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(ratio, ratio);
-    return { ctx, width: canvas.width / ratio, height: canvas.height / ratio };
+  const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const pct = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cssVar = (name, fallback) => (getComputedStyle(document.body).getPropertyValue(name).trim() || fallback);
+
+  const PERIODOS = [
+    { cod: '1D', label: '1D', dias: 1 },
+    { cod: '5D', label: '5D', dias: 5 },
+    { cod: '1M', label: '1M', dias: 31 },
+    { cod: '6M', label: '6M', dias: 183 },
+    { cod: 'YTD', label: 'YTD', dias: null },
+    { cod: '1A', label: '1A', dias: 366 },
+    { cod: 'MAX', label: 'MÁX', dias: null }
+  ];
+
+  let dados = null;
+  let chart = null;
+  let periodoAtual = '6M';
+  let serieAtual = 'total';
+
+  function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
+  function corNegativa() { return cssVar('--bs-danger', '#dc2626'); }
+
+  function valoresDe(chave) {
+    if (chave === 'total') return dados.total;
+    const setor = dados.setores.find(s => s.chave === chave);
+    return setor ? setor.valores : dados.total;
   }
 
-  function drawAxes(ctx, width, height, padding) {
-    ctx.strokeStyle = 'rgba(148, 163, 184, .35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, padding.top);
-    ctx.lineTo(padding.left, height - padding.bottom);
-    ctx.lineTo(width - padding.right, height - padding.bottom);
-    ctx.stroke();
+  function rotuloDe(chave) {
+    if (chave === 'total') return 'Patrimônio total';
+    const setor = dados.setores.find(s => s.chave === chave);
+    return setor ? setor.rotulo : 'Patrimônio total';
   }
 
-  function drawBarChart(canvasId, rows) {
-    const chart = setup(document.getElementById(canvasId));
-    if (!chart || !rows?.length) return;
-    const { ctx, width, height } = chart;
-    const padding = { top: 18, right: 18, bottom: 42, left: 58 };
-    const plotWidth = width - padding.left - padding.right;
-    const plotHeight = height - padding.top - padding.bottom;
-    const max = Math.max(...rows.flatMap(x => [x.compras || 0, x.vendas || 0]), 1);
-    const group = plotWidth / rows.length;
-    const barWidth = Math.max(8, Math.min(26, group / 3));
-
-    ctx.clearRect(0, 0, width, height);
-    drawAxes(ctx, width, height, padding);
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillStyle = bodyColor();
-    ctx.fillText(money.format(max), 8, padding.top + 8);
-
-    rows.forEach((row, index) => {
-      const x = padding.left + index * group + group / 2;
-      const comprasH = ((row.compras || 0) / max) * plotHeight;
-      const vendasH = ((row.vendas || 0) / max) * plotHeight;
-      const base = height - padding.bottom;
-      ctx.fillStyle = accent();
-      ctx.fillRect(x - barWidth - 2, base - comprasH, barWidth, comprasH);
-      ctx.fillStyle = success();
-      ctx.fillRect(x + 2, base - vendasH, barWidth, vendasH);
-      ctx.save();
-      ctx.translate(x - 8, height - 16);
-      ctx.rotate(-Math.PI / 6);
-      ctx.fillStyle = 'rgba(108, 117, 125, .95)';
-      ctx.fillText(row.label, 0, 0);
-      ctx.restore();
-    });
-
-    ctx.fillStyle = accent();
-    ctx.fillRect(width - 150, 12, 10, 10);
-    ctx.fillStyle = bodyColor();
-    ctx.fillText('Compras', width - 136, 22);
-    ctx.fillStyle = success();
-    ctx.fillRect(width - 78, 12, 10, 10);
-    ctx.fillStyle = bodyColor();
-    ctx.fillText('Vendas', width - 64, 22);
+  function variacaoDiaDe(chave) {
+    if (chave === 'total') return dados.variacaoDiaTotal || 0;
+    const setor = dados.setores.find(s => s.chave === chave);
+    return setor ? (setor.variacaoDia || 0) : 0;
   }
 
-  function drawLineChart(canvasId, rows) {
-    const chart = setup(document.getElementById(canvasId));
-    if (!chart || !rows?.length) return;
-    const { ctx, width, height } = chart;
-    const padding = { top: 18, right: 18, bottom: 42, left: 58 };
-    const plotWidth = width - padding.left - padding.right;
-    const plotHeight = height - padding.top - padding.bottom;
-    const max = Math.max(...rows.flatMap(x => [x.compras || 0, x.vendas || 0]), 1);
-
-    ctx.clearRect(0, 0, width, height);
-    drawAxes(ctx, width, height, padding);
-    ctx.font = '12px system-ui, sans-serif';
-
-    function point(row, index, key) {
-      const x = padding.left + (rows.length === 1 ? 0 : (index / (rows.length - 1)) * plotWidth);
-      const y = height - padding.bottom - ((row[key] || 0) / max) * plotHeight;
-      return [x, y];
+  function indiceInicial() {
+    const n = dados.datas.length;
+    const p = PERIODOS.find(x => x.cod === periodoAtual);
+    if (!p || p.cod === 'MAX' || p.cod === '1A') return 0;
+    if (p.cod === 'YTD') {
+      const ano = new Date().getFullYear().toString();
+      const idx = dados.datas.findIndex(d => d.startsWith(ano));
+      return idx < 0 ? 0 : idx;
     }
+    return Math.max(0, n - 1 - p.dias);
+  }
 
-    function series(key, color) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      rows.forEach((row, index) => {
-        const [x, y] = point(row, index, key);
-        if (index === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    }
+  function compact(v) {
+    const abs = Math.abs(v);
+    if (abs >= 1e6) return 'R$ ' + (v / 1e6).toFixed(1) + 'mi';
+    if (abs >= 1e3) return 'R$ ' + (v / 1e3).toFixed(0) + 'k';
+    return money.format(v);
+  }
 
-    series('compras', accent());
-    series('vendas', success());
-
-    const step = Math.max(1, Math.ceil(rows.length / 8));
-    ctx.fillStyle = 'rgba(108, 117, 125, .95)';
-    rows.forEach((row, index) => {
-      if (index % step !== 0) return;
-      const [x] = point(row, index, 'compras');
-      ctx.save();
-      ctx.translate(x - 8, height - 16);
-      ctx.rotate(-Math.PI / 6);
-      ctx.fillText(row.label, 0, 0);
-      ctx.restore();
-    });
+  function pontos(valores, ini) {
+    const out = [];
+    for (let i = ini; i < dados.datas.length; i++) out.push({ x: dados.datas[i], y: valores[i] });
+    return out;
   }
 
   function render() {
-    drawBarChart('chartB3Ano', data.b3Ano || []);
-    drawLineChart('chartB3Mes', data.b3Mes || []);
+    const ini = indiceInicial();
+    const valores = valoresDe(serieAtual);
+    const atual = valores.length ? valores[valores.length - 1] : 0;
+    const base = valores[ini] || 0;
+    const variacao = atual - base;
+    const positivo = variacao >= 0;
+    const cor = positivo ? corPositiva() : corNegativa();
+
+    if (elValor) elValor.textContent = money.format(atual);
+    if (elTitulo) elTitulo.textContent = rotuloDe(serieAtual);
+    if (elDelta) {
+      const sinal = positivo ? '+' : '';
+      const perc = base === 0 ? 0 : (variacao / base) * 100;
+      const vd = variacaoDiaDe(serieAtual);
+      const labelPeriodo = (PERIODOS.find(x => x.cod === periodoAtual) || {}).label || '';
+      elDelta.innerHTML =
+        `<span class="${positivo ? 'text-success' : 'text-danger'}">${sinal}${money.format(variacao)} (${sinal}${pct.format(perc)}%) <small>${labelPeriodo}</small></span>` +
+        `<span class="finance-hero-today ${vd >= 0 ? 'text-success' : 'text-danger'}">${vd >= 0 ? '+' : ''}${pct.format(vd)}% hoje</span>`;
+      elDelta.className = 'finance-hero-delta';
+    }
+
+    const series = [{ name: rotuloDe(serieAtual), data: pontos(valores, ini) }];
+    if (!chart) {
+      chart = new ApexCharts(container, baseOptions(series, cor));
+      chart.render();
+    } else {
+      chart.updateOptions({ colors: [cor], fill: gradiente(cor) }, false, false);
+      chart.updateSeries(series, true);
+    }
+
+    renderSetores(ini);
   }
 
-  window.addEventListener('resize', () => window.requestAnimationFrame(render));
-  render();
+  function gradiente(cor) {
+    return { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 95] } };
+  }
+
+  function baseOptions(series, cor) {
+    return {
+      chart: { type: 'area', height: 340, toolbar: { show: false }, zoom: { enabled: false }, fontFamily: 'inherit', background: 'transparent' },
+      theme: { mode: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light' },
+      series: series,
+      colors: [cor],
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
+      fill: gradiente(cor),
+      grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
+      xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
+      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      tooltip: { x: { format: 'dd/MM/yyyy' }, y: { formatter: v => money.format(v) } }
+    };
+  }
+
+  function sparkline(valores, ini, cor) {
+    const slice = valores.slice(ini);
+    if (slice.length < 2) return '';
+    const min = Math.min(...slice), max = Math.max(...slice);
+    const span = max - min || 1;
+    const w = 120, h = 32;
+    const step = w / (slice.length - 1);
+    const pts = slice.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / span) * h).toFixed(1)}`).join(' ');
+    return `<svg class="finance-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${cor}" stroke-width="2" points="${pts}"/></svg>`;
+  }
+
+  function renderSetores(ini) {
+    if (!elSetores) return;
+    const cards = [];
+    const totalAtual = (dados.valorAtualTotal && dados.valorAtualTotal > 0) ? dados.valorAtualTotal : (dados.total[dados.total.length - 1] || 0);
+    const totalBase = dados.total[ini] || 0;
+    cards.push(cardSetor('total', 'Patrimônio total', dados.total, ini, totalAtual, totalBase, dados.variacaoDiaTotal || 0));
+    dados.setores.forEach(s => {
+      const serieAtualFim = s.valores[s.valores.length - 1] || 0;
+      const atual = (s.valorAtual && s.valorAtual > 0) ? s.valorAtual : serieAtualFim;
+      const base = s.valores[ini] || 0;
+      if (atual === 0 && base === 0) return;
+      cards.push(cardSetor(s.chave, s.rotulo, s.valores, ini, atual, base, s.variacaoDia || 0));
+    });
+    elSetores.innerHTML = cards.join('');
+    elSetores.querySelectorAll('[data-serie]').forEach(el => {
+      el.addEventListener('click', () => { serieAtual = el.dataset.serie; render(); });
+    });
+  }
+
+  function cardSetor(chave, rotulo, valores, ini, atual, base, variacaoDia) {
+    const variacao = atual - base;
+    const positivoPer = variacao >= 0;
+    const perc = base === 0 ? 0 : (variacao / base) * 100;
+    const corDia = variacaoDia >= 0 ? corPositiva() : corNegativa();
+    const ativo = chave === serieAtual ? ' finance-sector-card--active' : '';
+    return `<button type="button" class="finance-sector-card${ativo}" data-serie="${chave}">
+        <div class="finance-sector-top">
+          <span class="finance-sector-name">${rotulo}</span>
+          <span class="finance-sector-perc ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>
+        </div>
+        <div class="finance-sector-value">${money.format(atual)}</div>
+        ${sparkline(valores, ini, corDia)}
+        <div class="finance-sector-foot ${positivoPer ? 'text-success' : 'text-danger'}">${positivoPer ? '+' : ''}${pct.format(perc)}% no período</div>
+      </button>`;
+  }
+
+  function renderBotoes() {
+    if (!elPeriodos) return;
+    elPeriodos.innerHTML = PERIODOS.map(p =>
+      `<button type="button" class="finance-period-btn${p.cod === periodoAtual ? ' active' : ''}" data-periodo="${p.cod}">${p.label}</button>`
+    ).join('');
+    elPeriodos.querySelectorAll('[data-periodo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        periodoAtual = btn.dataset.periodo;
+        elPeriodos.querySelectorAll('[data-periodo]').forEach(b => b.classList.toggle('active', b === btn));
+        render();
+      });
+    });
+  }
+
+  fetch(url, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(d => {
+      dados = d;
+      if (!dados || !dados.datas || dados.datas.length === 0) {
+        container.innerHTML = '<div class="text-secondary text-center py-5">Sem histórico suficiente para o gráfico. Importe relatórios ou adicione transações e atualize as cotações.</div>';
+        return;
+      }
+      renderBotoes();
+      render();
+    })
+    .catch(() => {
+      container.innerHTML = '<div class="text-danger text-center py-5">Não foi possível carregar a evolução do patrimônio.</div>';
+    });
 })();

@@ -25,7 +25,9 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         var historico = await _uow.MinhasFinancas.BuscarHistoricoPrecosAsync(DateTime.UtcNow.Date.AddYears(-1), cancellationToken);
         var documentosMonitorados = await _uow.MinhasFinancas.BuscarDocumentosMonitoradosAsync(cancellationToken);
         var ultimaImportacao = await _uow.MinhasFinancas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
-        var ativosCotados = CriarAtivosCotados(posicoes, cotacoes);
+        var transacoes = await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken);
+        var posicoesTabela = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > 0.000000001m).ToList();
+        var ativosCotados = CriarAtivosCotadosDaTabela(posicoesTabela, cotacoes);
 
         var dashboard = new MinhasFinancasDashboardDto
         {
@@ -112,6 +114,384 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
     public async Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default)
         => await _marketData.AtualizarCotacoesAsync(force: true, cancellationToken);
 
+    public Task<ValidacaoAtivoResultado> ValidarAtivoAsync(string ticker, CancellationToken cancellationToken = default)
+        => _marketData.ValidarAtivoAsync(ticker, cancellationToken);
+
+    public async Task<EvolucaoPatrimonioDto> ObterEvolucaoPatrimonioAsync(CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+
+        var hoje = DateTime.UtcNow.Date;
+        var inicio = hoje.AddYears(-1);
+        var totalDias = (hoje - inicio).Days + 1;
+        var datas = Enumerable.Range(0, totalDias).Select(i => inicio.AddDays(i)).ToList();
+
+        var transacoes = await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken);
+        var historico = await _uow.MinhasFinancas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
+        var carteiras = await _uow.MinhasFinancas.BuscarCarteirasComAtivosAsync(cancellationToken);
+
+        // Agrupa por carteira/grupo (Setor, Tese de cripto, Classe de FII...). Cada ativo cai na
+        // primeira carteira que o contém, na ordem definida. Ativos sem grupo vão para "Outros".
+        var setorPorAtivo = new Dictionary<int, string>();
+        foreach (var carteira in carteiras.OrderBy(c => c.Ordem).ThenBy(c => c.Nome))
+            foreach (var item in carteira.Ativos.Where(a => a.AtivoFinanceiroId > 0))
+                setorPorAtivo.TryAdd(item.AtivoFinanceiroId, carteira.Nome);
+
+        // closeBRL por (ativo, data), já ordenado, para forward-fill.
+        var precosPorAtivo = historico
+            .GroupBy(h => h.AtivoFinanceiroId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(h => h.Date.Date)
+                      .Select(d => (Date: d.Key, Close: d.OrderByDescending(x => x.CloseBRL).First().CloseBRL))
+                      .OrderBy(x => x.Date)
+                      .ToList());
+
+        var total = new decimal[totalDias];
+        var seriesSetor = new Dictionary<string, decimal[]>();
+
+        foreach (var grupo in transacoes.GroupBy(t => t.AssetId))
+        {
+            var txs = grupo.OrderBy(t => t.Date).ToList();
+            precosPorAtivo.TryGetValue(grupo.Key, out var candles);
+            var setor = setorPorAtivo.TryGetValue(grupo.Key, out var s) ? s : "Outros";
+            if (!seriesSetor.TryGetValue(setor, out var arrSetor))
+            {
+                arrSetor = new decimal[totalDias];
+                seriesSetor[setor] = arrSetor;
+            }
+
+            decimal quantidade = 0m;
+            decimal ultimoPreco = 0m;
+            int ti = 0, ci = 0;
+
+            for (int di = 0; di < totalDias; di++)
+            {
+                var d = datas[di];
+                while (ti < txs.Count && txs[ti].Date.Date <= d)
+                {
+                    quantidade += DeltaQuantidade(txs[ti]);
+                    ti++;
+                }
+                if (candles is not null)
+                    while (ci < candles.Count && candles[ci].Date <= d)
+                    {
+                        ultimoPreco = candles[ci].Close;
+                        ci++;
+                    }
+
+                var valor = quantidade > 0.000000000001m ? quantidade * ultimoPreco : 0m;
+                total[di] += valor;
+                arrSetor[di] += valor;
+            }
+        }
+
+        decimal atual = total.Length > 0 ? total[^1] : 0m;
+        PeriodoPerformanceDto Periodo(string codigo, string label, DateTime baseData)
+        {
+            var idx = datas.FindIndex(x => x >= baseData.Date);
+            if (idx < 0) idx = 0;
+            var baseValor = total[idx];
+            var variacao = atual - baseValor;
+            return new PeriodoPerformanceDto(codigo, label, baseValor == 0 ? 0 : variacao / baseValor * 100m, variacao);
+        }
+
+        var periodos = new List<PeriodoPerformanceDto>
+        {
+            Periodo("1D", "1 dia", hoje.AddDays(-1)),
+            Periodo("5D", "5 dias", hoje.AddDays(-5)),
+            Periodo("1M", "1 mês", hoje.AddMonths(-1)),
+            Periodo("6M", "6 meses", hoje.AddMonths(-6)),
+            Periodo("YTD", "No ano", new DateTime(hoje.Year, 1, 1)),
+            Periodo("1A", "1 ano", inicio)
+        };
+
+        // Variação do dia por setor e total, a partir das cotações ao vivo (não do histórico diário).
+        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(c => c.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());
+        var posicoesAtuais = CalcularPosicoes(transacoes);
+
+        var diaPorSetor = new Dictionary<string, (decimal Valor, decimal VarValor)>(StringComparer.OrdinalIgnoreCase);
+        decimal valorVivoTotal = 0m, varDiaValorTotal = 0m;
+        foreach (var pos in posicoesAtuais.Values.Where(p => p.Quantidade > 0m))
+        {
+            if (!cotacaoPorAtivo.TryGetValue(pos.Asset.Id, out var cot) || cot.PriceBRL <= 0m)
+                continue;
+
+            var valorAtual = pos.Quantidade * cot.PriceBRL;
+            var varValor = valorAtual * ((cot.ChangePercent ?? 0m) / 100m);
+            var setorAtivo = setorPorAtivo.TryGetValue(pos.Asset.Id, out var s) ? s : "Outros";
+            diaPorSetor.TryGetValue(setorAtivo, out var acc);
+            diaPorSetor[setorAtivo] = (acc.Valor + valorAtual, acc.VarValor + varValor);
+            valorVivoTotal += valorAtual;
+            varDiaValorTotal += varValor;
+        }
+
+        decimal VarDiaSetor(string setor)
+            => diaPorSetor.TryGetValue(setor, out var acc) && acc.Valor != 0m ? Math.Round(acc.VarValor / acc.Valor * 100m, 2) : 0m;
+        decimal ValorVivoSetor(string setor)
+            => diaPorSetor.TryGetValue(setor, out var acc) ? Math.Round(acc.Valor, 2) : 0m;
+
+        var setores = seriesSetor
+            .OrderByDescending(x => x.Value.Length > 0 ? x.Value[^1] : 0m)
+            .Select(x => new SerieEvolucaoDto(Slug(x.Key), x.Key, x.Value.Select(v => Math.Round(v, 2)).ToList(), VarDiaSetor(x.Key), ValorVivoSetor(x.Key)))
+            .Where(x => x.Valores.Any(v => v != 0m))
+            .ToList();
+
+        var variacaoDiaTotal = valorVivoTotal == 0m ? 0m : Math.Round(varDiaValorTotal / valorVivoTotal * 100m, 2);
+
+        return new EvolucaoPatrimonioDto(
+            datas.Select(d => d.ToString("yyyy-MM-dd")).ToList(),
+            total.Select(v => Math.Round(v, 2)).ToList(),
+            variacaoDiaTotal,
+            Math.Round(valorVivoTotal, 2),
+            setores,
+            periodos);
+    }
+
+    public async Task<ResumoAnaliticoDto> ObterResumoAnaliticoAsync(DateTime? inicioOpt, DateTime? fimOpt, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+
+        var fim = (fimOpt ?? DateTime.UtcNow.Date).Date;
+        var inicio = (inicioOpt ?? new DateTime(fim.Year, fim.Month, 1)).Date;
+
+        var transacoes = (await _uow.MinhasFinancas.BuscarTodasTransacoesAsync(cancellationToken))
+            .Where(t => t.Date.Date <= fim && t.Asset is not null)
+            .OrderBy(t => t.Date)
+            .ThenBy(t => t.Id)
+            .ToList();
+
+        var cotacoes = await _uow.MinhasFinancas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var precoAtualPorAtivo = cotacoes
+            .GroupBy(c => c.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+
+        var estado = new Dictionary<int, PosicaoAcumulada>();
+        decimal totalComprado = 0m, totalVendido = 0m, resultadoRealizado = 0m;
+        var numeroOperacoes = 0;
+        var vendas = new List<VendaRealizadaDto>();
+
+        foreach (var t in transacoes)
+        {
+            if (!estado.TryGetValue(t.AssetId, out var pos))
+            {
+                pos = new PosicaoAcumulada { Asset = t.Asset! };
+                estado[t.AssetId] = pos;
+            }
+
+            var noPeriodo = t.Date.Date >= inicio && t.Date.Date <= fim;
+            var delta = DeltaQuantidade(t);
+
+            if (delta > 0)
+            {
+                pos.Custo += t.Quantity * t.UnitPrice + t.Fees;
+                pos.Quantidade += t.Quantity;
+                if (noPeriodo && t.OperationType == TipoOperacaoFinanceira.Compra)
+                {
+                    totalComprado += t.GrossAmount;
+                    numeroOperacoes++;
+                }
+            }
+            else if (delta < 0)
+            {
+                var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
+                if (t.OperationType == TipoOperacaoFinanceira.Venda)
+                {
+                    var resultado = t.Quantity * (t.UnitPrice - precoMedio) - t.Fees;
+                    if (noPeriodo)
+                    {
+                        resultadoRealizado += resultado;
+                        totalVendido += t.GrossAmount;
+                        numeroOperacoes++;
+                        pos.RealizadoPeriodo += resultado;
+                        vendas.Add(new VendaRealizadaDto(t.Date, TickerDe(pos.Asset), t.Quantity, t.UnitPrice, precoMedio, resultado, t.UnitPrice >= precoMedio));
+                    }
+                }
+
+                var reduz = Math.Min(t.Quantity, pos.Quantidade);
+                pos.Custo -= reduz * precoMedio;
+                pos.Quantidade -= t.Quantity;
+                if (pos.Quantidade <= 0.000000000001m)
+                {
+                    pos.Quantidade = 0m;
+                    pos.Custo = 0m;
+                }
+            }
+        }
+
+        var ativos = new List<ResumoAtivoDto>();
+        decimal custoTotal = 0m, valorTotal = 0m;
+        foreach (var (ativoId, pos) in estado)
+        {
+            if (pos.Quantidade <= 0m && pos.RealizadoPeriodo == 0m)
+                continue;
+
+            var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
+            precoAtualPorAtivo.TryGetValue(ativoId, out var preco);
+            decimal? precoAtual = preco > 0m ? preco : null;
+            var valorMercado = pos.Quantidade * (precoAtual ?? precoMedio);
+            var pl = valorMercado - pos.Custo;
+            var plPercentual = pos.Custo > 0m ? pl / pos.Custo * 100m : 0m;
+            custoTotal += pos.Custo;
+            valorTotal += valorMercado;
+
+            ativos.Add(new ResumoAtivoDto(
+                TickerDe(pos.Asset),
+                pos.Asset.Name,
+                pos.Asset.AssetClass.ToString(),
+                Math.Round(pos.Quantidade, 8),
+                Math.Round(precoMedio, 4),
+                Math.Round(pos.Custo, 2),
+                precoAtual,
+                Math.Round(valorMercado, 2),
+                Math.Round(pl, 2),
+                Math.Round(plPercentual, 2),
+                Math.Round(pos.RealizadoPeriodo, 2)));
+        }
+
+        return new ResumoAnaliticoDto(
+            $"{inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}",
+            inicio,
+            fim,
+            Math.Round(totalComprado, 2),
+            Math.Round(totalVendido, 2),
+            Math.Round(totalComprado - totalVendido, 2),
+            Math.Round(resultadoRealizado, 2),
+            numeroOperacoes,
+            Math.Round(custoTotal, 2),
+            Math.Round(valorTotal, 2),
+            Math.Round(valorTotal - custoTotal, 2),
+            ativos.OrderByDescending(a => a.ValorMercado).ToList(),
+            vendas.OrderByDescending(v => v.Data).ToList());
+    }
+
+    private static string TickerDe(AtivoFinanceiro a) => a.Ticker ?? a.AssetKey ?? a.Name ?? string.Empty;
+
+    private sealed class PosicaoAcumulada
+    {
+        public decimal Quantidade;
+        public decimal Custo;
+        public decimal RealizadoPeriodo;
+        public AtivoFinanceiro Asset = null!;
+    }
+
+    // Efeito de uma transação no estoque do ativo (Quantity é sempre positiva; o tipo dá o sentido).
+    private static decimal DeltaQuantidade(TransacaoFinanceira t) => t.OperationType switch
+    {
+        TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Deposito or TipoOperacaoFinanceira.Rendimento => t.Quantity,
+        TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque or TipoOperacaoFinanceira.Taxa => -t.Quantity,
+        _ => 0m
+    };
+
+    private static string Slug(string valor)
+        => new string((valor ?? string.Empty).ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+
+    public async Task<PagedResult<TransacaoFinanceiraDto>> BuscarTransacoesAsync(int page, int pageSize, string? termo, string? origem, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        OrigemTransacao? origemFiltro = Enum.TryParse<OrigemTransacao>(origem, true, out var o) ? o : null;
+        var result = await _uow.MinhasFinancas.BuscarTransacoesAsync(page, pageSize, termo, origemFiltro, cancellationToken);
+        return new PagedResult<TransacaoFinanceiraDto>(result.Items.Select(MapTransacao).ToList(), result.TotalCount, result.Page, result.PageSize);
+    }
+
+    public async Task<ResultadoOperacao> RegistrarTransacaoManualAsync(NovaTransacaoInput input, CancellationToken cancellationToken = default)
+    {
+        if (input is null || string.IsNullOrWhiteSpace(input.Ticker))
+            return new ResultadoOperacao(false, "Informe o ticker do ativo.");
+        if (input.Quantidade <= 0)
+            return new ResultadoOperacao(false, "Quantidade deve ser maior que zero.");
+        if (input.PrecoUnitario < 0)
+            return new ResultadoOperacao(false, "Preço inválido.");
+        if (!Enum.TryParse<TipoOperacaoFinanceira>(input.Tipo, true, out var tipo) || tipo is not (TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Venda))
+            return new ResultadoOperacao(false, "Tipo deve ser Compra ou Venda.");
+
+        var ticker = input.Ticker.Trim().ToUpperInvariant();
+        var ativo = await _uow.MinhasFinancas.ObterAtivoPorChaveOuTickerAsync(ticker, cancellationToken);
+        if (ativo is null)
+        {
+            var validacao = await _marketData.ValidarAtivoAsync(ticker, cancellationToken);
+            if (!validacao.Valido)
+                return new ResultadoOperacao(false, validacao.Mensagem ?? "Ativo inválido.");
+
+            var classe = Enum.TryParse<ClasseAtivo>(validacao.Classe, true, out var c) ? c : ClasseAtivo.Outro;
+            ativo = new AtivoFinanceiro
+            {
+                AssetKey = ticker,
+                Ticker = ticker,
+                Name = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
+                AssetClass = classe,
+                Market = validacao.IsCrypto ? "Binance" : "B3",
+                Currency = "BRL",
+                IsCrypto = validacao.IsCrypto,
+                IsActive = true,
+                UsuarioInclusao = "minhas-financas-manual"
+            };
+            await _uow.MinhasFinancas.AdicionarAtivoAsync(ativo, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
+            await _marketData.GarantirCotacaoAtivoAsync(ativo.Id, cancellationToken);
+        }
+
+        var transacao = new TransacaoFinanceira
+        {
+            Origem = OrigemTransacao.Manual,
+            AssetId = ativo.Id,
+            Date = input.Data.Date,
+            OperationType = tipo,
+            Quantity = input.Quantidade,
+            UnitPrice = input.PrecoUnitario,
+            GrossAmount = input.Quantidade * input.PrecoUnitario,
+            Fees = input.Taxas,
+            Currency = "BRL",
+            Broker = string.IsNullOrWhiteSpace(input.Corretora) ? "Manual" : input.Corretora!.Trim(),
+            Fonte = "Manual",
+            Observacao = input.Observacao,
+            IsCanonical = true,
+            ConfidenceLevel = NivelConfianca.Alta,
+            RawJson = "{}",
+            UsuarioInclusao = "minhas-financas-manual"
+        };
+        await _uow.MinhasFinancas.AdicionarTransacaoAsync(transacao, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Transação registrada.", transacao.Id);
+    }
+
+    public async Task<ResultadoOperacao> EditarTransacaoAsync(int id, NovaTransacaoInput input, CancellationToken cancellationToken = default)
+    {
+        var transacao = await _uow.MinhasFinancas.ObterTransacaoAsync(id, cancellationToken);
+        if (transacao is null)
+            return new ResultadoOperacao(false, "Transação não encontrada.");
+        if (input.Quantidade <= 0)
+            return new ResultadoOperacao(false, "Quantidade deve ser maior que zero.");
+        if (!Enum.TryParse<TipoOperacaoFinanceira>(input.Tipo, true, out var tipo) || tipo is not (TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Venda))
+            return new ResultadoOperacao(false, "Tipo deve ser Compra ou Venda.");
+
+        transacao.OperationType = tipo;
+        transacao.Quantity = input.Quantidade;
+        transacao.UnitPrice = input.PrecoUnitario;
+        transacao.GrossAmount = input.Quantidade * input.PrecoUnitario;
+        transacao.Fees = input.Taxas;
+        transacao.Date = input.Data.Date;
+        transacao.Broker = string.IsNullOrWhiteSpace(input.Corretora) ? transacao.Broker : input.Corretora!.Trim();
+        transacao.Observacao = input.Observacao;
+        _uow.MinhasFinancas.AtualizarTransacao(transacao);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Transação atualizada.", transacao.Id);
+    }
+
+    public async Task<ResultadoOperacao> ExcluirTransacaoAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var transacao = await _uow.MinhasFinancas.ObterTransacaoAsync(id, cancellationToken);
+        if (transacao is null)
+            return new ResultadoOperacao(false, "Transação não encontrada.");
+
+        _uow.MinhasFinancas.RemoverTransacao(transacao);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Transação excluída.");
+    }
+
     private static IReadOnlyList<FinanceiroKpiDto> CriarKpis(CargaFinanceira? carga)
     {
         var summary = TryParseObject(carga?.DashboardJson, "summary") ?? TryParseObject(carga?.SummaryJson);
@@ -174,6 +554,97 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
 
     private static AlertaConfiabilidadeDto MapAlerta(AlertaConfiabilidade alerta)
         => new(alerta.Id, alerta.EntityType, alerta.Severity.ToString(), alerta.Code, alerta.Message, alerta.Details, alerta.CreatedAt);
+
+    private static TransacaoFinanceiraDto MapTransacao(TransacaoFinanceira t)
+        => new(
+            t.Id,
+            t.Origem.ToString(),
+            string.IsNullOrWhiteSpace(t.Fonte) ? t.Origem.ToString() : t.Fonte,
+            t.Asset?.Name ?? t.Asset?.Ticker ?? string.Empty,
+            t.Asset?.Ticker ?? t.Asset?.AssetKey ?? string.Empty,
+            t.Asset?.AssetClass.ToString() ?? string.Empty,
+            t.Date,
+            t.OperationType.ToString(),
+            t.Quantity,
+            t.UnitPrice,
+            t.GrossAmount,
+            t.Fees,
+            t.Broker,
+            t.Observacao);
+
+    // Posições atuais (qtd, custo, preço médio) por ativo, derivadas da tabela única de transações.
+    private static Dictionary<int, PosicaoAcumulada> CalcularPosicoes(IReadOnlyList<TransacaoFinanceira> transacoes)
+    {
+        var estado = new Dictionary<int, PosicaoAcumulada>();
+        foreach (var t in transacoes.Where(t => t.Asset is not null).OrderBy(t => t.Date).ThenBy(t => t.Id))
+        {
+            if (!estado.TryGetValue(t.AssetId, out var pos))
+            {
+                pos = new PosicaoAcumulada { Asset = t.Asset! };
+                estado[t.AssetId] = pos;
+            }
+
+            var delta = DeltaQuantidade(t);
+            if (delta > 0)
+            {
+                pos.Custo += t.Quantity * t.UnitPrice + t.Fees;
+                pos.Quantidade += t.Quantity;
+            }
+            else if (delta < 0)
+            {
+                var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
+                var reduz = Math.Min(t.Quantity, pos.Quantidade);
+                pos.Custo -= reduz * precoMedio;
+                pos.Quantidade -= t.Quantity;
+                if (pos.Quantidade <= 0.000000000001m)
+                {
+                    pos.Quantidade = 0m;
+                    pos.Custo = 0m;
+                }
+            }
+        }
+
+        return estado;
+    }
+
+    private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAcumulada> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
+    {
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+
+        return posicoes
+            .Select(pos =>
+            {
+                var asset = pos.Asset;
+                cotacaoPorAtivo.TryGetValue(asset.Id, out var cotacao);
+                var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
+                var precoAtual = cotacao is { PriceBRL: > 0m } ? cotacao.PriceBRL : (decimal?)null;
+                var custo = pos.Custo;
+                var valorMercado = precoAtual.HasValue ? pos.Quantidade * precoAtual.Value : custo;
+                var resultado = valorMercado - custo;
+                var percentual = custo == 0m ? 0m : resultado / custo * 100m;
+
+                return new CotacaoAtivoDto(
+                    asset.Id,
+                    asset.Ticker ?? asset.AssetKey ?? asset.Name ?? string.Empty,
+                    asset.AssetClass.ToString(),
+                    cotacao?.Symbol ?? asset.Ticker ?? asset.AssetKey ?? string.Empty,
+                    pos.Quantidade,
+                    precoMedio,
+                    precoAtual,
+                    valorMercado,
+                    custo,
+                    resultado,
+                    percentual,
+                    cotacao?.ChangePercent,
+                    cotacao?.RetrievedAt,
+                    cotacao?.Status.ToString() ?? "SemCotacao",
+                    "Calculada");
+            })
+            .OrderByDescending(x => x.ValorMercado)
+            .ToList();
+    }
 
     private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotados(IReadOnlyList<EstimativaPosicaoCarteira> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
     {

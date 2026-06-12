@@ -70,8 +70,16 @@
                     <div><span>1</span> Home: painel operacional, atalhos e comunicacoes recentes.</div>
                     <div><span>2</span> Configuracoes: parametros por grupo e operacao.</div>
                     <div><span>3</span> Mensagens: feed, caixa de saida, avisos, posts e threads.</div>
-                    <div><span>4</span> Minhas Financas: importacao, documentos, B3, cripto, posicoes e alertas.</div>
+                    <div><span>4</span> Minhas Financas: carteira pessoal estilo Google Finance.</div>
                 </div>
+                <p class="mt-3">O modulo gira em torno de uma <strong>tabela unica de transacoes</strong> (<code>FinanceiroTransacao</code>), que e a fonte de verdade tanto para a importacao (notas B3 em PDF e relatorios Binance em CSV/XLSX, materializados a partir do staging bruto) quanto para o <strong>lancamento manual</strong>. No manual, o ticker e validado pela API (Brapi para acao/FII/ETF/BDR, Binance para cripto) antes de ser aceito, e o ativo e criado/cotado na hora. Cada transacao guarda sua <strong>Fonte</strong> (Binance, Nubank B3, Manual...). Da Binance entram apenas os negocios com preco (spot/convert); o restante do extrato (Earn, staking, juros, airdrops) fica so no staging para auditoria.</p>
+                <ul>
+                    <li><strong>Dashboard</strong>: grafico de evolucao do patrimonio (area, periodos 1D/5D/1M/6M/YTD/1A) reconstruido a partir das transacoes, cards por setor com variacao e sparkline (clique faz drill-down no grafico) e lista de ativos com preco medio, variacao do dia e retorno total.</li>
+                    <li><strong>Transacoes</strong>: lista, adiciona, edita e exclui lancamentos (importados e manuais).</li>
+                    <li><strong>Resumo analitico</strong>: por periodo (mes/ano/intervalo) mostra comprado, vendido, aporte liquido, resultado realizado, preco medio e L/P por ativo, melhores/piores e o resultado de cada venda (acima ou abaixo do preco medio).</li>
+                    <li><strong>Dados &amp; importacao</strong> (secao recolhida no dashboard): importacao de pasta, atualizacao de cotacoes, KPIs de IR, posicoes estimadas e alertas de confiabilidade. A importacao roda em <strong>segundo plano via Hangfire</strong> (painel em <code>/jobs</code>, so para usuarios logados) e nao copia os arquivos — apenas le e grava na tabela.</li>
+                </ul>
+                <p class="small text-secondary">Limites: historico de precos e diario (1D/5D ficam em granularidade de dia); acoes B3 no Brapi gratis tem historico curto (configure <code>MinhasFinancas:MarketData:BrapiToken</code> para series longas); FII vs ETF (sufixo 11) pode precisar de ajuste manual de classe.</p>
             </section>
 
             <section id="seguranca" class="surface-card doc-section">

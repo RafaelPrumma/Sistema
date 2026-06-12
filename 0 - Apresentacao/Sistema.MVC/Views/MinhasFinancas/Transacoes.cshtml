@@ -1,0 +1,183 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<TransacaoFinanceiraDto>
+@{
+    ViewData["Title"] = "Transações";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    var inv = CultureInfo.InvariantCulture;
+    string Money(decimal value) => value.ToString("C", br);
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Transações",
+    Description = "Fonte de verdade única: lançamentos importados e manuais. Tudo o que move a carteira sai daqui."
+})
+
+@await Html.PartialAsync("_FlashMessages")
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex flex-wrap gap-2">
+        <input class="form-control" name="termo" value="@ViewBag.Termo" placeholder="Ativo ou corretora" />
+        <select class="form-select" name="origem" style="max-width: 180px">
+            <option value="">Todas as origens</option>
+            <option value="Manual" selected="@(ViewBag.Origem as string == "Manual")">Manual</option>
+            <option value="Importacao" selected="@(ViewBag.Origem as string == "Importacao")">Importação</option>
+        </select>
+        <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+    </form>
+    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#novaTransacaoModal">
+        <i class="bi bi-plus-circle me-1"></i>Adicionar transação
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Operação</th>
+                    <th>Ativo</th>
+                    <th>Classe</th>
+                    <th class="text-end">Qtd</th>
+                    <th class="text-end">Preço</th>
+                    <th class="text-end">Total</th>
+                    <th>Corretora</th>
+                    <th>Fonte</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.Data.ToString("dd/MM/yyyy")</td>
+                        <td><span class="badge @(item.Tipo == "Compra" ? "text-bg-primary" : "text-bg-success")">@item.Tipo</span></td>
+                        <td>@item.Ticker</td>
+                        <td><span class="small text-secondary">@item.Classe</span></td>
+                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
+                        <td class="text-end">@Money(item.PrecoUnitario)</td>
+                        <td class="text-end">@Money(item.ValorTotal)</td>
+                        <td><span class="small">@item.Corretora</span></td>
+                        <td>
+                            <span class="badge @(item.Origem == "Manual" ? "text-bg-info" : "text-bg-light border")">@item.Fonte</span>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary js-editar"
+                                    data-id="@item.Id"
+                                    data-ticker="@item.Ticker"
+                                    data-tipo="@item.Tipo"
+                                    data-qtd="@item.Quantidade.ToString(inv)"
+                                    data-preco="@item.PrecoUnitario.ToString(inv)"
+                                    data-data="@item.Data.ToString("yyyy-MM-dd")"
+                                    data-taxas="@item.Taxas.ToString(inv)"
+                                    data-corretora="@item.Corretora"
+                                    data-obs="@item.Observacao"
+                                    title="Editar"><i class="bi bi-pencil"></i></button>
+                            <form method="post" asp-action="ExcluirTransacao" class="d-inline" onsubmit="return confirm('Excluir esta transação?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="Excluir"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Items.Any())
+                {
+                    <tr><td colspan="10" class="text-center text-secondary py-4">Nenhuma transação encontrada. Use <strong>Adicionar transação</strong> ou importe seus relatórios.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span>@Model.TotalCount transações</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo" asp-route-origem="@ViewBag.Origem">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo" asp-route-origem="@ViewBag.Origem">Próxima</a>
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync("_NovaTransacaoModal")
+
+<div class="modal fade" id="editarTransacaoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" asp-action="EditarTransacao" id="formEditarTransacao">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="edId" />
+                <input type="hidden" name="Ticker" id="edTicker" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar transação <span id="edTituloTicker" class="text-secondary"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Operação</label>
+                            <select class="form-select" name="Tipo" id="edTipo">
+                                <option value="Compra">Compra</option>
+                                <option value="Venda">Venda</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Data</label>
+                            <input class="form-control" type="date" name="Data" id="edData" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Quantidade</label>
+                            <input class="form-control" type="number" step="any" min="0" name="Quantidade" id="edQtd" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Preço unitário (R$)</label>
+                            <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" id="edPreco" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Taxas (R$)</label>
+                            <input class="form-control" type="number" step="any" min="0" name="Taxas" id="edTaxas" value="0" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Corretora</label>
+                            <input class="form-control" name="Corretora" id="edCorretora" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observação</label>
+                            <input class="form-control" name="Observacao" id="edObs" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+    (function () {
+        var modalEl = document.getElementById('editarTransacaoModal');
+        if (!modalEl) return;
+        var modal = new bootstrap.Modal(modalEl);
+        document.querySelectorAll('.js-editar').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.getElementById('edId').value = btn.dataset.id;
+                document.getElementById('edTicker').value = btn.dataset.ticker;
+                document.getElementById('edTituloTicker').textContent = btn.dataset.ticker;
+                document.getElementById('edTipo').value = btn.dataset.tipo;
+                document.getElementById('edData').value = btn.dataset.data;
+                document.getElementById('edQtd').value = btn.dataset.qtd;
+                document.getElementById('edPreco').value = btn.dataset.preco;
+                document.getElementById('edTaxas').value = btn.dataset.taxas;
+                document.getElementById('edCorretora').value = btn.dataset.corretora;
+                document.getElementById('edObs').value = btn.dataset.obs || '';
+                modal.show();
+            });
+        });
+    })();
+    </script>
+}

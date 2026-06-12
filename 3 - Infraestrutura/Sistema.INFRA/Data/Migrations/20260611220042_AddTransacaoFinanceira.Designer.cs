@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sistema.INFRA.Data;
 
 #nullable disable
 
-namespace Sistema.INFRA.Migrations
+namespace Sistema.INFRA.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260611220042_AddTransacaoFinanceira")]
+    partial class AddTransacaoFinanceira
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1723,11 +1726,6 @@ namespace Sistema.INFRA.Migrations
                         .HasPrecision(28, 12)
                         .HasColumnType("decimal(28,12)");
 
-                    b.Property<string>("Fonte")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
                     b.Property<decimal>("GrossAmount")
                         .HasPrecision(28, 12)
                         .HasColumnType("decimal(28,12)");
@@ -1782,8 +1780,6 @@ namespace Sistema.INFRA.Migrations
                     b.HasIndex("CargaFinanceiraId");
 
                     b.HasIndex("DuplicateGroupKey");
-
-                    b.HasIndex("Fonte");
 
                     b.HasIndex("Origem");
 
