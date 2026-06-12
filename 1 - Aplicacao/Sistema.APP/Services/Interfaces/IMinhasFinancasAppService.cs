@@ -12,7 +12,7 @@ public interface IMinhasFinancasAppService
     Task<PagedResult<TransacaoCriptoDto>> BuscarTransacoesCriptoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PosicaoFinanceiraDto>> BuscarPosicoesAsync(bool? somenteAbertas, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> BuscarAlertasAsync(CancellationToken cancellationToken = default);
-    Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default);
+    Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
     Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default);
 
     Task<EvolucaoPatrimonioDto> ObterEvolucaoPatrimonioAsync(CancellationToken cancellationToken = default);

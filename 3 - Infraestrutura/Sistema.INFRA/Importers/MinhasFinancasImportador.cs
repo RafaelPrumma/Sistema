@@ -15,13 +15,14 @@ using UglyToad.PdfPig;
 
 namespace Sistema.INFRA.Importers;
 
-public partial class MinhasFinancasImportador(AppDbContext context, IConfiguration configuration, IHostEnvironment hostEnvironment, ILogger<MinhasFinancasImportador> logger) : IMinhasFinancasImportador
+public partial class MinhasFinancasImportador(AppDbContext context, IConfiguration configuration, IConfiguracaoLeitura config, IHostEnvironment hostEnvironment, ILogger<MinhasFinancasImportador> logger) : IMinhasFinancasImportador
 {
     private static readonly string[] CryptoQuotes = ["BRL", "USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB"];
     private const string ParserVersion = "financeiro-v1";
 
     private readonly AppDbContext _context = context;
     private readonly IConfiguration _configuration = configuration;
+    private readonly IConfiguracaoLeitura _config = config;
     private readonly IHostEnvironment _hostEnvironment = hostEnvironment;
     private readonly ILogger<MinhasFinancasImportador> _logger = logger;
 
@@ -37,7 +38,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
         await GarantirCarteirasPadraoAsync(cancellationToken);
 
-        var watchedFolder = _configuration["MinhasFinancas:WatchedFolderPath"];
+        var watchedFolder = await _config.ObterTextoAsync("MinhasFinancas", "WatchedFolderPath", null, cancellationToken);
         if (!string.IsNullOrWhiteSpace(watchedFolder)
             && Directory.Exists(watchedFolder)
             && !await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == watchedFolder, cancellationToken))
@@ -52,7 +53,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
     {
-        var watchedFolder = _configuration["MinhasFinancas:WatchedFolderPath"];
+        var watchedFolder = await _config.ObterTextoAsync("MinhasFinancas", "WatchedFolderPath", null, cancellationToken);
         if (string.IsNullOrWhiteSpace(watchedFolder) || !Directory.Exists(watchedFolder))
             return;
 

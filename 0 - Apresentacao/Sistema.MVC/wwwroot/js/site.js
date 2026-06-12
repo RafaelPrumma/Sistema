@@ -38,6 +38,32 @@
         notificar('info', 'Info', mensagem);
     };
 
+    // Helpers de modal no padrão iziModal (init sob demanda, lendo título/ícone do data-attribute).
+    window.abrirModal = function (id, opts) {
+        var $m = $('#' + id);
+        if (!$m.length || typeof $m.iziModal !== 'function') return;
+        if (!$m.data('uiInit')) {
+            $m.iziModal(opts || {
+                title: $m.data('titulo') || '',
+                icon: $m.data('icone') || '',
+                width: $m.data('largura') || 600
+            });
+            $m.data('uiInit', true);
+        }
+        $m.iziModal('open');
+    };
+
+    window.fecharModal = function (id) {
+        var $m = $('#' + id);
+        if ($m.length && typeof $m.iziModal === 'function') $m.iziModal('close');
+    };
+
+    // Abre modais por delegação: qualquer elemento com data-abrir-modal="idDoModal".
+    $(document).on('click', '[data-abrir-modal]', function (e) {
+        e.preventDefault();
+        window.abrirModal(this.getAttribute('data-abrir-modal'));
+    });
+
     $(function () {
         const splash = document.getElementById('appSplash');
         const hideSplash = () => {

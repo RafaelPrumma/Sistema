@@ -27,7 +27,7 @@
         </select>
         <button class="btn btn-outline-primary" type="submit">Filtrar</button>
     </form>
-    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#novaTransacaoModal">
+    <button class="btn btn-primary" type="button" data-abrir-modal="novaTransacaoModal">
         <i class="bi bi-plus-circle me-1"></i>Adicionar transação
     </button>
 </div>
@@ -102,72 +102,59 @@
 
 @await Html.PartialAsync("_NovaTransacaoModal")
 
-<div class="modal fade" id="editarTransacaoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="post" asp-action="EditarTransacao" id="formEditarTransacao">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" id="edId" />
-                <input type="hidden" name="Ticker" id="edTicker" />
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar transação <span id="edTituloTicker" class="text-secondary"></span></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label">Operação</label>
-                            <select class="form-select" name="Tipo" id="edTipo">
-                                <option value="Compra">Compra</option>
-                                <option value="Venda">Venda</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Data</label>
-                            <input class="form-control" type="date" name="Data" id="edData" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Quantidade</label>
-                            <input class="form-control" type="number" step="any" min="0" name="Quantidade" id="edQtd" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Preço unitário (R$)</label>
-                            <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" id="edPreco" required />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Taxas (R$)</label>
-                            <input class="form-control" type="number" step="any" min="0" name="Taxas" id="edTaxas" value="0" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Corretora</label>
-                            <input class="form-control" name="Corretora" id="edCorretora" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Observação</label>
-                            <input class="form-control" name="Observacao" id="edObs" />
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar alterações</button>
-                </div>
-            </form>
+<div id="editarTransacaoModal" data-titulo="Editar transação" data-icone="bi bi-pencil" data-largura="640" style="display:none">
+    <form method="post" asp-action="EditarTransacao" id="formEditarTransacao" class="p-3">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="edId" />
+        <input type="hidden" name="Ticker" id="edTicker" />
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Operação</label>
+                <select class="form-select" name="Tipo" id="edTipo">
+                    <option value="Compra">Compra</option>
+                    <option value="Venda">Venda</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Data</label>
+                <input class="form-control" type="date" name="Data" id="edData" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Quantidade</label>
+                <input class="form-control" type="number" step="any" min="0" name="Quantidade" id="edQtd" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Preço unitário (R$)</label>
+                <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" id="edPreco" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Taxas (R$)</label>
+                <input class="form-control" type="number" step="any" min="0" name="Taxas" id="edTaxas" value="0" />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Corretora</label>
+                <input class="form-control" name="Corretora" id="edCorretora" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observação</label>
+                <input class="form-control" name="Observacao" id="edObs" />
+            </div>
         </div>
-    </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="edCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar alterações</button>
+        </div>
+    </form>
 </div>
 
 @section Scripts {
     <script>
     (function () {
-        var modalEl = document.getElementById('editarTransacaoModal');
-        if (!modalEl) return;
-        var modal = new bootstrap.Modal(modalEl);
+        var $ = window.jQuery;
         document.querySelectorAll('.js-editar').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 document.getElementById('edId').value = btn.dataset.id;
                 document.getElementById('edTicker').value = btn.dataset.ticker;
-                document.getElementById('edTituloTicker').textContent = btn.dataset.ticker;
                 document.getElementById('edTipo').value = btn.dataset.tipo;
                 document.getElementById('edData').value = btn.dataset.data;
                 document.getElementById('edQtd').value = btn.dataset.qtd;
@@ -175,9 +162,14 @@
                 document.getElementById('edTaxas').value = btn.dataset.taxas;
                 document.getElementById('edCorretora').value = btn.dataset.corretora;
                 document.getElementById('edObs').value = btn.dataset.obs || '';
-                modal.show();
+                if (window.abrirModal) window.abrirModal('editarTransacaoModal');
+                if ($ && typeof $('#editarTransacaoModal').iziModal === 'function') {
+                    $('#editarTransacaoModal').iziModal('setTitle', 'Editar ' + (btn.dataset.ticker || 'transação'));
+                }
             });
         });
+        var cancelar = document.getElementById('edCancelar');
+        if (cancelar) cancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('editarTransacaoModal'); });
     })();
     </script>
 }

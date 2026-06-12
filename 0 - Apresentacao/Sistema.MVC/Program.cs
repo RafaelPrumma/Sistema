@@ -4,6 +4,7 @@ using Hangfire;
 using Hangfire.SqlServer;
 using Hangfire.Dashboard;
 using Sistema.APP.DependencyInjection;
+using Sistema.APP.Services.Interfaces;
 using Sistema.INFRA.Data;
 using Sistema.INFRA.DependencyInjection;
 using Sistema.MVC.DependencyInjection;
@@ -97,6 +98,27 @@ using (var scope = app.Services.CreateScope())
     }
 
     DbInitializer.Seed(db);
+
+    // Job recorrente de cotações (substitui o BackgroundService). Intervalo vem da Configuração;
+    // como o cron é por minuto, segundos < 60 viram 1 minuto. Re-registra a cada inicialização.
+    if (hangfireEnabled)
+    {
+        var leitura = scope.ServiceProvider.GetRequiredService<IConfiguracaoLeitura>();
+        if (await leitura.ObterBoolAsync("MinhasFinancas", "MarketData:BackgroundEnabled", true))
+        {
+            var segundos = await leitura.ObterIntAsync("MinhasFinancas", "MarketData:RefreshSeconds", 60);
+            var minutos = Math.Max(1, (int)Math.Round(segundos / 60.0));
+            var cron = minutos <= 1 ? "* * * * *" : $"*/{minutos} * * * *";
+            RecurringJob.AddOrUpdate<IMinhasFinancasMarketDataService>(
+                "financas-cotacoes",
+                s => s.AtualizarCotacoesAsync(false, CancellationToken.None),
+                cron);
+        }
+        else
+        {
+            RecurringJob.RemoveIfExists("financas-cotacoes");
+        }
+    }
 }
 
 app.MapControllerRoute(

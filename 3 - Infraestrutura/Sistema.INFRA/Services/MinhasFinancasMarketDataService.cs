@@ -14,13 +14,13 @@ namespace Sistema.INFRA.Services;
 public class MinhasFinancasMarketDataService(
     AppDbContext context,
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration,
+    IConfiguracaoLeitura config,
     ILogger<MinhasFinancasMarketDataService> logger) : IMinhasFinancasMarketDataService
 {
     private const string UsuarioSistema = "market-data";
     private readonly AppDbContext _context = context;
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
-    private readonly IConfiguration _configuration = configuration;
+    private readonly IConfiguracaoLeitura _config = config;
     private readonly ILogger<MinhasFinancasMarketDataService> _logger = logger;
 
     public async Task AtualizarCotacoesAsync(bool force = false, CancellationToken cancellationToken = default)
@@ -81,7 +81,7 @@ public class MinhasFinancasMarketDataService(
     private async Task<ValidacaoAtivoResultado?> ValidarB3Async(string symbol, CancellationToken cancellationToken)
     {
         var pareceB3 = System.Text.RegularExpressions.Regex.IsMatch(symbol, @"^[A-Z]{4}\d{1,2}$");
-        var token = _configuration["MinhasFinancas:MarketData:BrapiToken"];
+        var token = await _config.ObterTextoAsync("MinhasFinancas", "MarketData:BrapiToken", null, cancellationToken);
         var client = _httpClientFactory.CreateClient("Brapi");
 
         try
@@ -225,7 +225,7 @@ public class MinhasFinancasMarketDataService(
         if (staleSymbols.Count == 0)
             return;
 
-        var token = _configuration["MinhasFinancas:MarketData:BrapiToken"];
+        var token = await _config.ObterTextoAsync("MinhasFinancas", "MarketData:BrapiToken", null, cancellationToken);
         if (string.IsNullOrWhiteSpace(token) && staleSymbols.Any(x => !IsBrapiFreeTicker(x)))
         {
             await MarcarSemTokenAsync(ativos, ProvedorCotacao.Brapi, staleSymbols, cancellationToken);

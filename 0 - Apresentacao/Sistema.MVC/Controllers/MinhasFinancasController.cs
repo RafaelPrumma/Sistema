@@ -4,6 +4,7 @@ using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Enums;
 using Sistema.MVC.Authorization;
+using System.Security.Claims;
 
 namespace Sistema.MVC.Controllers;
 
@@ -22,20 +23,31 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportarPasta(CancellationToken cancellationToken)
     {
+        var usuarioId = ObterUsuarioId();
         try
         {
             // Roda em segundo plano (Hangfire) para não travar a requisição com PDFs grandes.
-            BackgroundJob.Enqueue<IMinhasFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(CancellationToken.None));
-            TempData["MensagemSucesso"] = "Importação iniciada em segundo plano. Os dados aparecem assim que o processamento terminar — acompanhe em /jobs.";
+            // O usuarioId é capturado agora e usado para notificar quem disparou ao concluir.
+            BackgroundJob.Enqueue<IMinhasFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(usuarioId, CancellationToken.None));
+            TempData["MensagemSucesso"] = "Importação iniciada em segundo plano. Você será notificado ao concluir — acompanhe na tela de Fila.";
         }
         catch
         {
             // Sem Hangfire configurado: importa de forma síncrona como fallback.
-            await _service.ImportarPastaMonitoradaAsync(cancellationToken);
+            await _service.ImportarPastaMonitoradaAsync(usuarioId, cancellationToken);
             TempData["MensagemSucesso"] = "Pasta financeira importada.";
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    private int? ObterUsuarioId()
+    {
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (userId.HasValue)
+            return userId.Value;
+
+        return int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedId) ? parsedId : null;
     }
 
     [HttpPost]

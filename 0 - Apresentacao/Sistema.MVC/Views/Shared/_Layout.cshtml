@@ -91,6 +91,7 @@
     <link rel="stylesheet" href="~/lib/izitoast/css/iziToast.min.css" />
     <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="~/lib/aos/aos.css" />
+    <link rel="stylesheet" href="~/lib/datatables/css/dataTables.bootstrap5.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="@(headerFixo ? "layout-header-fixed" : string.Empty) @(footerFixo ? "layout-footer-fixed" : string.Empty)" data-bs-theme="@(modoEscuro ? "dark" : "light")">
@@ -128,9 +129,12 @@
     <script src="~/lib/izitoast/js/iziToast.min.js"></script>
     <script src="~/lib/izimodal/js/iziModal.min.js"></script>
     <script src="~/lib/aos/aos.js"></script>
+    <script src="~/lib/datatables/js/jquery.dataTables.min.js"></script>
+    <script src="~/lib/datatables/js/dataTables.bootstrap5.min.js"></script>
     <script src="~/js/menu.js" asp-append-version="true"></script>
     <script src="~/js/theme.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/datatable.js" asp-append-version="true"></script>
 
     @await Html.PartialAsync("_ThemePanel", themePanelModel)
     @await RenderSectionAsync("Scripts", required: false)
