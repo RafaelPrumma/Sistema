@@ -2,6 +2,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
+using Sistema.CORE.Common;
 using Sistema.CORE.Enums;
 using Sistema.MVC.Authorization;
 using System.Security.Claims;
@@ -105,12 +106,15 @@ public class MinhasFinancasController(IMinhasFinancasAppService service) : Contr
         => View(await _service.BuscarAlertasAsync(cancellationToken));
 
     [HttpGet]
-    public async Task<IActionResult> Transacoes(string? termo, string? origem, int page = 1, CancellationToken cancellationToken = default)
+    public IActionResult Transacoes(string? origem)
     {
-        ViewBag.Termo = termo;
         ViewBag.Origem = origem;
-        return View(await _service.BuscarTransacoesAsync(page, 30, termo, origem, cancellationToken));
+        return View();
     }
+
+    [HttpGet("/MinhasFinancas/TransacoesData")]
+    public async Task<IActionResult> TransacoesData([FromQuery] DataTablesRequest request, string? origem, CancellationToken cancellationToken)
+        => Json(await _service.BuscarTransacoesDataTableAsync(request, origem, cancellationToken));
 
     [HttpGet]
     public async Task<IActionResult> Resumo(DateTime? inicio, DateTime? fim, string? preset, CancellationToken cancellationToken = default)

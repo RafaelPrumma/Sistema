@@ -1,12 +1,6 @@
-@using System.Globalization
-@using Sistema.APP.DTOs
-@using Sistema.CORE.Common
-@model PagedResult<TransacaoFinanceiraDto>
 @{
     ViewData["Title"] = "Transações";
-    var br = CultureInfo.GetCultureInfo("pt-BR");
-    var inv = CultureInfo.InvariantCulture;
-    string Money(decimal value) => value.ToString("C", br);
+    var origem = ViewBag.Origem as string;
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
@@ -18,23 +12,24 @@
 @await Html.PartialAsync("_FlashMessages")
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <form method="get" class="d-flex flex-wrap gap-2">
-        <input class="form-control" name="termo" value="@ViewBag.Termo" placeholder="Ativo ou corretora" />
-        <select class="form-select" name="origem" style="max-width: 180px">
-            <option value="">Todas as origens</option>
-            <option value="Manual" selected="@(ViewBag.Origem as string == "Manual")">Manual</option>
-            <option value="Importacao" selected="@(ViewBag.Origem as string == "Importacao")">Importação</option>
-        </select>
-        <button class="btn btn-outline-primary" type="submit">Filtrar</button>
-    </form>
+    <div class="d-flex align-items-end gap-2">
+        <div>
+            <label class="form-label small">Origem</label>
+            <select class="form-select form-select-sm" id="fOrigem" style="max-width: 200px">
+                <option value="">Todas as origens</option>
+                <option value="Manual" selected="@(origem == "Manual")">Manual</option>
+                <option value="Importacao" selected="@(origem == "Importacao")">Importação</option>
+            </select>
+        </div>
+    </div>
     <button class="btn btn-primary" type="button" data-abrir-modal="novaTransacaoModal">
         <i class="bi bi-plus-circle me-1"></i>Adicionar transação
     </button>
 </div>
 
 <div class="card">
-    <div class="card-body table-responsive">
-        <table class="table table-sm align-middle">
+    <div class="card-body">
+        <table id="tabelaTransacoes" class="table table-sm table-striped align-middle w-100">
             <thead>
                 <tr>
                     <th>Data</th>
@@ -49,54 +44,8 @@
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach (var item in Model.Items)
-                {
-                    <tr>
-                        <td>@item.Data.ToString("dd/MM/yyyy")</td>
-                        <td><span class="badge @(item.Tipo == "Compra" ? "text-bg-primary" : "text-bg-success")">@item.Tipo</span></td>
-                        <td>@item.Ticker</td>
-                        <td><span class="small text-secondary">@item.Classe</span></td>
-                        <td class="text-end">@item.Quantidade.ToString("N4", br)</td>
-                        <td class="text-end">@Money(item.PrecoUnitario)</td>
-                        <td class="text-end">@Money(item.ValorTotal)</td>
-                        <td><span class="small">@item.Corretora</span></td>
-                        <td>
-                            <span class="badge @(item.Origem == "Manual" ? "text-bg-info" : "text-bg-light border")">@item.Fonte</span>
-                        </td>
-                        <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary js-editar"
-                                    data-id="@item.Id"
-                                    data-ticker="@item.Ticker"
-                                    data-tipo="@item.Tipo"
-                                    data-qtd="@item.Quantidade.ToString(inv)"
-                                    data-preco="@item.PrecoUnitario.ToString(inv)"
-                                    data-data="@item.Data.ToString("yyyy-MM-dd")"
-                                    data-taxas="@item.Taxas.ToString(inv)"
-                                    data-corretora="@item.Corretora"
-                                    data-obs="@item.Observacao"
-                                    title="Editar"><i class="bi bi-pencil"></i></button>
-                            <form method="post" asp-action="ExcluirTransacao" class="d-inline" onsubmit="return confirm('Excluir esta transação?');">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="id" value="@item.Id" />
-                                <button class="btn btn-sm btn-outline-danger" type="submit" title="Excluir"><i class="bi bi-trash"></i></button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-                @if (!Model.Items.Any())
-                {
-                    <tr><td colspan="10" class="text-center text-secondary py-4">Nenhuma transação encontrada. Use <strong>Adicionar transação</strong> ou importe seus relatórios.</td></tr>
-                }
-            </tbody>
+            <tbody></tbody>
         </table>
-    </div>
-    <div class="card-footer d-flex justify-content-between">
-        <span>@Model.TotalCount transações</span>
-        <div class="btn-group">
-            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo" asp-route-origem="@ViewBag.Origem">Anterior</a>
-            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo" asp-route-origem="@ViewBag.Origem">Próxima</a>
-        </div>
     </div>
 </div>
 
@@ -147,27 +96,71 @@
     </form>
 </div>
 
+<form method="post" asp-action="ExcluirTransacao" id="formExcluirTransacao" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" id="exId" />
+</form>
+
 @section Scripts {
     <script>
     (function () {
+        if (!window.initDataTable) return;
         var $ = window.jQuery;
-        document.querySelectorAll('.js-editar').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                document.getElementById('edId').value = btn.dataset.id;
-                document.getElementById('edTicker').value = btn.dataset.ticker;
-                document.getElementById('edTipo').value = btn.dataset.tipo;
-                document.getElementById('edData').value = btn.dataset.data;
-                document.getElementById('edQtd').value = btn.dataset.qtd;
-                document.getElementById('edPreco').value = btn.dataset.preco;
-                document.getElementById('edTaxas').value = btn.dataset.taxas;
-                document.getElementById('edCorretora').value = btn.dataset.corretora;
-                document.getElementById('edObs').value = btn.dataset.obs || '';
-                if (window.abrirModal) window.abrirModal('editarTransacaoModal');
-                if ($ && typeof $('#editarTransacaoModal').iziModal === 'function') {
-                    $('#editarTransacaoModal').iziModal('setTitle', 'Editar ' + (btn.dataset.ticker || 'transação'));
+        var money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+        var qtdFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 });
+        function esc(v) { return (v == null ? '' : String(v)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+        var tabela = window.initDataTable('#tabelaTransacoes', {
+            url: '@Url.Action("TransacoesData", "MinhasFinancas")',
+            order: [[0, 'desc']],
+            columns: [
+                { data: 'data', render: function (d) { return d ? new Date(d).toLocaleDateString('pt-BR') : ''; } },
+                { data: 'tipo', render: function (t) { return '<span class="badge ' + (t === 'Compra' ? 'text-bg-primary' : 'text-bg-success') + '">' + esc(t) + '</span>'; } },
+                { data: 'ticker', render: esc },
+                { data: 'classe', orderable: false, render: function (c) { return '<span class="small text-secondary">' + esc(c) + '</span>'; } },
+                { data: 'quantidade', className: 'text-end', render: function (q) { return qtdFmt.format(q); } },
+                { data: 'precoUnitario', className: 'text-end', render: function (p) { return money.format(p); } },
+                { data: 'valorTotal', className: 'text-end', render: function (v) { return money.format(v); } },
+                { data: 'corretora', render: function (c) { return '<span class="small">' + esc(c) + '</span>'; } },
+                { data: 'fonte', orderable: false, render: function (f, t, row) { return '<span class="badge ' + (row.origem === 'Manual' ? 'text-bg-info' : 'text-bg-light border') + '">' + esc(f) + '</span>'; } },
+                {
+                    data: null, orderable: false, className: 'text-end text-nowrap', render: function (row) {
+                        var dataIso = row.data ? String(row.data).substring(0, 10) : '';
+                        return '<button class="btn btn-sm btn-outline-secondary js-editar" data-id="' + row.id + '" data-ticker="' + esc(row.ticker) + '" data-tipo="' + esc(row.tipo) + '" data-qtd="' + row.quantidade + '" data-preco="' + row.precoUnitario + '" data-data="' + dataIso + '" data-taxas="' + row.taxas + '" data-corretora="' + esc(row.corretora) + '" data-obs="' + esc(row.observacao || '') + '" title="Editar"><i class="bi bi-pencil"></i></button> ' +
+                            '<button class="btn btn-sm btn-outline-danger js-excluir" data-id="' + row.id + '" title="Excluir"><i class="bi bi-trash"></i></button>';
+                    }
                 }
-            });
+            ],
+            extraData: function () { return { origem: document.getElementById('fOrigem').value }; }
         });
+
+        document.getElementById('fOrigem').addEventListener('change', function () { tabela.ajax.reload(); });
+
+        // Editar (linhas dinâmicas → delegação)
+        $(document).on('click', '.js-editar', function () {
+            var b = this;
+            document.getElementById('edId').value = b.dataset.id;
+            document.getElementById('edTicker').value = b.dataset.ticker;
+            document.getElementById('edTipo').value = b.dataset.tipo;
+            document.getElementById('edData').value = b.dataset.data;
+            document.getElementById('edQtd').value = b.dataset.qtd;
+            document.getElementById('edPreco').value = b.dataset.preco;
+            document.getElementById('edTaxas').value = b.dataset.taxas;
+            document.getElementById('edCorretora').value = b.dataset.corretora;
+            document.getElementById('edObs').value = b.dataset.obs || '';
+            if (window.abrirModal) window.abrirModal('editarTransacaoModal');
+            if ($ && typeof $('#editarTransacaoModal').iziModal === 'function') {
+                $('#editarTransacaoModal').iziModal('setTitle', 'Editar ' + (b.dataset.ticker || 'transação'));
+            }
+        });
+
+        // Excluir (form compartilhado)
+        $(document).on('click', '.js-excluir', function () {
+            if (!confirm('Excluir esta transação?')) return;
+            document.getElementById('exId').value = this.dataset.id;
+            document.getElementById('formExcluirTransacao').submit();
+        });
+
         var cancelar = document.getElementById('edCancelar');
         if (cancelar) cancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('editarTransacaoModal'); });
     })();

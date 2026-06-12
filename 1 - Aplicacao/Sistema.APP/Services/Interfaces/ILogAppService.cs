@@ -1,3 +1,5 @@
+using Sistema.APP.DTOs;
+using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 
 namespace Sistema.APP.Services.Interfaces;
@@ -5,6 +7,7 @@ namespace Sistema.APP.Services.Interfaces;
 public interface ILogAppService
 {
     Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo = null, CancellationToken cancellationToken = default);
+    Task<DataTablesResponse<LogDto>> BuscarDataTableAsync(DataTablesRequest request, DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo, CancellationToken cancellationToken = default);
     Task RegistrarAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, string? detalhe = null, CancellationToken cancellationToken = default);
     Task RegistrarPorModuloAsync(string entidade, string operacao, bool sucesso, string mensagem, LogTipo tipo, string usuario, LogModulo modulo, string? detalhe = null, CancellationToken cancellationToken = default);
 

@@ -40,7 +40,7 @@
         type: options.method || 'GET',
         data: function (d) {
           const temOrdem = d.order && d.order.length > 0;
-          return {
+          const payload = {
             draw: d.draw,
             start: d.start,
             length: d.length,
@@ -48,6 +48,11 @@
             orderColumn: temOrdem ? d.columns[d.order[0].column].data : '',
             orderDir: temOrdem ? d.order[0].dir : 'asc'
           };
+          // Filtros extras da tela (ex.: módulo, tipo, datas) — reenviados a cada requisição.
+          if (typeof options.extraData === 'function') {
+            Object.assign(payload, options.extraData());
+          }
+          return payload;
         }
       }
     });

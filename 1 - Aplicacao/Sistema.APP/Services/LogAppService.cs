@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
+using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
+using Sistema.CORE.Common;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Repositories.Interfaces;
 using System.Diagnostics;
@@ -24,6 +26,14 @@ public class LogAppService(IUnitOfWork uow, IHttpContextAccessor httpContextAcce
 
     public Task<IEnumerable<Log>> BuscarFiltradosAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo = null, CancellationToken cancellationToken = default)
         => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, modulo, cancellationToken);
+
+    public async Task<DataTablesResponse<LogDto>> BuscarDataTableAsync(DataTablesRequest request, DateTime? inicio, DateTime? fim, LogTipo? tipo, LogModulo? modulo, CancellationToken cancellationToken = default)
+    {
+        var resposta = await _uow.Logs.BuscarDataTableAsync(request, inicio, fim, tipo, modulo, cancellationToken);
+        return resposta.Map(l => new LogDto(
+            l.Id, l.DataOperacao, l.Modulo.ToString(), l.Tipo.ToString(),
+            l.Entidade, l.Operacao, l.Sucesso, l.Usuario, l.Mensagem));
+    }
 
     public Task<IEnumerable<Log>> BuscarAcessoAsync(DateTime? inicio, DateTime? fim, LogTipo? tipo, CancellationToken cancellationToken = default)
         => _uow.Logs.BuscarFiltradosAsync(inicio, fim, tipo, LogModulo.Acesso, cancellationToken);

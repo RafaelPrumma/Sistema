@@ -1,0 +1,111 @@
+@{
+    ViewData["Title"] = "Logs do sistema";
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Logs do sistema",
+    Description = "Auditoria de operações por módulo — acesso, comunicação, administração e financeiro."
+})
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-lg-2">
+                <label class="form-label small">Módulo</label>
+                <select class="form-select form-select-sm" id="fModulo">
+                    <option value="">Todos</option>
+                    <option value="Geral">Geral</option>
+                    <option value="Acesso">Acesso</option>
+                    <option value="Comunicacao">Comunicação</option>
+                    <option value="Administracao">Administração</option>
+                    <option value="Financeiro">Financeiro</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label small">Tipo</label>
+                <select class="form-select form-select-sm" id="fTipo">
+                    <option value="">Todos</option>
+                    <option value="Informacao">Informação</option>
+                    <option value="Sucesso">Sucesso</option>
+                    <option value="Erro">Erro</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label small">De</label>
+                <input type="date" class="form-control form-control-sm" id="fInicio" />
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label small">Até</label>
+                <input type="date" class="form-control form-control-sm" id="fFim" />
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button class="btn btn-sm btn-primary" type="button" id="btnFiltrar"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table id="tabelaLogs" class="table table-sm table-striped align-middle w-100">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Módulo</th>
+                    <th>Tipo</th>
+                    <th>Entidade</th>
+                    <th>Operação</th>
+                    <th>OK</th>
+                    <th>Usuário</th>
+                    <th>Mensagem</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+    (function () {
+        if (!window.initDataTable) return;
+
+        function esc(v) {
+            return (v == null ? '' : String(v)).replace(/[&<>"]/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+            });
+        }
+
+        var tabela = window.initDataTable('#tabelaLogs', {
+            url: '@Url.Action("Data", "Log")',
+            order: [[0, 'desc']],
+            columns: [
+                { data: 'dataOperacao', render: function (d) { return d ? new Date(d).toLocaleString('pt-BR') : ''; } },
+                { data: 'modulo' },
+                {
+                    data: 'tipo', render: function (t) {
+                        var cls = t === 'Erro' ? 'text-bg-danger' : (t === 'Sucesso' ? 'text-bg-success' : 'text-bg-secondary');
+                        return '<span class="badge ' + cls + '">' + esc(t) + '</span>';
+                    }
+                },
+                { data: 'entidade' },
+                { data: 'operacao' },
+                { data: 'sucesso', render: function (s) { return s ? '<span class="badge text-bg-success">Sim</span>' : '<span class="badge text-bg-danger">Não</span>'; } },
+                { data: 'usuario' },
+                { data: 'mensagem', render: function (m) { return esc(m); } }
+            ],
+            extraData: function () {
+                return {
+                    modulo: document.getElementById('fModulo').value,
+                    tipo: document.getElementById('fTipo').value,
+                    inicio: document.getElementById('fInicio').value,
+                    fim: document.getElementById('fFim').value
+                };
+            }
+        });
+
+        document.getElementById('btnFiltrar').addEventListener('click', function () { tabela.ajax.reload(); });
+    })();
+    </script>
+}

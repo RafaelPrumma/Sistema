@@ -420,6 +420,14 @@ public class MinhasFinancasAppService(IUnitOfWork uow, IMinhasFinancasImportador
         return new PagedResult<TransacaoFinanceiraDto>(result.Items.Select(MapTransacao).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
+    public async Task<DataTablesResponse<TransacaoFinanceiraDto>> BuscarTransacoesDataTableAsync(DataTablesRequest request, string? origem, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        OrigemTransacao? origemFiltro = Enum.TryParse<OrigemTransacao>(origem, true, out var o) ? o : null;
+        var resposta = await _uow.MinhasFinancas.BuscarTransacoesDataTableAsync(request, origemFiltro, cancellationToken);
+        return resposta.Map(MapTransacao);
+    }
+
     public async Task<ResultadoOperacao> RegistrarTransacaoManualAsync(NovaTransacaoInput input, CancellationToken cancellationToken = default)
     {
         if (input is null || string.IsNullOrWhiteSpace(input.Ticker))

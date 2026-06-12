@@ -220,6 +220,33 @@ public class MinhasFinancasRepository(AppDbContext context) : IMinhasFinancasRep
         return await query.OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
     }
 
+    public Task<DataTablesResponse<TransacaoFinanceira>> BuscarTransacoesDataTableAsync(DataTablesRequest request, OrigemTransacao? origem, CancellationToken cancellationToken = default)
+    {
+        var query = _context.TransacoesFinanceiras.AsNoTracking().Include(x => x.Asset)
+            .Where(x => x.IsCanonical && x.Asset != null);
+        if (origem.HasValue)
+            query = query.Where(x => x.Origem == origem.Value);
+
+        var ordenacoes = new Dictionary<string, Func<IQueryable<TransacaoFinanceira>, bool, IOrderedQueryable<TransacaoFinanceira>>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["data"] = (q, d) => d ? q.OrderByDescending(x => x.Date) : q.OrderBy(x => x.Date),
+            ["ticker"] = (q, d) => d ? q.OrderByDescending(x => x.Asset!.Ticker) : q.OrderBy(x => x.Asset!.Ticker),
+            ["tipo"] = (q, d) => d ? q.OrderByDescending(x => x.OperationType) : q.OrderBy(x => x.OperationType),
+            ["quantidade"] = (q, d) => d ? q.OrderByDescending(x => x.Quantity) : q.OrderBy(x => x.Quantity),
+            ["precoUnitario"] = (q, d) => d ? q.OrderByDescending(x => x.UnitPrice) : q.OrderBy(x => x.UnitPrice),
+            ["valorTotal"] = (q, d) => d ? q.OrderByDescending(x => x.GrossAmount) : q.OrderBy(x => x.GrossAmount),
+            ["corretora"] = (q, d) => d ? q.OrderByDescending(x => x.Broker) : q.OrderBy(x => x.Broker),
+            ["fonte"] = (q, d) => d ? q.OrderByDescending(x => x.Fonte) : q.OrderBy(x => x.Fonte)
+        };
+
+        return query.ToDataTablesAsync(
+            request,
+            (q, termo) => q.Where(x => x.Asset!.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)) || x.Broker.Contains(termo)),
+            ordenacoes,
+            "data",
+            cancellationToken);
+    }
+
     public Task<TransacaoFinanceira?> ObterTransacaoAsync(int id, CancellationToken cancellationToken = default)
         => _context.TransacoesFinanceiras.Include(x => x.Asset).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
