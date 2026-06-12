@@ -37,6 +37,7 @@ public class AppDbContext : DbContext
     public DbSet<PrecoHistoricoAtivoFinanceiro> PrecosHistoricosAtivosFinanceiros => Set<PrecoHistoricoAtivoFinanceiro>();
     public DbSet<OperacaoB3> OperacoesB3 => Set<OperacaoB3>();
     public DbSet<TransacaoCripto> TransacoesCripto => Set<TransacaoCripto>();
+    public DbSet<TransacaoFinanceira> TransacoesFinanceiras => Set<TransacaoFinanceira>();
     public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();
     public DbSet<RendimentoInvestimento> RendimentosInvestimento => Set<RendimentoInvestimento>();
     public DbSet<AgregadoFinanceiro> AgregadosFinanceiros => Set<AgregadoFinanceiro>();

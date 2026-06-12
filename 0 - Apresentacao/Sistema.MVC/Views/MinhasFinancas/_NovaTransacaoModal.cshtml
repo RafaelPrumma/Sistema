@@ -1,0 +1,118 @@
+@using System.Globalization
+@{
+    var brNow = DateTime.Now.ToString("yyyy-MM-dd");
+}
+
+<div class="modal fade" id="novaTransacaoModal" tabindex="-1" aria-labelledby="novaTransacaoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" asp-action="Transacoes" id="formNovaTransacao">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="novaTransacaoLabel"><i class="bi bi-plus-circle me-2"></i>Adicionar transação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ativo (ticker)</label>
+                        <div class="input-group">
+                            <input class="form-control text-uppercase" name="Ticker" id="txTicker" placeholder="Ex.: PETR4, SANB11, BTC, ADA" autocomplete="off" required />
+                            <button class="btn btn-outline-secondary" type="button" id="txValidar">Validar</button>
+                        </div>
+                        <div class="form-text" id="txFeedback">Digite o ticker e valide — aceita ação, FII, ETF, BDR (B3) ou cripto (Binance).</div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Operação</label>
+                            <select class="form-select" name="Tipo" required>
+                                <option value="Compra">Compra</option>
+                                <option value="Venda">Venda</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Data</label>
+                            <input class="form-control" type="date" name="Data" value="@brNow" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Quantidade</label>
+                            <input class="form-control" type="number" step="any" min="0" name="Quantidade" placeholder="0" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Preço unitário (R$)</label>
+                            <input class="form-control" type="number" step="any" min="0" name="PrecoUnitario" placeholder="0,00" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Taxas (R$)</label>
+                            <input class="form-control" type="number" step="any" min="0" name="Taxas" value="0" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Corretora</label>
+                            <input class="form-control" name="Corretora" placeholder="Manual, NU Invest, Binance..." />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observação</label>
+                            <input class="form-control" name="Observacao" placeholder="Opcional" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="txSalvar" disabled>Salvar transação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var ticker = document.getElementById('txTicker');
+    var validar = document.getElementById('txValidar');
+    var feedback = document.getElementById('txFeedback');
+    var salvar = document.getElementById('txSalvar');
+    if (!ticker || !validar) return;
+
+    var validado = '';
+
+    function bloquear() {
+        salvar.disabled = true;
+        if (ticker.value.trim().toUpperCase() !== validado) {
+            feedback.className = 'form-text';
+        }
+    }
+
+    async function validarTicker() {
+        var valor = ticker.value.trim().toUpperCase();
+        if (!valor) return;
+        feedback.className = 'form-text text-secondary';
+        feedback.textContent = 'Validando ' + valor + '...';
+        salvar.disabled = true;
+        try {
+            var resp = await fetch('@Url.Action("ValidarAtivo", "MinhasFinancas")?ticker=' + encodeURIComponent(valor));
+            var data = await resp.json();
+            if (data.valido) {
+                validado = (data.ticker || valor).toUpperCase();
+                ticker.value = validado;
+                var preco = data.precoAtual != null
+                    ? ' · ~R$ ' + Number(data.precoAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                    : '';
+                feedback.className = 'form-text text-success';
+                feedback.textContent = '✓ ' + (data.nome || validado) + ' · ' + data.classe + ' (' + data.provedor + ')' + preco;
+                salvar.disabled = false;
+            } else {
+                feedback.className = 'form-text text-danger';
+                feedback.textContent = '✕ ' + (data.mensagem || 'Ativo não encontrado.');
+                salvar.disabled = true;
+            }
+        } catch (e) {
+            feedback.className = 'form-text text-danger';
+            feedback.textContent = 'Não foi possível validar agora. Tente novamente.';
+            salvar.disabled = true;
+        }
+    }
+
+    validar.addEventListener('click', validarTicker);
+    ticker.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); validarTicker(); } });
+    ticker.addEventListener('input', bloquear);
+})();
+</script>

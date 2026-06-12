@@ -204,6 +204,33 @@ public class TransacaoCriptoMap : IEntityTypeConfiguration<TransacaoCripto>
     }
 }
 
+public class TransacaoFinanceiraMap : IEntityTypeConfiguration<TransacaoFinanceira>
+{
+    public void Configure(EntityTypeBuilder<TransacaoFinanceira> builder)
+    {
+        builder.ToTable("FinanceiroTransacao");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Currency).IsRequired().HasMaxLength(10);
+        builder.Property(x => x.Broker).HasMaxLength(120);
+        builder.Property(x => x.Fonte).HasMaxLength(80);
+        builder.Property(x => x.Observacao).HasMaxLength(500);
+        builder.HasIndex(x => x.Fonte);
+        builder.Property(x => x.StagingTipo).HasMaxLength(40);
+        builder.Property(x => x.DuplicateGroupKey).HasMaxLength(160);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.Property(x => x.Quantity).HasPrecision(28, 12);
+        builder.Property(x => x.UnitPrice).HasPrecision(28, 12);
+        builder.Property(x => x.GrossAmount).HasPrecision(28, 12);
+        builder.Property(x => x.Fees).HasPrecision(28, 12);
+        builder.HasIndex(x => new { x.AssetId, x.Date });
+        builder.HasIndex(x => x.Origem);
+        builder.HasIndex(x => x.DuplicateGroupKey);
+        builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.SourceDocument).WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne<CargaFinanceira>().WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
 public class EstimativaPosicaoCarteiraMap : IEntityTypeConfiguration<EstimativaPosicaoCarteira>
 {
     public void Configure(EntityTypeBuilder<EstimativaPosicaoCarteira> builder)

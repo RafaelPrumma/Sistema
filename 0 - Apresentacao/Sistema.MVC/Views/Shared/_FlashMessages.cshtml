@@ -1,0 +1,18 @@
+@{
+    var sucesso = TempData["MensagemSucesso"] as string;
+    var erro = TempData["MensagemErro"] as string;
+}
+@if (!string.IsNullOrWhiteSpace(sucesso))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-1"></i>@sucesso
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(erro))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-1"></i>@erro
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+}

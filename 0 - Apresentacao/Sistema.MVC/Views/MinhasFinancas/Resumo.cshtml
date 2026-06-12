@@ -1,0 +1,218 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model ResumoAnaliticoDto
+@{
+    ViewData["Title"] = "Resumo";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal v) => v.ToString("C", br);
+    string Pct(decimal v) => v.ToString("N2", br) + "%";
+    string Cls(decimal v) => v >= 0 ? "text-success" : "text-danger";
+    var preset = ViewBag.Preset as string;
+    var melhores = Model.Ativos.Where(a => a.Quantidade > 0).OrderByDescending(a => a.PlNaoRealizado).Take(5).ToList();
+    var piores = Model.Ativos.Where(a => a.Quantidade > 0).OrderBy(a => a.PlNaoRealizado).Take(5).ToList();
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Resumo analítico",
+    Description = "Leitura da carteira a partir das transações: o que comprou, vendeu, ganhou e perdeu no período."
+})
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="btn-group">
+        <a class="btn btn-sm @(preset == "mes" ? "btn-primary" : "btn-outline-primary")" asp-route-preset="mes">Mês atual</a>
+        <a class="btn btn-sm @(preset == "ano" ? "btn-primary" : "btn-outline-primary")" asp-route-preset="ano">No ano</a>
+        <a class="btn btn-sm @(preset == "12m" ? "btn-primary" : "btn-outline-primary")" asp-route-preset="12m">12 meses</a>
+        <a class="btn btn-sm @(preset == "tudo" ? "btn-primary" : "btn-outline-primary")" asp-route-preset="tudo">Tudo</a>
+    </div>
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+        <input type="date" class="form-control form-control-sm" name="inicio" value="@Model.Inicio.ToString("yyyy-MM-dd")" />
+        <span class="text-secondary">até</span>
+        <input type="date" class="form-control form-control-sm" name="fim" value="@Model.Fim.ToString("yyyy-MM-dd")" />
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Aplicar</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-xl-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Comprado no período</div>
+            <div class="fs-4 fw-semibold">@Money(Model.TotalComprado)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Vendido no período</div>
+            <div class="fs-4 fw-semibold">@Money(Model.TotalVendido)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Aporte líquido</div>
+            <div class="fs-4 fw-semibold @Cls(Model.AporteLiquido)">@Money(Model.AporteLiquido)</div>
+            <div class="small text-secondary">@Model.NumeroOperacoes operações</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Resultado realizado</div>
+            <div class="fs-4 fw-semibold @Cls(Model.ResultadoRealizado)">@Money(Model.ResultadoRealizado)</div>
+            <div class="small text-secondary">lucro/prejuízo nas vendas</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Valor de mercado atual</div>
+            <div class="fs-4 fw-semibold">@Money(Model.ValorMercadoTotal)</div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Custo investido</div>
+            <div class="fs-4 fw-semibold">@Money(Model.CustoTotal)</div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Lucro/prejuízo não realizado</div>
+            <div class="fs-4 fw-semibold @Cls(Model.PlNaoRealizadoTotal)">@Money(Model.PlNaoRealizadoTotal)</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-6">
+        <div class="card h-100"><div class="card-body">
+            <h6 class="text-success"><i class="bi bi-arrow-up-right me-1"></i>Melhores do período</h6>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var a in melhores)
+                    {
+                        <tr>
+                            <td><strong>@a.Ticker</strong> <span class="small text-secondary">@a.Classe</span></td>
+                            <td class="text-end @Cls(a.PlNaoRealizado)">@Money(a.PlNaoRealizado)</td>
+                            <td class="text-end @Cls(a.PlPercentual)">@Pct(a.PlPercentual)</td>
+                        </tr>
+                    }
+                    @if (melhores.Count == 0)
+                    {
+                        <tr><td class="text-secondary">Sem posições com cotação.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card h-100"><div class="card-body">
+            <h6 class="text-danger"><i class="bi bi-arrow-down-right me-1"></i>Piores do período</h6>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var a in piores)
+                    {
+                        <tr>
+                            <td><strong>@a.Ticker</strong> <span class="small text-secondary">@a.Classe</span></td>
+                            <td class="text-end @Cls(a.PlNaoRealizado)">@Money(a.PlNaoRealizado)</td>
+                            <td class="text-end @Cls(a.PlPercentual)">@Pct(a.PlPercentual)</td>
+                        </tr>
+                    }
+                    @if (piores.Count == 0)
+                    {
+                        <tr><td class="text-secondary">Sem posições com cotação.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="mb-3">Preço médio e resultado por ativo</h5>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Ativo</th>
+                        <th class="text-end">Qtd</th>
+                        <th class="text-end">Preço médio</th>
+                        <th class="text-end">Custo</th>
+                        <th class="text-end">Preço atual</th>
+                        <th class="text-end">Valor mercado</th>
+                        <th class="text-end">L/P não realiz.</th>
+                        <th class="text-end">Realizado período</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Model.Ativos)
+                    {
+                        <tr>
+                            <td><strong>@a.Ticker</strong><div class="small text-secondary">@a.Nome · @a.Classe</div></td>
+                            <td class="text-end">@a.Quantidade.ToString("N4", br)</td>
+                            <td class="text-end">@Money(a.PrecoMedio)</td>
+                            <td class="text-end">@Money(a.Custo)</td>
+                            <td class="text-end">@(a.PrecoAtual.HasValue ? Money(a.PrecoAtual.Value) : "-")</td>
+                            <td class="text-end">@Money(a.ValorMercado)</td>
+                            <td class="text-end @Cls(a.PlNaoRealizado)">@Money(a.PlNaoRealizado)<div class="small @Cls(a.PlPercentual)">@Pct(a.PlPercentual)</div></td>
+                            <td class="text-end @Cls(a.ResultadoRealizadoPeriodo)">@Money(a.ResultadoRealizadoPeriodo)</td>
+                        </tr>
+                    }
+                    @if (!Model.Ativos.Any())
+                    {
+                        <tr><td colspan="8" class="text-center text-secondary py-3">Nenhuma posição no período.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="mb-3">Vendas no período <span class="small text-secondary">— vendeu acima ou abaixo do preço médio?</span></h5>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Ativo</th>
+                        <th class="text-end">Qtd</th>
+                        <th class="text-end">Preço venda</th>
+                        <th class="text-end">Preço médio</th>
+                        <th class="text-end">Resultado</th>
+                        <th>Avaliação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Model.Vendas)
+                    {
+                        <tr>
+                            <td>@v.Data.ToString("dd/MM/yyyy")</td>
+                            <td><strong>@v.Ticker</strong></td>
+                            <td class="text-end">@v.Quantidade.ToString("N4", br)</td>
+                            <td class="text-end">@Money(v.PrecoVenda)</td>
+                            <td class="text-end">@Money(v.PrecoMedio)</td>
+                            <td class="text-end @Cls(v.Resultado)">@Money(v.Resultado)</td>
+                            <td>
+                                @if (v.Boa)
+                                {
+                                    <span class="badge text-bg-success">Acima do médio</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-danger">Abaixo do médio</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Vendas.Any())
+                    {
+                        <tr><td colspan="7" class="text-center text-secondary py-3">Nenhuma venda no período.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

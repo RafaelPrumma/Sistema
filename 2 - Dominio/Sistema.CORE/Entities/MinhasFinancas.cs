@@ -25,6 +25,12 @@ public enum TipoOperacaoFinanceira
     Outro = 99
 }
 
+public enum OrigemTransacao
+{
+    Importacao = 1,
+    Manual = 2
+}
+
 public enum NivelConfianca
 {
     Alta = 1,
@@ -304,6 +310,38 @@ public class TransacaoCripto : AuditableEntity
     public decimal? FeeAmount { get; set; }
     public string RawType { get; set; } = string.Empty;
     public string SourceFile { get; set; } = string.Empty;
+    public string RawJson { get; set; } = "{}";
+}
+
+// Tabela única canônica de transações: recebe tanto a materialização da importação
+// (OperacaoB3/TransacaoCripto continuam como staging bruto) quanto lançamentos manuais.
+// É a fonte de verdade para posições, gráfico de evolução e resumo analítico.
+public class TransacaoFinanceira : AuditableEntity
+{
+    public int Id { get; set; }
+    public OrigemTransacao Origem { get; set; } = OrigemTransacao.Manual;
+    public int AssetId { get; set; }
+    public AtivoFinanceiro? Asset { get; set; }
+    public DateTime Date { get; set; }
+    public TipoOperacaoFinanceira OperationType { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal GrossAmount { get; set; }
+    public decimal Fees { get; set; }
+    public string Currency { get; set; } = "BRL";
+    public string Broker { get; set; } = string.Empty;
+    public string Fonte { get; set; } = string.Empty;
+    public string? Observacao { get; set; }
+
+    // Rastreio de origem (preenchido quando a transação veio de importação).
+    public int? SourceDocumentId { get; set; }
+    public DocumentoFinanceiro? SourceDocument { get; set; }
+    public int? CargaFinanceiraId { get; set; }
+    public string? StagingTipo { get; set; }
+    public int? StagingId { get; set; }
+    public string? DuplicateGroupKey { get; set; }
+    public bool IsCanonical { get; set; } = true;
+    public NivelConfianca ConfidenceLevel { get; set; } = NivelConfianca.Media;
     public string RawJson { get; set; } = "{}";
 }
 

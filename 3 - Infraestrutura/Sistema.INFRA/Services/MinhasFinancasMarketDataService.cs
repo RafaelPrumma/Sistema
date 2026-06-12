@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.INFRA.Data;
@@ -24,25 +25,188 @@ public class MinhasFinancasMarketDataService(
 
     public async Task AtualizarCotacoesAsync(bool force = false, CancellationToken cancellationToken = default)
     {
-        var cargaId = await _context.CargasFinanceiras
-            .OrderByDescending(x => x.ImportedAt)
-            .Select(x => (int?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (cargaId is null)
-            return;
-
-        var posicoes = await _context.EstimativasPosicaoCarteira
-            .Include(x => x.Asset)
-            .Where(x => x.CargaFinanceiraId == cargaId && x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.Asset != null)
+        // Cota os ativos com posição líquida > 0 na tabela única de transações (B3 + cripto + manuais).
+        var movimentos = await _context.TransacoesFinanceiras
+            .Where(x => x.IsCanonical && x.Asset != null)
+            .Select(x => new { x.AssetId, x.OperationType, x.Quantity, Asset = x.Asset! })
             .ToListAsync(cancellationToken);
 
-        if (posicoes.Count == 0)
+        if (movimentos.Count == 0)
             return;
 
-        var ativos = posicoes.Select(x => x.Asset!).DistinctBy(x => x.Id).ToList();
+        var saldos = new Dictionary<int, (decimal Saldo, AtivoFinanceiro Asset)>();
+        foreach (var m in movimentos)
+        {
+            var delta = m.OperationType switch
+            {
+                TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Deposito or TipoOperacaoFinanceira.Rendimento => m.Quantity,
+                TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque or TipoOperacaoFinanceira.Taxa => -m.Quantity,
+                _ => 0m
+            };
+            saldos.TryGetValue(m.AssetId, out var atual);
+            saldos[m.AssetId] = (atual.Saldo + delta, m.Asset);
+        }
+
+        var ativos = saldos.Values.Where(x => x.Saldo > 0.000000001m).Select(x => x.Asset).ToList();
+        if (ativos.Count == 0)
+            return;
+
         await AtualizarB3Async(ativos.Where(x => !x.IsCrypto).ToList(), force, cancellationToken);
         await AtualizarCriptoAsync(ativos.Where(x => x.IsCrypto).ToList(), force, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<ValidacaoAtivoResultado> ValidarAtivoAsync(string ticker, CancellationToken cancellationToken = default)
+    {
+        var symbol = (ticker ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(symbol))
+            return new ValidacaoAtivoResultado(false, symbol, string.Empty, string.Empty, string.Empty, false, null, "Informe um ticker.");
+
+        var pareceB3 = System.Text.RegularExpressions.Regex.IsMatch(symbol, @"^[A-Z]{4}\d{1,2}$");
+
+        if (pareceB3)
+            return await ValidarB3Async(symbol, cancellationToken)
+                ?? await ValidarCriptoAsync(symbol, cancellationToken)
+                ?? Invalido(symbol);
+
+        return await ValidarCriptoAsync(symbol, cancellationToken)
+            ?? await ValidarB3Async(symbol, cancellationToken)
+            ?? Invalido(symbol);
+    }
+
+    private static ValidacaoAtivoResultado Invalido(string symbol)
+        => new(false, symbol, string.Empty, string.Empty, string.Empty, false, null,
+            "Ativo não encontrado na B3 (Brapi) nem na Binance. Verifique o ticker.");
+
+    private async Task<ValidacaoAtivoResultado?> ValidarB3Async(string symbol, CancellationToken cancellationToken)
+    {
+        var pareceB3 = System.Text.RegularExpressions.Regex.IsMatch(symbol, @"^[A-Z]{4}\d{1,2}$");
+        var token = _configuration["MinhasFinancas:MarketData:BrapiToken"];
+        var client = _httpClientFactory.CreateClient("Brapi");
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"api/quote/{WebUtility.UrlEncode(symbol)}?range=1d&interval=1d");
+            if (!string.IsNullOrWhiteSpace(token))
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                if (doc.RootElement.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array && results.GetArrayLength() > 0)
+                {
+                    var r = results[0];
+                    var temErro = r.TryGetProperty("error", out var erro) && erro.ValueKind == JsonValueKind.True;
+                    var sym = GetString(r, "symbol");
+                    if (!temErro && !string.IsNullOrWhiteSpace(sym))
+                    {
+                        var nome = GetString(r, "longName") ?? GetString(r, "shortName") ?? sym;
+                        var preco = GetDecimal(r, "regularMarketPrice");
+                        return new ValidacaoAtivoResultado(true, sym, nome, ClassificarB3(sym, nome).ToString(), "Brapi", false, preco, null);
+                    }
+                }
+            }
+
+            // Quote indisponível (sem token / ticker pago): confirma a existência na lista pública da B3.
+            var existe = await ExisteNaListaBrapiAsync(symbol, client, cancellationToken);
+            if (existe == true)
+                return new ValidacaoAtivoResultado(true, symbol, symbol, ClassificarB3(symbol, symbol).ToString(), "Brapi", false, null,
+                    "Validado pela lista da B3. Configure o token Brapi para preço e histórico completos.");
+            if (existe == false)
+                return null;
+
+            // Lista indisponível agora: não bloqueia um ticker no formato estrito da B3.
+            if (pareceB3)
+                return new ValidacaoAtivoResultado(true, symbol, symbol, ClassificarB3(symbol, symbol).ToString(), "Brapi", false, null,
+                    "Cadastrado pelo padrão B3 (não foi possível confirmar na API agora).");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            MinhasFinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/validação", ex.Message);
+            return null;
+        }
+    }
+
+    // true = existe na B3; false = a lista respondeu e não contém; null = não foi possível consultar.
+    private async Task<bool?> ExisteNaListaBrapiAsync(string symbol, HttpClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var resp = await client.GetAsync($"api/available?search={WebUtility.UrlEncode(symbol)}", cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+                return null;
+
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(cancellationToken));
+            if (doc.RootElement.TryGetProperty("stocks", out var stocks) && stocks.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var s in stocks.EnumerateArray())
+                    if (string.Equals(s.GetString(), symbol, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                return false;
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<ValidacaoAtivoResultado?> ValidarCriptoAsync(string symbol, CancellationToken cancellationToken)
+    {
+        foreach (var quote in new[] { "BRL", "USDT" })
+        {
+            var ticker = await ObterTickerBinanceAsync($"{symbol}{quote}", cancellationToken);
+            if (ticker is null || ticker.Price <= 0)
+                continue;
+
+            decimal? precoBrl = ticker.Price;
+            if (!string.Equals(quote, "BRL", StringComparison.OrdinalIgnoreCase))
+            {
+                var usdtBrl = await ObterTickerBinanceAsync("USDTBRL", cancellationToken);
+                precoBrl = usdtBrl?.Price > 0 ? ticker.Price * usdtBrl.Price : null;
+            }
+
+            return new ValidacaoAtivoResultado(true, symbol, symbol, ClasseAtivo.Cripto.ToString(), "Binance", true, precoBrl, null);
+        }
+
+        return null;
+    }
+
+    private static ClasseAtivo ClassificarB3(string ticker, string? nome)
+    {
+        var t = (ticker ?? string.Empty).ToUpperInvariant();
+        var n = (nome ?? string.Empty).ToUpperInvariant();
+
+        if (t.EndsWith("34") || t.EndsWith("35") || t.EndsWith("32") || t.EndsWith("33") || t.EndsWith("39"))
+            return ClasseAtivo.BDR;
+
+        if (t.EndsWith("11"))
+        {
+            if (n.Contains("FII") || n.Contains("FDO") || n.Contains("IMOB") || n.Contains("RECEB") || n.Contains("FUNDO") && n.Contains("INVEST IMOB"))
+                return ClasseAtivo.FII;
+            if (n.Contains("ETF") || n.Contains("INDEX") || n.Contains("ISHARES") || n.Contains("TREND") || n.Contains("IT NOW"))
+                return ClasseAtivo.ETF;
+            return ClasseAtivo.FII;
+        }
+
+        return ClasseAtivo.Acao;
+    }
+
+    public async Task GarantirCotacaoAtivoAsync(int ativoId, CancellationToken cancellationToken = default)
+    {
+        var ativo = await _context.AtivosFinanceiros.FirstOrDefaultAsync(x => x.Id == ativoId, cancellationToken);
+        if (ativo is null)
+            return;
+
+        if (ativo.IsCrypto)
+            await AtualizarCriptoAsync(new[] { ativo }, force: true, cancellationToken);
+        else
+            await AtualizarB3Async(new[] { ativo }, force: true, cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
     }
 

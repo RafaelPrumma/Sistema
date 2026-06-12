@@ -107,6 +107,98 @@ public record CarteiraFinanceiraResumoDto(
 
 public record PeriodoPerformanceDto(string Codigo, string Label, decimal VariacaoPercentual, decimal VariacaoValor);
 
+public record ValidacaoAtivoResultado(
+    bool Valido,
+    string Ticker,
+    string Nome,
+    string Classe,
+    string Provedor,
+    bool IsCrypto,
+    decimal? PrecoAtual,
+    string? Mensagem);
+
+public record TransacaoFinanceiraDto(
+    int Id,
+    string Origem,
+    string Fonte,
+    string Ativo,
+    string Ticker,
+    string Classe,
+    DateTime Data,
+    string Tipo,
+    decimal Quantidade,
+    decimal PrecoUnitario,
+    decimal ValorTotal,
+    decimal Taxas,
+    string Corretora,
+    string? Observacao);
+
+public record NovaTransacaoInput(
+    string Ticker,
+    string Tipo,
+    decimal Quantidade,
+    decimal PrecoUnitario,
+    DateTime Data,
+    decimal Taxas = 0m,
+    string? Corretora = null,
+    string? Observacao = null);
+
+public record ResultadoOperacao(bool Sucesso, string? Mensagem, int? Id = null);
+
+// Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
+// VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
+public record SerieEvolucaoDto(
+    string Chave,
+    string Rotulo,
+    IReadOnlyList<decimal> Valores,
+    decimal VariacaoDia,
+    decimal ValorAtual);
+
+public record EvolucaoPatrimonioDto(
+    IReadOnlyList<string> Datas,
+    IReadOnlyList<decimal> Total,
+    decimal VariacaoDiaTotal,
+    decimal ValorAtualTotal,
+    IReadOnlyList<SerieEvolucaoDto> Setores,
+    IReadOnlyList<PeriodoPerformanceDto> Periodos);
+
+public record ResumoAtivoDto(
+    string Ticker,
+    string Nome,
+    string Classe,
+    decimal Quantidade,
+    decimal PrecoMedio,
+    decimal Custo,
+    decimal? PrecoAtual,
+    decimal ValorMercado,
+    decimal PlNaoRealizado,
+    decimal PlPercentual,
+    decimal ResultadoRealizadoPeriodo);
+
+public record VendaRealizadaDto(
+    DateTime Data,
+    string Ticker,
+    decimal Quantidade,
+    decimal PrecoVenda,
+    decimal PrecoMedio,
+    decimal Resultado,
+    bool Boa);
+
+public record ResumoAnaliticoDto(
+    string PeriodoLabel,
+    DateTime Inicio,
+    DateTime Fim,
+    decimal TotalComprado,
+    decimal TotalVendido,
+    decimal AporteLiquido,
+    decimal ResultadoRealizado,
+    int NumeroOperacoes,
+    decimal CustoTotal,
+    decimal ValorMercadoTotal,
+    decimal PlNaoRealizadoTotal,
+    IReadOnlyList<ResumoAtivoDto> Ativos,
+    IReadOnlyList<VendaRealizadaDto> Vendas);
+
 public record ImportacaoFinanceiraResumoDto(
     DateTime? UltimaImportacao,
     int DocumentosMonitorados,

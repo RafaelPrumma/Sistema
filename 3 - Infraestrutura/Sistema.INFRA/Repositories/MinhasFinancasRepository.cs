@@ -196,6 +196,53 @@ public class MinhasFinancasRepository(AppDbContext context) : IMinhasFinancasRep
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TransacaoFinanceira>> BuscarTodasTransacoesAsync(CancellationToken cancellationToken = default)
+        => await _context.TransacoesFinanceiras
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .Where(x => x.IsCanonical && x.Asset != null)
+            .OrderBy(x => x.Date)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+    public async Task<PagedResult<TransacaoFinanceira>> BuscarTransacoesAsync(int page, int pageSize, string? termo, OrigemTransacao? origem, CancellationToken cancellationToken = default)
+    {
+        var query = _context.TransacoesFinanceiras.AsNoTracking().Include(x => x.Asset).AsQueryable();
+
+        if (origem.HasValue)
+            query = query.Where(x => x.Origem == origem.Value);
+
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(x =>
+                (x.Asset != null && (x.Asset.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)))) ||
+                x.Broker.Contains(termo));
+
+        return await query.OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
+    }
+
+    public Task<TransacaoFinanceira?> ObterTransacaoAsync(int id, CancellationToken cancellationToken = default)
+        => _context.TransacoesFinanceiras.Include(x => x.Asset).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<bool> TransacaoExisteAsync(string duplicateGroupKey, CancellationToken cancellationToken = default)
+        => _context.TransacoesFinanceiras.AnyAsync(x => x.DuplicateGroupKey == duplicateGroupKey, cancellationToken);
+
+    public async Task AdicionarTransacaoAsync(TransacaoFinanceira transacao, CancellationToken cancellationToken = default)
+        => await _context.TransacoesFinanceiras.AddAsync(transacao, cancellationToken);
+
+    public void AtualizarTransacao(TransacaoFinanceira transacao)
+        => _context.TransacoesFinanceiras.Update(transacao);
+
+    public void RemoverTransacao(TransacaoFinanceira transacao)
+        => _context.TransacoesFinanceiras.Remove(transacao);
+
+    public Task<AtivoFinanceiro?> ObterAtivoPorChaveOuTickerAsync(string chaveOuTicker, CancellationToken cancellationToken = default)
+        => _context.AtivosFinanceiros.FirstOrDefaultAsync(
+            x => x.AssetKey == chaveOuTicker || (x.Ticker != null && x.Ticker == chaveOuTicker),
+            cancellationToken);
+
+    public async Task AdicionarAtivoAsync(AtivoFinanceiro ativo, CancellationToken cancellationToken = default)
+        => await _context.AtivosFinanceiros.AddAsync(ativo, cancellationToken);
+
     private async Task<int> ObterCargaIdAsync(CancellationToken cancellationToken)
     {
         var carga = await _context.CargasFinanceiras.AsNoTracking().OrderByDescending(x => x.ImportedAt).Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);

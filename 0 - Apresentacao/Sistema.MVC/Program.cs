@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
+using Hangfire;
+using Hangfire.SqlServer;
+using Hangfire.Dashboard;
 using Sistema.APP.DependencyInjection;
 using Sistema.INFRA.Data;
 using Sistema.INFRA.DependencyInjection;
 using Sistema.MVC.DependencyInjection;
+using Sistema.MVC.Infrastructure;
 using Sistema.MVC.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +29,25 @@ if (builder.Environment.IsDevelopment())
 }
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
+
+// Hangfire: processa importação de arquivos em segundo plano (não trava as requisições).
+var hangfireConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+var hangfireEnabled = !builder.Configuration.GetValue<bool>("UseInMemoryDatabase")
+    && !string.IsNullOrWhiteSpace(hangfireConnection);
+if (hangfireEnabled)
+{
+    builder.Services.AddHangfire(cfg => cfg
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UseSqlServerStorage(hangfireConnection, new SqlServerStorageOptions
+        {
+            PrepareSchemaIfNecessary = true,
+            QueuePollInterval = TimeSpan.FromSeconds(15),
+            SchemaName = "HangFire"
+        }));
+    builder.Services.AddHangfireServer();
+}
 
 var app = builder.Build();
 
@@ -56,6 +79,14 @@ app.UseRouting();
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+
+if (hangfireEnabled)
+{
+    app.UseHangfireDashboard("/jobs", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireAuthorizationFilter() }
+    });
+}
 
 using (var scope = app.Services.CreateScope())
 {

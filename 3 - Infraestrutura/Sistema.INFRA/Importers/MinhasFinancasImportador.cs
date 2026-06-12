@@ -44,6 +44,10 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
         {
             await ImportarPastaMonitoradaAsync(cancellationToken);
         }
+
+        // Garante que a tabela única reflita a regra de materialização atual.
+        // Barato quando já está na versão certa; faz o resync completo quando a regra muda.
+        await RessincronizarPorVersaoAsync(cancellationToken);
     }
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
@@ -95,14 +99,13 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             }
 
             var documentKind = ClassificarDocumento(file);
-            var storedPath = await CopiarParaStorageAsync(file, sha, cancellationToken);
             var documento = new DocumentoFinanceiro
             {
                 CargaFinanceira = carga,
                 ImportacaoFinanceiraArquivo = batch,
                 Colecao = "watched-folder",
                 Path = file,
-                StoredPath = storedPath,
+                StoredPath = file,
                 FileName = Path.GetFileName(file),
                 FileType = Path.GetExtension(file).TrimStart('.').ToLowerInvariant(),
                 Source = "watched-folder",
@@ -113,7 +116,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
                 ParserVersion = ParserVersion,
                 ParseStatus = StatusParseDocumentoFinanceiro.Pendente,
                 Status = StatusDocumentoFinanceiro.Importado,
-                RawMetadataJson = JsonSerializer.Serialize(new { path = file, storedPath, sha256 = sha, documentKind }),
+                RawMetadataJson = JsonSerializer.Serialize(new { path = file, sha256 = sha, documentKind }),
                 UsuarioInclusao = "minhas-financas-importador"
             };
             _context.DocumentosFinanceiros.Add(documento);
@@ -130,6 +133,159 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
             : batch.StructuredRowsImported == 0 ? StatusImportacaoFinanceira.ConcluidaComAlertas : StatusImportacaoFinanceira.Concluida;
 
         await _context.SaveChangesAsync(cancellationToken);
+        await SincronizarTransacoesCanonicasAsync(cancellationToken);
+    }
+
+    // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
+    // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
+    private const int MaterializacaoVersao = 2;
+
+    // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
+    // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
+    // (spot trades e converts) — o restante do ledger da Binance (Simple Earn, staking, juros,
+    // airdrops, taxas e o detalhamento sem preço dos trades) fica no staging para auditoria,
+    // mas não polui a carteira. Idempotente por "{StagingTipo}#{StagingId}".
+    private async Task SincronizarTransacoesCanonicasAsync(CancellationToken cancellationToken)
+    {
+        var jaMaterializadas = new HashSet<string>(
+            await _context.TransacoesFinanceiras
+                .Where(x => x.Origem == OrigemTransacao.Importacao && x.DuplicateGroupKey != null)
+                .Select(x => x.DuplicateGroupKey!)
+                .ToListAsync(cancellationToken),
+            StringComparer.Ordinal);
+
+        var novas = new List<TransacaoFinanceira>();
+
+        var ops = await _context.OperacoesB3
+            .Where(x => x.IsCanonical && x.AssetId != null)
+            .ToListAsync(cancellationToken);
+        foreach (var op in ops)
+        {
+            var chave = $"OperacaoB3#{op.Id}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
+            {
+                Origem = OrigemTransacao.Importacao,
+                AssetId = op.AssetId!.Value,
+                Date = (op.TradeDate ?? op.DataInclusao).Date,
+                OperationType = op.OperationType,
+                Quantity = Math.Abs(op.Quantity),
+                UnitPrice = op.UnitPrice,
+                GrossAmount = op.GrossAmount,
+                Fees = op.Fees,
+                Currency = "BRL",
+                Broker = string.IsNullOrWhiteSpace(op.Broker) ? "NU Invest" : op.Broker,
+                Fonte = "Nubank B3",
+                SourceDocumentId = op.SourceDocumentId,
+                CargaFinanceiraId = op.CargaFinanceiraId,
+                StagingTipo = "OperacaoB3",
+                StagingId = op.Id,
+                DuplicateGroupKey = chave,
+                IsCanonical = true,
+                ConfidenceLevel = op.ConfidenceLevel,
+                RawJson = "{}",
+                UsuarioInclusao = "minhas-financas-importador"
+            });
+        }
+
+        var cryptos = await _context.TransacoesCripto
+            .Where(x => x.Price != null && x.Price > 0m)
+            .ToListAsync(cancellationToken);
+        if (cryptos.Count > 0)
+        {
+            var assetIdPorChave = (await _context.AtivosFinanceiros
+                    .Where(a => a.IsCrypto)
+                    .ToListAsync(cancellationToken))
+                .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tx in cryptos)
+            {
+                var chave = $"TransacaoCripto#{tx.Id}";
+                if (!jaMaterializadas.Add(chave))
+                    continue;
+                if (string.IsNullOrWhiteSpace(tx.AssetSymbol) || !assetIdPorChave.TryGetValue(tx.AssetSymbol, out var assetId))
+                    continue;
+
+                var quantidade = Math.Abs(tx.Amount);
+                if (quantidade <= 0m)
+                    continue;
+
+                var preco = tx.Price!.Value;
+                var tipo = tx.OperationType is TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque
+                    ? TipoOperacaoFinanceira.Venda
+                    : TipoOperacaoFinanceira.Compra;
+
+                novas.Add(new TransacaoFinanceira
+                {
+                    Origem = OrigemTransacao.Importacao,
+                    AssetId = assetId,
+                    Date = (tx.TransactionDate ?? tx.DataInclusao).Date,
+                    OperationType = tipo,
+                    Quantity = quantidade,
+                    UnitPrice = preco,
+                    GrossAmount = tx.Total ?? quantidade * preco,
+                    Fees = tx.FeeAmount ?? 0m,
+                    Currency = "BRL",
+                    Broker = string.IsNullOrWhiteSpace(tx.Exchange) ? "Binance" : tx.Exchange,
+                    Fonte = "Binance",
+                    SourceDocumentId = tx.SourceDocumentId,
+                    CargaFinanceiraId = tx.CargaFinanceiraId,
+                    StagingTipo = "TransacaoCripto",
+                    StagingId = tx.Id,
+                    DuplicateGroupKey = chave,
+                    IsCanonical = true,
+                    ConfidenceLevel = NivelConfianca.Media,
+                    RawJson = "{}",
+                    UsuarioInclusao = "minhas-financas-importador"
+                });
+            }
+        }
+
+        if (novas.Count > 0)
+        {
+            await _context.TransacoesFinanceiras.AddRangeAsync(novas, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // Apaga e refaz as transações de importação quando a regra de materialização muda de versão.
+    private async Task RessincronizarPorVersaoAsync(CancellationToken cancellationToken)
+    {
+        const string agrupamento = "MinhasFinancas";
+        const string chave = "MaterializacaoVersao";
+        var config = await _context.Configuracoes
+            .FirstOrDefaultAsync(x => x.Agrupamento == agrupamento && x.Chave == chave, cancellationToken);
+        var versaoAtual = int.TryParse(config?.Valor, out var v) ? v : 0;
+        if (versaoAtual == MaterializacaoVersao)
+            return;
+
+        await _context.TransacoesFinanceiras
+            .IgnoreQueryFilters()
+            .Where(x => x.Origem == OrigemTransacao.Importacao)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (config is null)
+        {
+            _context.Configuracoes.Add(new Configuracao
+            {
+                Agrupamento = agrupamento,
+                Chave = chave,
+                Valor = MaterializacaoVersao.ToString(),
+                Descricao = "Versão interna da materialização de transações financeiras.",
+                Ativo = true,
+                UsuarioInclusao = "minhas-financas-importador"
+            });
+        }
+        else
+        {
+            config.Valor = MaterializacaoVersao.ToString();
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await SincronizarTransacoesCanonicasAsync(cancellationToken);
     }
 
     private async Task ImportarAsync(byte[] jsonBytes, string sha, string sourcePath, CancellationToken cancellationToken)
@@ -162,6 +318,7 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
         ImportarAlertas(root, carga);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await SincronizarTransacoesCanonicasAsync(cancellationToken);
         MinhasFinancasImportadorLogMessages.CargaFinanceiraImportada(_logger, sourcePath, sha);
     }
 
@@ -948,24 +1105,6 @@ public partial class MinhasFinancasImportador(AppDbContext context, IConfigurati
         if (name.Contains("nubank"))
             return TipoDocumentoFinanceiro.ExtratoInvestimentosNubank;
         return TipoDocumentoFinanceiro.Desconhecido;
-    }
-
-    private async Task<string> CopiarParaStorageAsync(string file, string sha, CancellationToken cancellationToken)
-    {
-        var storagePath = _configuration["MinhasFinancas:StoragePath"];
-        if (string.IsNullOrWhiteSpace(storagePath))
-            storagePath = Path.Combine(_hostEnvironment.ContentRootPath, "App_Data", "Financeiro", "Documentos");
-
-        Directory.CreateDirectory(storagePath);
-        var target = Path.Combine(storagePath, $"{sha}{Path.GetExtension(file).ToLowerInvariant()}");
-        if (!File.Exists(target))
-        {
-            await using var source = File.OpenRead(file);
-            await using var destination = File.Create(target);
-            await source.CopyToAsync(destination, cancellationToken);
-        }
-
-        return target;
     }
 
     private static List<string> SplitCsvLine(string line)
