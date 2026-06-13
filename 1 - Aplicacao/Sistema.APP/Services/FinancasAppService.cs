@@ -27,7 +27,6 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var posicoes = await _uow.Financas.BuscarPosicoesAsync(null, cancellationToken);
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
-        var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(DateTime.UtcNow.Date.AddYears(-1), cancellationToken);
         var documentosMonitorados = await _uow.Financas.BuscarDocumentosMonitoradosAsync(cancellationToken);
         var ultimaImportacao = await _uow.Financas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
         var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
@@ -51,7 +50,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             Alertas = alertas.Take(8).Select(MapAlerta).ToList(),
             AtivosCotados = ativosCotados,
             Carteiras = CriarResumoCarteiras(carteiras, ativosCotados),
-            Periodos = CriarPeriodos(posicoes, cotacoes, historico),
+            Periodos = [],
             ImportacaoArquivos = new ImportacaoFinanceiraResumoDto(
                 ultimaImportacao?.FinishedAt ?? ultimaImportacao?.StartedAt,
                 documentosMonitorados.Count,
@@ -758,45 +757,4 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .ToList();
     }
 
-    private static IReadOnlyList<PeriodoPerformanceDto> CriarPeriodos(
-        IReadOnlyList<EstimativaPosicaoCarteira> posicoes,
-        IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes,
-        IReadOnlyList<PrecoHistoricoAtivoFinanceiro> historico)
-    {
-        var cotacaoPorAtivo = cotacoes
-            .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
-        var historicoPorAtivo = historico
-            .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderBy(h => h.Date).ToList());
-
-        var periodos = new (string Codigo, string Label, DateTime Inicio)[]
-        {
-            ("1D", "1 dia", DateTime.UtcNow.Date.AddDays(-1)),
-            ("5D", "5 dias", DateTime.UtcNow.Date.AddDays(-5)),
-            ("1W", "1 semana", DateTime.UtcNow.Date.AddDays(-7)),
-            ("1M", "1 mês", DateTime.UtcNow.Date.AddMonths(-1)),
-            ("3M", "3 meses", DateTime.UtcNow.Date.AddMonths(-3)),
-            ("YTD", "No ano", new DateTime(DateTime.UtcNow.Year, 1, 1)),
-            ("1Y", "1 ano", DateTime.UtcNow.Date.AddYears(-1))
-        };
-
-        var abertas = posicoes.Where(x => x.Status == StatusEstimativaPosicao.AbertaOuResidual).ToList();
-        var atual = abertas.Sum(x => cotacaoPorAtivo.TryGetValue(x.AssetId, out var c) ? x.Quantity * c.PriceBRL : x.EstimatedCurrentPosition);
-
-        return periodos.Select(periodo =>
-        {
-            var baseValor = abertas.Sum(posicao =>
-            {
-                if (!historicoPorAtivo.TryGetValue(posicao.AssetId, out var serie))
-                    return 0m;
-
-                var precoBase = serie.LastOrDefault(x => x.Date.Date <= periodo.Inicio.Date) ?? serie.FirstOrDefault();
-                return precoBase is null ? 0m : posicao.Quantity * precoBase.CloseBRL;
-            });
-
-            var variacao = baseValor == 0 ? 0 : atual - baseValor;
-            return new PeriodoPerformanceDto(periodo.Codigo, periodo.Label, baseValor == 0 ? 0 : variacao / baseValor * 100m, variacao);
-        }).ToList();
-    }
 }

@@ -267,7 +267,7 @@ public class FinancasMarketDataService(
                 var price = GetDecimal(result, "regularMarketPrice") ?? 0m;
                 var marketTime = TryParseDateTime(GetString(result, "regularMarketTime"));
                 UpsertCotacao(ativo.Id, ProvedorCotacao.Brapi, symbol, GetString(result, "currency") ?? "BRL", price, price, GetDecimal(result, "regularMarketChange"), GetDecimal(result, "regularMarketChangePercent"), marketTime, StatusCotacao.Atual, null, result.GetRawText(), TimeSpan.FromMinutes(5));
-                ImportarHistoricoBrapi(ativo.Id, symbol, result);
+                await ImportarHistoricoBrapiAsync(ativo.Id, symbol, result, cancellationToken);
             }
         }
         catch (Exception ex)
@@ -355,8 +355,12 @@ public class FinancasMarketDataService(
 
     private async Task ImportarHistoricoBinanceAsync(int ativoId, string symbol, string currency, decimal brlRate, CancellationToken cancellationToken)
     {
+        const string interval = "1d";
+        if (await HistoricoSincronizadoHojeAsync(ativoId, ProvedorCotacao.Binance, interval, cancellationToken))
+            return;
+
         var client = _httpClientFactory.CreateClient("Binance");
-        using var response = await client.GetAsync($"api/v3/klines?symbol={WebUtility.UrlEncode(symbol)}&interval=1d&limit=370", cancellationToken);
+        using var response = await client.GetAsync($"api/v3/klines?symbol={WebUtility.UrlEncode(symbol)}&interval={interval}&limit=370", cancellationToken);
         if (!response.IsSuccessStatusCode)
             return;
 
@@ -364,6 +368,7 @@ public class FinancasMarketDataService(
         if (doc.RootElement.ValueKind != JsonValueKind.Array)
             return;
 
+        var candles = new List<HistoricoCandle>();
         foreach (var row in doc.RootElement.EnumerateArray())
         {
             if (row.ValueKind != JsonValueKind.Array || row.GetArrayLength() < 6)
@@ -375,15 +380,22 @@ public class FinancasMarketDataService(
             var low = ParseDecimal(row[3].GetString()) ?? 0m;
             var close = ParseDecimal(row[4].GetString()) ?? 0m;
             var multiplier = string.Equals(currency, "BRL", StringComparison.OrdinalIgnoreCase) ? 1m : brlRate;
-            UpsertHistorico(ativoId, ProvedorCotacao.Binance, symbol, date, "1d", open, high, low, close, close * multiplier, ParseDecimal(row[5].GetString()), row.GetRawText());
+            candles.Add(new HistoricoCandle(ativoId, ProvedorCotacao.Binance, symbol, date, interval, open, high, low, close, close * multiplier, ParseDecimal(row[5].GetString()), row.GetRawText()));
         }
+
+        await UpsertHistoricoEmLoteAsync(candles, cancellationToken);
     }
 
-    private void ImportarHistoricoBrapi(int ativoId, string symbol, JsonElement result)
+    private async Task ImportarHistoricoBrapiAsync(int ativoId, string symbol, JsonElement result, CancellationToken cancellationToken)
     {
+        const string interval = "1d";
+        if (await HistoricoSincronizadoHojeAsync(ativoId, ProvedorCotacao.Brapi, interval, cancellationToken))
+            return;
+
         if (!result.TryGetProperty("historicalDataPrice", out var historical) || historical.ValueKind != JsonValueKind.Array)
             return;
 
+        var candles = new List<HistoricoCandle>();
         foreach (var item in historical.EnumerateArray())
         {
             var unix = GetDecimal(item, "date");
@@ -392,20 +404,22 @@ public class FinancasMarketDataService(
 
             var date = DateTimeOffset.FromUnixTimeSeconds((long)unix.Value).UtcDateTime.Date;
             var close = GetDecimal(item, "adjustedClose") ?? GetDecimal(item, "close") ?? 0m;
-            UpsertHistorico(
+            candles.Add(new HistoricoCandle(
                 ativoId,
                 ProvedorCotacao.Brapi,
                 symbol,
                 date,
-                "1d",
+                interval,
                 GetDecimal(item, "open") ?? close,
                 GetDecimal(item, "high") ?? close,
                 GetDecimal(item, "low") ?? close,
                 close,
                 close,
                 GetDecimal(item, "volume"),
-                item.GetRawText());
+                item.GetRawText()));
         }
+
+        await UpsertHistoricoEmLoteAsync(candles, cancellationToken);
     }
 
     private void UpsertCotacao(int ativoId, ProvedorCotacao provedor, string symbol, string currency, decimal price, decimal priceBrl, decimal? change, decimal? changePercent, DateTime? marketTime, StatusCotacao status, string? error, string rawJson, TimeSpan ttl)
@@ -436,36 +450,67 @@ public class FinancasMarketDataService(
         cotacao.RawJson = rawJson;
     }
 
-    private void UpsertHistorico(int ativoId, ProvedorCotacao provedor, string symbol, DateTime date, string interval, decimal open, decimal high, decimal low, decimal close, decimal closeBrl, decimal? volume, string rawJson)
+    private async Task<bool> HistoricoSincronizadoHojeAsync(int ativoId, ProvedorCotacao provedor, string interval, CancellationToken cancellationToken)
     {
-        var historico = _context.PrecosHistoricosAtivosFinanceiros.FirstOrDefault(x =>
+        var hoje = DateTime.UtcNow.Date;
+        return await _context.PrecosHistoricosAtivosFinanceiros.AnyAsync(x =>
             x.AtivoFinanceiroId == ativoId &&
             x.Provedor == provedor &&
-            x.Symbol == symbol &&
             x.Interval == interval &&
-            x.Date == date);
+            ((x.DataAlteracao ?? x.DataInclusao) >= hoje),
+            cancellationToken);
+    }
 
-        if (historico is null)
+    private async Task UpsertHistoricoEmLoteAsync(IReadOnlyList<HistoricoCandle> candles, CancellationToken cancellationToken)
+    {
+        if (candles.Count == 0)
+            return;
+
+        foreach (var grupo in candles.GroupBy(x => new { x.AtivoFinanceiroId, x.Provedor, x.Interval }))
         {
-            historico = new PrecoHistoricoAtivoFinanceiro
-            {
-                AtivoFinanceiroId = ativoId,
-                Provedor = provedor,
-                Symbol = symbol,
-                Interval = interval,
-                Date = date,
-                UsuarioInclusao = UsuarioSistema
-            };
-            _context.PrecosHistoricosAtivosFinanceiros.Add(historico);
-        }
+            var inicio = grupo.Min(x => x.Date);
+            var fim = grupo.Max(x => x.Date);
+            var existentes = await _context.PrecosHistoricosAtivosFinanceiros
+                .Where(x =>
+                    x.AtivoFinanceiroId == grupo.Key.AtivoFinanceiroId &&
+                    x.Provedor == grupo.Key.Provedor &&
+                    x.Interval == grupo.Key.Interval &&
+                    x.Date >= inicio &&
+                    x.Date <= fim)
+                .ToListAsync(cancellationToken);
 
-        historico.Open = open;
-        historico.High = high;
-        historico.Low = low;
-        historico.Close = close;
-        historico.CloseBRL = closeBrl;
-        historico.Volume = volume;
-        historico.RawJson = rawJson;
+            var existentesPorData = existentes.ToDictionary(x => x.Date.Date);
+            foreach (var candle in grupo.OrderBy(x => x.Date))
+            {
+                if (!existentesPorData.TryGetValue(candle.Date, out var historico))
+                {
+                    historico = new PrecoHistoricoAtivoFinanceiro
+                    {
+                        AtivoFinanceiroId = candle.AtivoFinanceiroId,
+                        Provedor = candle.Provedor,
+                        Interval = candle.Interval,
+                        Date = candle.Date,
+                        UsuarioInclusao = UsuarioSistema
+                    };
+                    existentesPorData[candle.Date] = historico;
+                    _context.PrecosHistoricosAtivosFinanceiros.Add(historico);
+                }
+
+                AplicarHistorico(historico, candle);
+            }
+        }
+    }
+
+    private static void AplicarHistorico(PrecoHistoricoAtivoFinanceiro historico, HistoricoCandle candle)
+    {
+        historico.Symbol = candle.Symbol;
+        historico.Open = candle.Open;
+        historico.High = candle.High;
+        historico.Low = candle.Low;
+        historico.Close = candle.Close;
+        historico.CloseBRL = candle.CloseBrl;
+        historico.Volume = candle.Volume;
+        historico.RawJson = candle.RawJson;
     }
 
     private async Task MarcarSemTokenAsync(IReadOnlyList<AtivoFinanceiro> ativos, ProvedorCotacao provedor, IReadOnlyList<string> symbols, CancellationToken cancellationToken)
@@ -519,6 +564,20 @@ public class FinancasMarketDataService(
         => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed) ? parsed.ToUniversalTime() : null;
 
     private sealed record BinanceTicker(string Symbol, decimal Price, decimal? Change, decimal? ChangePercent, DateTime? MarketTime, string RawJson);
+
+    private sealed record HistoricoCandle(
+        int AtivoFinanceiroId,
+        ProvedorCotacao Provedor,
+        string Symbol,
+        DateTime Date,
+        string Interval,
+        decimal Open,
+        decimal High,
+        decimal Low,
+        decimal Close,
+        decimal CloseBrl,
+        decimal? Volume,
+        string RawJson);
 }
 
 internal static partial class FinancasMarketDataLogMessages
