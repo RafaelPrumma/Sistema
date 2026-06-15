@@ -343,6 +343,11 @@ public class TransacaoFinanceira : AuditableEntity
     public bool IsCanonical { get; set; } = true;
     public NivelConfianca ConfidenceLevel { get; set; } = NivelConfianca.Media;
     public string RawJson { get; set; } = "{}";
+
+    // Chave natural da transação (fonte + ativo + data/hora + tipo + quantidade + preço).
+    // Só é preenchida em importações; um índice único garante que o mesmo lançamento não
+    // entre duas vezes mesmo vindo de arquivos diferentes. Lançamentos manuais ficam nulos.
+    public string? ChaveNatural { get; set; }
 }
 
 public class EstimativaPosicaoCarteira : AuditableEntity
