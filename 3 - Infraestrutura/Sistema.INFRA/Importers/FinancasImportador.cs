@@ -139,7 +139,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 2;
+    private const int MaterializacaoVersao = 3;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
@@ -155,6 +155,15 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 .ToListAsync(cancellationToken),
             StringComparer.Ordinal);
 
+        // Chaves naturais já existentes: a mesma transação não entra duas vezes, mesmo vindo de
+        // arquivos diferentes (ex.: reimportar junho parcial e depois junho completo).
+        var chavesNaturais = new HashSet<string>(
+            await _context.TransacoesFinanceiras
+                .Where(x => x.Origem == OrigemTransacao.Importacao && x.ChaveNatural != null)
+                .Select(x => x.ChaveNatural!)
+                .ToListAsync(cancellationToken),
+            StringComparer.Ordinal);
+
         var novas = new List<TransacaoFinanceira>();
 
         var ops = await _context.OperacoesB3
@@ -166,13 +175,21 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             if (!jaMaterializadas.Add(chave))
                 continue;
 
+            var quantidade = Math.Abs(op.Quantity);
+            // Notas B3 não têm horário por trade: a chave usa a data (sem hora).
+            var chaveNatural = op.TradeDate.HasValue
+                ? GerarChaveNatural("Nubank B3", op.AssetId!.Value, op.TradeDate.Value, op.OperationType, quantidade, op.UnitPrice)
+                : null;
+            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                continue;
+
             novas.Add(new TransacaoFinanceira
             {
                 Origem = OrigemTransacao.Importacao,
                 AssetId = op.AssetId!.Value,
                 Date = (op.TradeDate ?? op.DataInclusao).Date,
                 OperationType = op.OperationType,
-                Quantity = Math.Abs(op.Quantity),
+                Quantity = quantidade,
                 UnitPrice = op.UnitPrice,
                 GrossAmount = op.GrossAmount,
                 Fees = op.Fees,
@@ -184,6 +201,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 StagingTipo = "OperacaoB3",
                 StagingId = op.Id,
                 DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
                 IsCanonical = true,
                 ConfidenceLevel = op.ConfidenceLevel,
                 RawJson = "{}",
@@ -219,11 +237,18 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                     ? TipoOperacaoFinanceira.Venda
                     : TipoOperacaoFinanceira.Compra;
 
+                // Cripto da Binance tem o horário exato (até o segundo): a chave usa data+hora.
+                var chaveNatural = tx.TransactionDate.HasValue
+                    ? GerarChaveNatural("Binance", assetId, tx.TransactionDate.Value, tipo, quantidade, preco)
+                    : null;
+                if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                    continue;
+
                 novas.Add(new TransacaoFinanceira
                 {
                     Origem = OrigemTransacao.Importacao,
                     AssetId = assetId,
-                    Date = (tx.TransactionDate ?? tx.DataInclusao).Date,
+                    Date = tx.TransactionDate ?? tx.DataInclusao,
                     OperationType = tipo,
                     Quantity = quantidade,
                     UnitPrice = preco,
@@ -237,6 +262,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                     StagingTipo = "TransacaoCripto",
                     StagingId = tx.Id,
                     DuplicateGroupKey = chave,
+                    ChaveNatural = chaveNatural,
                     IsCanonical = true,
                     ConfidenceLevel = NivelConfianca.Media,
                     RawJson = "{}",
@@ -250,6 +276,14 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             await _context.TransacoesFinanceiras.AddRangeAsync(novas, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    // Chave natural: identifica a transação pelo que ela é (independe do arquivo de origem).
+    // B3 entra com a data (sem hora); cripto entra com data+hora (a Binance dá o segundo exato).
+    private static string GerarChaveNatural(string fonte, int assetId, DateTime dataHora, TipoOperacaoFinanceira tipo, decimal quantidade, decimal preco)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        return $"{fonte}|{assetId}|{dataHora.ToString("yyyyMMddHHmmss", inv)}|{(int)tipo}|{quantidade.ToString("0.########", inv)}|{preco.ToString("0.############", inv)}";
     }
 
     // Apaga e refaz as transações de importação quando a regra de materialização muda de versão.

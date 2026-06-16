@@ -217,6 +217,7 @@ public class TransacaoFinanceiraMap : IEntityTypeConfiguration<TransacaoFinancei
         builder.HasIndex(x => x.Fonte);
         builder.Property(x => x.StagingTipo).HasMaxLength(40);
         builder.Property(x => x.DuplicateGroupKey).HasMaxLength(160);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(200);
         builder.Property(x => x.RawJson).IsRequired();
         builder.Property(x => x.Quantity).HasPrecision(28, 12);
         builder.Property(x => x.UnitPrice).HasPrecision(28, 12);
@@ -225,6 +226,9 @@ public class TransacaoFinanceiraMap : IEntityTypeConfiguration<TransacaoFinancei
         builder.HasIndex(x => new { x.AssetId, x.Date });
         builder.HasIndex(x => x.Origem);
         builder.HasIndex(x => x.DuplicateGroupKey);
+        // Impede a mesma transação importada de entrar duas vezes (mesmo de arquivos diferentes).
+        // Filtrado: só vale para chaves preenchidas (importação) e registros não excluídos.
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
         builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.SourceDocument).WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne<CargaFinanceira>().WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.SetNull);
