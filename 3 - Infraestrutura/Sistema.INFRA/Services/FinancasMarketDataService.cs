@@ -264,6 +264,13 @@ public class FinancasMarketDataService(
             var valorBrl = tx.Total is > 0m ? Math.Round(tx.Total!.Value, 2) : (preco.HasValue ? Math.Round(qtd * preco.Value, 2) : 0m);
             if (valorBrl <= 0m)
                 continue; // sem preço para valorar — não dá pra somar no retorno; fica fora.
+            // Trava de sanidade: nenhum earn diário de varejo chega a R$50k. Acima disso é parsing
+            // suspeito (ex.: notação científica mal lida) — ignora para não poluir o retorno.
+            if (valorBrl > 50000m)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Binance/earn", $"valor suspeito ignorado: {tx.AssetSymbol} {qtd} = R$ {valorBrl}");
+                continue;
+            }
 
             algum |= UpsertProvento(
                 ativo.Id,

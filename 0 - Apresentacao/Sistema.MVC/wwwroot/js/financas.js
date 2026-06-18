@@ -126,7 +126,7 @@
       grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
       xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
       yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
-      tooltip: { x: { format: 'dd/MM/yyyy' }, y: { formatter: v => money.format(v) } }
+      tooltip: { theme: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light', x: { format: 'dd/MM/yyyy' }, y: { formatter: v => money.format(v) } }
     };
   }
 

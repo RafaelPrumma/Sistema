@@ -79,11 +79,10 @@
     <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
             <h5 class="mb-0">Proventos por mês</h5>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                @foreach (var periodo in Model.Periodos)
-                {
-                    <span class="badge text-bg-light border fw-normal">@periodo.Rotulo: <strong>@((periodo.Recebido + periodo.AReceber).ToString("C2", br))</strong></span>
-                }
+            <div id="proventosPeriodos" class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary" data-meses="6">6M</button>
+                <button type="button" class="btn btn-outline-secondary active" data-meses="12">12M</button>
+                <button type="button" class="btn btn-outline-secondary" data-meses="24">24M</button>
             </div>
         </div>
         <div id="chartProventosMensais" style="min-height:300px;"></div>
@@ -165,29 +164,47 @@
     <script src="~/lib/apexcharts/apexcharts.min.js" asp-append-version="true"></script>
     <script>
         (function () {
-            var labels = @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.Rotulo)));
-            var recebido = @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.Recebido)));
-            var aReceber = @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.AReceber)));
+            var all = {
+                labels: @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.Rotulo))),
+                recebido: @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.Recebido))),
+                aReceber: @Html.Raw(Json.Serialize(Model.Mensais.Select(m => m.AReceber)))
+            };
             var el = document.querySelector('#chartProventosMensais');
             if (!el || typeof ApexCharts === 'undefined') return;
 
+            var dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
             var brl = function (v) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
-            var options = {
-                chart: { type: 'bar', height: 300, stacked: true, fontFamily: 'inherit', toolbar: { show: false } },
-                series: [
-                    { name: 'Recebido', data: recebido },
-                    { name: 'A receber', data: aReceber }
-                ],
-                colors: ['#198754', '#0dcaf0'],
-                plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
-                dataLabels: { enabled: false },
-                grid: { borderColor: 'rgba(128,128,128,.15)' },
-                xaxis: { categories: labels, axisBorder: { show: false }, axisTicks: { show: false } },
-                yaxis: { labels: { formatter: function (v) { return 'R$ ' + (v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); } } },
-                legend: { position: 'top', horizontalAlign: 'left' },
-                tooltip: { y: { formatter: brl } }
-            };
-            new ApexCharts(el, options).render();
+            var chart = null;
+
+            function render(meses) {
+                var ini = Math.max(0, all.labels.length - meses);
+                var opt = {
+                    chart: { type: 'bar', height: 300, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, background: 'transparent' },
+                    theme: { mode: dark ? 'dark' : 'light' },
+                    series: [
+                        { name: 'Recebido', data: all.recebido.slice(ini) },
+                        { name: 'A receber', data: all.aReceber.slice(ini) }
+                    ],
+                    colors: ['#198754', '#0dcaf0'],
+                    plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
+                    dataLabels: { enabled: false },
+                    grid: { borderColor: 'rgba(128,128,128,.15)' },
+                    xaxis: { categories: all.labels.slice(ini), axisBorder: { show: false }, axisTicks: { show: false } },
+                    yaxis: { labels: { formatter: function (v) { return 'R$ ' + (v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); } } },
+                    legend: { position: 'top', horizontalAlign: 'left' },
+                    tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: brl } }
+                };
+                if (chart) { chart.updateOptions(opt); } else { chart = new ApexCharts(el, opt); chart.render(); }
+            }
+
+            render(12);
+            document.querySelectorAll('#proventosPeriodos [data-meses]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    document.querySelectorAll('#proventosPeriodos [data-meses]').forEach(function (x) { x.classList.remove('active'); });
+                    b.classList.add('active');
+                    render(parseInt(b.dataset.meses, 10));
+                });
+            });
         })();
     </script>
 }

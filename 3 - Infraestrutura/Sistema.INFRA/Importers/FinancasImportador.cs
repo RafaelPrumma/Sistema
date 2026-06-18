@@ -1632,6 +1632,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             return null;
 
         var text = value.Trim().Replace("R$", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+
+        // Notação científica (ex.: earn da Binance vem como "6E-8" = 0,00000006). O regex de prefixo
+        // abaixo cortaria no "E" e devolveria "6" (erro de 10^8); trata antes.
+        if (Regex.IsMatch(text, @"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$"))
+            return decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var sci) ? sci : null;
+
         var match = DecimalPrefixRegex().Match(text);
         if (match.Success)
             text = match.Value;

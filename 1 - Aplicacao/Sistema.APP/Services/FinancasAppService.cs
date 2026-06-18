@@ -39,6 +39,11 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .ToList();
         var valorMercadoTotal = ativosCotados.Sum(x => x.ValorMercado);
 
+        var hojeProv = DateTime.UtcNow.Date;
+        var proventosMensais = CriarProventosMensais(
+            await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hojeProv.AddYears(1), cancellationToken),
+            hojeProv);
+
         var dashboard = new FinancasDashboardDto
         {
             GeradoEm = carga?.GeneratedAt?.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR")) ?? string.Empty,
@@ -65,6 +70,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 ultimaImportacao?.SourceFolder),
             CotacoesAtualizadasEm = cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault(),
             ValorMercadoTotal = valorMercadoTotal,
+            ProventosMensais = proventosMensais,
             CustoEstimadoTotal = ativosCotados.Sum(x => x.CustoEstimado),
             ResultadoNaoRealizadoTotal = ativosCotados.Sum(x => x.ResultadoNaoRealizado)
         };
@@ -174,8 +180,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     // Meses futuros (data de pagamento à frente de hoje) vão como "a receber".
     private static IReadOnlyList<ProventoMensalDto> CriarProventosMensais(IReadOnlyList<RendimentoInvestimento> proventos, DateTime hoje)
     {
-        var meses = Enumerable.Range(0, 12)
-            .Select(i => new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-11 + i))
+        var meses = Enumerable.Range(0, 24)
+            .Select(i => new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-23 + i))
             .ToList();
 
         var cultura = CultureInfo.GetCultureInfo("pt-BR");

@@ -304,4 +304,5 @@ public class FinancasDashboardDto
     public decimal CustoEstimadoTotal { get; set; }
     public decimal ResultadoNaoRealizadoTotal { get; set; }
     public string? DashboardJson { get; set; }
+    public IReadOnlyList<ProventoMensalDto> ProventosMensais { get; set; } = [];
 }

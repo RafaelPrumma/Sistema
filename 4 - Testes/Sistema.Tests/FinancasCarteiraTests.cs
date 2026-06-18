@@ -135,6 +135,7 @@ public class FinancasCarteiraTests
         repo.Setup(r => r.BuscarDocumentosMonitoradosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         repo.Setup(r => r.ObterUltimaImportacaoArquivoAsync(It.IsAny<CancellationToken>())).ReturnsAsync((ImportacaoFinanceiraArquivo?)null);
         repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarProventosPorPeriodoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         repo.Setup(r => r.BuscarAgregadosAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         repo.Setup(r => r.BuscarUltimasOperacoesB3Async(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         repo.Setup(r => r.BuscarUltimasTransacoesCriptoAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
