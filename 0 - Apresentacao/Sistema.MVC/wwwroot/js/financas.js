@@ -1,19 +1,22 @@
 (function () {
   'use strict';
 
-  const container = document.getElementById('financeEvolucao');
-  if (!container || typeof ApexCharts === 'undefined') return;
+  const dashboard = document.getElementById('financeDashboard');
+  if (!dashboard) return;
 
-  const url = container.dataset.evolucaoUrl || '/Financas/Evolucao';
-  const elPeriodos = document.getElementById('financePeriodos');
-  const elValor = document.getElementById('financeHeaderValor');
-  const elDelta = document.getElementById('financeHeaderDelta');
-  const elTitulo = document.getElementById('financeHeaderTitulo');
-  const elSetores = document.getElementById('financeSetores');
-
+  const controller = new AbortController();
+  const signal = controller.signal;
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   const pct = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const cssVar = (name, fallback) => (getComputedStyle(document.body).getPropertyValue(name).trim() || fallback);
+  const cssVar = (name, fallback) => getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const islands = {
+    patrimonio: document.getElementById('financePatrimonioIsland'),
+    carteiras: document.getElementById('financeCarteirasIsland'),
+    importacao: document.getElementById('financeImportacaoIsland'),
+    operacional: document.getElementById('financeOperacionalIsland')
+  };
 
   const PERIODOS = [
     { cod: '1D', label: '1D', dias: 1 },
@@ -30,179 +33,295 @@
   let periodoAtual = '6M';
   let serieAtual = 'total';
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function setLoaded(island) {
+    island?.setAttribute('aria-busy', 'false');
+    if (window.AOS && island?.querySelector('[data-aos]')) {
+      window.AOS.refreshHard();
+    }
+  }
+
+  function setError(island, error) {
+    if (!island) return;
+    console.error('Falha ao carregar ilha financeira.', error);
+    island.setAttribute('aria-busy', 'false');
+    island.innerHTML = `
+      <div class="finance-island-error" role="alert">
+        <div>
+          <i class="bi bi-exclamation-triangle d-block fs-4 mb-2"></i>
+          Não foi possível carregar este conteúdo.
+        </div>
+      </div>`;
+  }
+
+  async function fetchChecked(url, accept) {
+    const response = await fetch(url, {
+      signal,
+      headers: { Accept: accept }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status} em ${url}`);
+    return response;
+  }
+
+  async function loadPartial(island, url) {
+    try {
+      const response = await fetchChecked(url, 'text/html');
+      island.innerHTML = await response.text();
+      setLoaded(island);
+    } catch (error) {
+      if (error.name !== 'AbortError') setError(island, error);
+      throw error;
+    }
+  }
+
   function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
   function corNegativa() { return cssVar('--bs-danger', '#dc2626'); }
 
   function valoresDe(chave) {
     if (chave === 'total') return dados.total;
-    const setor = dados.setores.find(s => s.chave === chave);
-    return setor ? setor.valores : dados.total;
+    return dados.setores.find(s => s.chave === chave)?.valores ?? dados.total;
   }
 
   function rotuloDe(chave) {
     if (chave === 'total') return 'Patrimônio total';
-    const setor = dados.setores.find(s => s.chave === chave);
-    return setor ? setor.rotulo : 'Patrimônio total';
+    return dados.setores.find(s => s.chave === chave)?.rotulo ?? 'Patrimônio total';
   }
 
   function variacaoDiaDe(chave) {
     if (chave === 'total') return dados.variacaoDiaTotal || 0;
-    const setor = dados.setores.find(s => s.chave === chave);
-    return setor ? (setor.variacaoDia || 0) : 0;
+    return dados.setores.find(s => s.chave === chave)?.variacaoDia || 0;
   }
 
   function indiceInicial() {
-    const n = dados.datas.length;
-    const p = PERIODOS.find(x => x.cod === periodoAtual);
-    if (!p || p.cod === 'MAX' || p.cod === '1A') return 0;
-    if (p.cod === 'YTD') {
+    const quantidade = dados.datas.length;
+    const periodo = PERIODOS.find(x => x.cod === periodoAtual);
+    if (!periodo || periodo.cod === 'MAX' || periodo.cod === '1A') return 0;
+    if (periodo.cod === 'YTD') {
       const ano = new Date().getFullYear().toString();
-      const idx = dados.datas.findIndex(d => d.startsWith(ano));
-      return idx < 0 ? 0 : idx;
+      const indice = dados.datas.findIndex(data => data.startsWith(ano));
+      return indice < 0 ? 0 : indice;
     }
-    return Math.max(0, n - 1 - p.dias);
+    return Math.max(0, quantidade - 1 - periodo.dias);
   }
 
-  function compact(v) {
-    const abs = Math.abs(v);
-    if (abs >= 1e6) return 'R$ ' + (v / 1e6).toFixed(1) + 'mi';
-    if (abs >= 1e3) return 'R$ ' + (v / 1e3).toFixed(0) + 'k';
-    return money.format(v);
+  function compact(value) {
+    const absolute = Math.abs(value);
+    if (absolute >= 1e6) return `R$ ${(value / 1e6).toFixed(1)}mi`;
+    if (absolute >= 1e3) return `R$ ${(value / 1e3).toFixed(0)}k`;
+    return money.format(value);
   }
 
-  function pontos(valores, ini) {
-    const out = [];
-    for (let i = ini; i < dados.datas.length; i++) out.push({ x: dados.datas[i], y: valores[i] });
-    return out;
+  function pontos(valores, inicio) {
+    return dados.datas.slice(inicio).map((data, index) => ({ x: data, y: valores[inicio + index] }));
   }
 
-  function render() {
-    const ini = indiceInicial();
-    const valores = valoresDe(serieAtual);
-    const atual = valores.length ? valores[valores.length - 1] : 0;
-    const base = valores[ini] || 0;
-    const variacao = atual - base;
-    const positivo = variacao >= 0;
-    const cor = positivo ? corPositiva() : corNegativa();
-
-    if (elValor) elValor.textContent = money.format(atual);
-    if (elTitulo) elTitulo.textContent = rotuloDe(serieAtual);
-    if (elDelta) {
-      const sinal = positivo ? '+' : '';
-      const perc = base === 0 ? 0 : (variacao / base) * 100;
-      const vd = variacaoDiaDe(serieAtual);
-      const labelPeriodo = (PERIODOS.find(x => x.cod === periodoAtual) || {}).label || '';
-      elDelta.innerHTML =
-        `<span class="${positivo ? 'text-success' : 'text-danger'}">${sinal}${money.format(variacao)} (${sinal}${pct.format(perc)}%) <small>${labelPeriodo}</small></span>` +
-        `<span class="finance-hero-today ${vd >= 0 ? 'text-success' : 'text-danger'}">${vd >= 0 ? '+' : ''}${pct.format(vd)}% hoje</span>`;
-      elDelta.className = 'finance-hero-delta';
-    }
-
-    const series = [{ name: rotuloDe(serieAtual), data: pontos(valores, ini) }];
-    if (!chart) {
-      chart = new ApexCharts(container, baseOptions(series, cor));
-      chart.render();
-    } else {
-      chart.updateOptions({ colors: [cor], fill: gradiente(cor) }, false, false);
-      chart.updateSeries(series, true);
-    }
-
-    renderSetores(ini);
-  }
-
-  function gradiente(cor) {
-    return { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 95] } };
-  }
-
-  function baseOptions(series, cor) {
+  function gradiente() {
     return {
-      chart: { type: 'area', height: 340, toolbar: { show: false }, zoom: { enabled: false }, fontFamily: 'inherit', background: 'transparent' },
-      theme: { mode: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light' },
-      series: series,
-      colors: [cor],
-      dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 2 },
-      fill: gradiente(cor),
-      grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
-      xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
-      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
-      tooltip: { theme: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light', x: { format: 'dd/MM/yyyy' }, y: { formatter: v => money.format(v) } }
+      type: 'gradient',
+      gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 95] }
     };
   }
 
-  function sparkline(valores, ini, cor) {
-    const slice = valores.slice(ini);
+  function chartOptions(series, cor) {
+    return {
+      chart: {
+        type: 'area',
+        height: 340,
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        animations: { enabled: !prefersReducedMotion },
+        fontFamily: 'inherit',
+        background: 'transparent'
+      },
+      theme: { mode: document.body.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light' },
+      series,
+      colors: [cor],
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
+      fill: gradiente(),
+      grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
+      xaxis: {
+        type: 'datetime',
+        labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false }
+      },
+      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      tooltip: { x: { format: 'dd/MM/yyyy' }, y: { formatter: value => money.format(value) } }
+    };
+  }
+
+  function sparkline(valores, inicio, cor) {
+    const slice = valores.slice(inicio);
     if (slice.length < 2) return '';
-    const min = Math.min(...slice), max = Math.max(...slice);
+    const min = Math.min(...slice);
+    const max = Math.max(...slice);
     const span = max - min || 1;
-    const w = 120, h = 32;
-    const step = w / (slice.length - 1);
-    const pts = slice.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / span) * h).toFixed(1)}`).join(' ');
-    return `<svg class="finance-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${cor}" stroke-width="2" points="${pts}"/></svg>`;
+    const width = 120;
+    const height = 32;
+    const step = width / (slice.length - 1);
+    const points = slice
+      .map((value, index) => `${(index * step).toFixed(1)},${(height - ((value - min) / span) * height).toFixed(1)}`)
+      .join(' ');
+    return `<svg class="finance-spark" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="${cor}" stroke-width="2" points="${points}"/></svg>`;
   }
 
-  function renderSetores(ini) {
-    if (!elSetores) return;
-    const cards = [];
-    const totalAtual = (dados.valorAtualTotal && dados.valorAtualTotal > 0) ? dados.valorAtualTotal : (dados.total[dados.total.length - 1] || 0);
-    const totalBase = dados.total[ini] || 0;
-    cards.push(cardSetor('total', 'Patrimônio total', dados.total, ini, totalAtual, totalBase, dados.variacaoDiaTotal || 0));
-    dados.setores.forEach(s => {
-      const serieAtualFim = s.valores[s.valores.length - 1] || 0;
-      const atual = (s.valorAtual && s.valorAtual > 0) ? s.valorAtual : serieAtualFim;
-      const base = s.valores[ini] || 0;
-      if (atual === 0 && base === 0) return;
-      cards.push(cardSetor(s.chave, s.rotulo, s.valores, ini, atual, base, s.variacaoDia || 0));
-    });
-    elSetores.innerHTML = cards.join('');
-    elSetores.querySelectorAll('[data-serie]').forEach(el => {
-      el.addEventListener('click', () => { serieAtual = el.dataset.serie; render(); });
-    });
-  }
-
-  function cardSetor(chave, rotulo, valores, ini, atual, base, variacaoDia) {
+  function sectorCard(chave, rotulo, valores, inicio, atual, base, variacaoDia) {
     const variacao = atual - base;
-    const positivoPer = variacao >= 0;
-    const perc = base === 0 ? 0 : (variacao / base) * 100;
+    const positivoPeriodo = variacao >= 0;
+    const percentual = base === 0 ? 0 : (variacao / base) * 100;
     const corDia = variacaoDia >= 0 ? corPositiva() : corNegativa();
     const ativo = chave === serieAtual ? ' finance-sector-card--active' : '';
-    return `<button type="button" class="finance-sector-card${ativo}" data-serie="${chave}">
-        <div class="finance-sector-top">
-          <span class="finance-sector-name">${rotulo}</span>
-          <span class="finance-sector-perc ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>
-        </div>
-        <div class="finance-sector-value">${money.format(atual)}</div>
-        ${sparkline(valores, ini, corDia)}
-        <div class="finance-sector-foot ${positivoPer ? 'text-success' : 'text-danger'}">${positivoPer ? '+' : ''}${pct.format(perc)}% no período</div>
-      </button>`;
+    return `<button type="button" class="finance-sector-card${ativo}" data-serie="${escapeHtml(chave)}">
+      <div class="finance-sector-top">
+        <span class="finance-sector-name">${escapeHtml(rotulo)}</span>
+        <span class="finance-sector-perc ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>
+      </div>
+      <div class="finance-sector-value">${money.format(atual)}</div>
+      ${sparkline(valores, inicio, corDia)}
+      <div class="finance-sector-foot ${positivoPeriodo ? 'text-success' : 'text-danger'}">${positivoPeriodo ? '+' : ''}${pct.format(percentual)}% no período</div>
+    </button>`;
   }
 
-  function renderBotoes() {
-    if (!elPeriodos) return;
-    elPeriodos.innerHTML = PERIODOS.map(p =>
-      `<button type="button" class="finance-period-btn${p.cod === periodoAtual ? ' active' : ''}" data-periodo="${p.cod}">${p.label}</button>`
-    ).join('');
-    elPeriodos.querySelectorAll('[data-periodo]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        periodoAtual = btn.dataset.periodo;
-        elPeriodos.querySelectorAll('[data-periodo]').forEach(b => b.classList.toggle('active', b === btn));
-        render();
+  function renderSetores(inicio) {
+    const container = document.getElementById('financeSetores');
+    if (!container) return;
+    const cards = [];
+    const totalAtual = dados.valorAtualTotal > 0 ? dados.valorAtualTotal : dados.total.at(-1) || 0;
+    cards.push(sectorCard('total', 'Patrimônio total', dados.total, inicio, totalAtual, dados.total[inicio] || 0, dados.variacaoDiaTotal || 0));
+    dados.setores.forEach(setor => {
+      const atual = setor.valorAtual > 0 ? setor.valorAtual : setor.valores.at(-1) || 0;
+      const base = setor.valores[inicio] || 0;
+      if (atual !== 0 || base !== 0) {
+        cards.push(sectorCard(setor.chave, setor.rotulo, setor.valores, inicio, atual, base, setor.variacaoDia || 0));
+      }
+    });
+    container.innerHTML = cards.join('');
+    container.querySelectorAll('[data-serie]').forEach(button => {
+      button.addEventListener('click', () => {
+        serieAtual = button.dataset.serie;
+        renderPatrimonioData();
       });
     });
   }
 
-  fetch(url, { headers: { 'Accept': 'application/json' } })
-    .then(r => r.json())
-    .then(d => {
-      dados = d;
-      if (!dados || !dados.datas || dados.datas.length === 0) {
-        container.innerHTML = '<div class="text-secondary text-center py-5">Sem histórico suficiente para o gráfico. Importe relatórios ou adicione transações e atualize as cotações.</div>';
-        return;
-      }
-      renderBotoes();
-      render();
-    })
-    .catch(() => {
-      container.innerHTML = '<div class="text-danger text-center py-5">Não foi possível carregar a evolução do patrimônio.</div>';
+  function renderPeriodos() {
+    const container = document.getElementById('financePeriodos');
+    if (!container) return;
+    container.innerHTML = PERIODOS.map(periodo =>
+      `<button type="button" class="finance-period-btn${periodo.cod === periodoAtual ? ' active' : ''}" data-periodo="${periodo.cod}">${periodo.label}</button>`
+    ).join('');
+    container.querySelectorAll('[data-periodo]').forEach(button => {
+      button.addEventListener('click', () => {
+        periodoAtual = button.dataset.periodo;
+        renderPeriodos();
+        renderPatrimonioData();
+      });
     });
+  }
+
+  function renderPatrimonioData() {
+    const inicio = indiceInicial();
+    const valores = valoresDe(serieAtual);
+    const atual = valores.at(-1) || 0;
+    const base = valores[inicio] || 0;
+    const variacao = atual - base;
+    const positivo = variacao >= 0;
+    const percentual = base === 0 ? 0 : (variacao / base) * 100;
+    const variacaoDia = variacaoDiaDe(serieAtual);
+    const cor = positivo ? corPositiva() : corNegativa();
+
+    document.getElementById('financeHeaderTitulo').textContent = rotuloDe(serieAtual);
+    document.getElementById('financeHeaderValor').textContent = money.format(atual);
+    document.getElementById('financeHeaderDelta').innerHTML =
+      `<span class="${positivo ? 'text-success' : 'text-danger'}">${positivo ? '+' : ''}${money.format(variacao)} (${positivo ? '+' : ''}${pct.format(percentual)}%)</span>` +
+      `<span class="finance-hero-today ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>`;
+
+    const series = [{ name: rotuloDe(serieAtual), data: pontos(valores, inicio) }];
+    const chartContainer = document.getElementById('financeEvolucao');
+    if (!chart && chartContainer && window.ApexCharts) {
+      chart = new ApexCharts(chartContainer, chartOptions(series, cor));
+      chart.render();
+    } else if (chart) {
+      chart.updateOptions({ colors: [cor], fill: gradiente() }, false, false);
+      chart.updateSeries(series, !prefersReducedMotion);
+    }
+    renderSetores(inicio);
+  }
+
+  async function loadPatrimonio() {
+    const island = islands.patrimonio;
+    try {
+      const response = await fetchChecked(dashboard.dataset.patrimonioUrl, 'application/json');
+      const payload = await response.json();
+      dados = payload.evolucao;
+      island.innerHTML = `
+        <div data-aos="fade-up" data-aos-duration="220">
+          <div class="card finance-hero mb-3">
+            <div class="card-body">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
+                <div>
+                  <div class="text-secondary small" id="financeHeaderTitulo">Patrimônio total</div>
+                  <div class="finance-hero-value" id="financeHeaderValor">${money.format(payload.valorMercadoTotal)}</div>
+                  <div class="finance-hero-delta ${payload.resultadoNaoRealizadoTotal >= 0 ? 'text-success' : 'text-danger'}" id="financeHeaderDelta">${money.format(payload.resultadoNaoRealizadoTotal)}</div>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-2">
+                  <button class="btn btn-primary" type="button" data-abrir-modal="novaTransacaoModal"><i class="bi bi-plus-circle me-1"></i>Adicionar transação</button>
+                  <a class="btn btn-outline-secondary btn-sm" href="/Financas/Resumo?preset=mes"><i class="bi bi-clipboard-data me-1"></i>Resumo do período</a>
+                </div>
+              </div>
+              <div class="finance-period-bar" id="financePeriodos"></div>
+              <div id="financeEvolucao" class="finance-chart"></div>
+              <div class="small text-secondary mt-2"><i class="bi bi-info-circle me-1"></i>Leitura estimada a partir das suas transações e cotações públicas. Não é recomendação de investimento.</div>
+            </div>
+          </div>
+          <h5 class="mb-2">Carteiras</h5>
+          <div class="finance-sectors mb-4" id="financeSetores"></div>
+        </div>`;
+
+      if (!dados?.datas?.length) {
+        document.getElementById('financeEvolucao').innerHTML = '<div class="text-secondary text-center py-5">Sem histórico suficiente para o gráfico.</div>';
+      } else {
+        renderPeriodos();
+        renderPatrimonioData();
+      }
+      setLoaded(island);
+    } catch (error) {
+      if (error.name !== 'AbortError') setError(island, error);
+      throw error;
+    }
+  }
+
+  async function initialize() {
+    try {
+      await fetchChecked(dashboard.dataset.prepareUrl, 'application/json');
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      Object.values(islands).forEach(island => setError(island, error));
+      return;
+    }
+
+    await Promise.allSettled([
+      loadPatrimonio(),
+      loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
+      loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
+      loadPartial(islands.operacional, dashboard.dataset.operacionalUrl)
+    ]);
+  }
+
+  window.addEventListener('pagehide', () => {
+    controller.abort();
+    chart?.destroy();
+  }, { once: true });
+
+  initialize();
 })();

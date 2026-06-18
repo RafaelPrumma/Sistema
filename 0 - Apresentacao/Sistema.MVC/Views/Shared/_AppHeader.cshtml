@@ -8,15 +8,15 @@
             </button>
         </div>
         <div class="ms-auto d-flex align-items-center gap-1">
-            <div class="dropdown">
-                <button class="btn btn-link @Model.TextClass topbar-icon" type="button" id="communicationMenu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mensagens e notificações">
+            <div>
+                <button class="btn btn-link @Model.TextClass topbar-icon" type="button" id="communicationMenu" popovertarget="communicationPopover" aria-label="Mensagens e notificações">
                     <i class="bi bi-bell"></i>
                     @if (Model.UnreadMessages > 0)
                     {
                         <span class="topbar-badge">@Model.UnreadMessages</span>
                     }
                 </button>
-                <div class="dropdown-menu dropdown-menu-end notification-menu" aria-labelledby="communicationMenu">
+                <div class="notification-menu" id="communicationPopover" popover aria-labelledby="communicationMenu">
                     <div class="notification-menu-header">
                         <strong>Comunicação</strong>
                         <span class="badge text-bg-primary">@Model.UnreadMessages nova(s)</span>

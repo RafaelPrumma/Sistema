@@ -281,6 +281,24 @@ public record ImportacaoFinanceiraResumoDto(
     int DocumentosComAlerta,
     string? PastaMonitorada);
 
+public record FinancasPatrimonioDto(
+    decimal ValorMercadoTotal,
+    decimal CustoEstimadoTotal,
+    decimal ResultadoNaoRealizadoTotal,
+    EvolucaoPatrimonioDto Evolucao);
+
+public record FinancasCarteirasDto(
+    IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras);
+
+public record FinancasImportacaoDto(
+    IReadOnlyList<FinanceiroKpiDto> Kpis,
+    ImportacaoFinanceiraResumoDto ImportacaoArquivos,
+    DateTime? CotacoesAtualizadasEm);
+
+public record FinancasOperacionalDto(
+    IReadOnlyList<PosicaoFinanceiraDto> PosicoesAbertas,
+    IReadOnlyList<AlertaConfiabilidadeDto> Alertas);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;

@@ -73,6 +73,12 @@ async function setThemeToggle(page, id, checked) {
 
 async function verifyRoute(page, url, name, file) {
   await page.goto(`${baseUrl}${url}`, { waitUntil: 'networkidle' });
+  if (url === '/Financas') {
+    await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
+    await page.waitForSelector('#financeCarteirasIsland[aria-busy="false"]');
+    await page.waitForSelector('#financeImportacaoIsland[aria-busy="false"]');
+    await page.waitForSelector('#financeOperacionalIsland[aria-busy="false"]');
+  }
   await ensureNoLayoutBreak(page, name);
   await screenshot(page, file);
 }
@@ -90,9 +96,15 @@ try {
   await page.click('button[type="submit"]');
   await page.waitForURL(/\/Home\/Index|\/$/);
   await page.waitForLoadState('networkidle');
+  await page.waitForSelector('#appSplash', { state: 'detached' });
 
   await ensureNoLayoutBreak(page, 'home-default');
   await screenshot(page, '02-home-default.png');
+  await page.goto(`${baseUrl}/Configuracao`, { waitUntil: 'networkidle' });
+  if (await page.locator('#appSplash').count()) {
+    throw new Error('Splash reapareceu durante a mesma sessão autenticada.');
+  }
+  await page.goto(`${baseUrl}/Home/Index`, { waitUntil: 'networkidle' });
 
   await openThemePanel(page);
   await page.click('[data-theme-preset="executivo"]');
@@ -108,6 +120,23 @@ try {
   await closeThemePanel(page);
   await ensureNoLayoutBreak(page, 'menu-colapsado');
   await screenshot(page, '04-menu-colapsado.png');
+
+  const delayedPatrimonio = async route => {
+    await new Promise(resolve => setTimeout(resolve, 450));
+    await route.continue();
+  };
+  await page.route('**/Financas/Dashboard/Patrimonio', delayedPatrimonio);
+  await page.goto(`${baseUrl}/Financas`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#financePatrimonioIsland[aria-busy="true"] .finance-skeleton');
+  await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
+  await page.unroute('**/Financas/Dashboard/Patrimonio', delayedPatrimonio);
+
+  const failOperacional = route => route.fulfill({ status: 500, body: 'falha simulada' });
+  await page.route('**/Financas/Dashboard/Operacional', failOperacional);
+  await page.goto(`${baseUrl}/Financas`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#financeOperacionalIsland .finance-island-error');
+  await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
+  await page.unroute('**/Financas/Dashboard/Operacional', failOperacional);
 
   const routes = [
     ['/Home/Index', 'home', '05-home.png'],

@@ -69,6 +69,12 @@
         const hideSplash = () => {
             if (!splash || splash.classList.contains('app-splash--hide')) return;
             splash.classList.add('app-splash--hide');
+            try {
+                window.sessionStorage.setItem('appSplashSeen', 'true');
+            } catch {
+                // A aplicação continua funcional quando o storage estiver indisponível.
+            }
+            document.documentElement.classList.add('splash-seen');
             window.setTimeout(() => splash.remove(), 320);
         };
         const sidebarMenu = document.getElementById('sidebarMenu');
@@ -105,7 +111,11 @@
             });
         }
 
-        window.addEventListener('load', () => window.setTimeout(hideSplash, 120), { once: true });
-        window.setTimeout(hideSplash, 1400);
+        if (document.documentElement.classList.contains('splash-seen')) {
+            splash?.remove();
+        } else {
+            window.addEventListener('load', () => window.setTimeout(hideSplash, 120), { once: true });
+            window.setTimeout(hideSplash, 1400);
+        }
     });
 })();

@@ -7,6 +7,12 @@
         return;
     }
 
+    try {
+        window.sessionStorage.removeItem('appSplashSeen');
+    } catch {
+        // Storage pode estar bloqueado; o login permanece funcional.
+    }
+
     $(function () {
         const $modal = $('#loadingModal');
 

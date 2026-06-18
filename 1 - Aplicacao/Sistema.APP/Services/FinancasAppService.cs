@@ -22,6 +22,68 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
     private string UsuarioAtual => string.IsNullOrWhiteSpace(_execution.Usuario) ? "sistema" : _execution.Usuario!;
 
+    public Task PrepararDashboardAsync(CancellationToken cancellationToken = default)
+        => _importador.GarantirCargaInicialAsync(cancellationToken);
+
+    public async Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var hoje = DateTime.UtcNow.Date;
+        var inicio = hoje.AddYears(-1);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
+        var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var evolucao = CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
+        var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+        var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+
+        return new FinancasPatrimonioDto(
+            ativos.Sum(x => x.ValorMercado),
+            ativos.Sum(x => x.CustoEstimado),
+            ativos.Sum(x => x.ResultadoNaoRealizado),
+            evolucao);
+    }
+
+    public async Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+        var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+        var valorMercadoTotal = ativos.Sum(x => x.ValorMercado);
+
+        return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal));
+    }
+
+    public async Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var carga = await _uow.Financas.ObterCargaMaisRecenteAsync(cancellationToken);
+        var documentos = await _uow.Financas.BuscarDocumentosMonitoradosAsync(cancellationToken);
+        var ultimaImportacao = await _uow.Financas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+
+        return new FinancasImportacaoDto(
+            CriarKpis(carga),
+            new ImportacaoFinanceiraResumoDto(
+                ultimaImportacao?.FinishedAt ?? ultimaImportacao?.StartedAt,
+                documentos.Count,
+                documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Processado or StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
+                documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
+                ultimaImportacao?.SourceFolder),
+            cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault());
+    }
+
+    public async Task<FinancasOperacionalDto> ObterOperacionalDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var posicoes = await _uow.Financas.BuscarPosicoesAsync(true, cancellationToken);
+        var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
+
+        return new FinancasOperacionalDto(
+            posicoes.Where(EhPosicaoEstimativaAbertaVisivel).Take(12).Select(MapPosicao).ToList(),
+            alertas.Take(8).Select(MapAlerta).ToList());
+    }
+
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
@@ -321,13 +383,24 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
         var hoje = DateTime.UtcNow.Date;
         var inicio = hoje.AddYears(-1);
-        var totalDias = (hoje - inicio).Days + 1;
-        var datas = Enumerable.Range(0, totalDias).Select(i => inicio.AddDays(i)).ToList();
-
         var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
         var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
         var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+
+        return CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
+    }
+
+    private static EvolucaoPatrimonioDto CriarEvolucaoPatrimonio(
+        IReadOnlyList<TransacaoFinanceira> transacoes,
+        IReadOnlyList<PrecoHistoricoAtivoFinanceiro> historico,
+        IReadOnlyList<CarteiraFinanceira> carteiras,
+        IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes,
+        DateTime hoje,
+        DateTime inicio)
+    {
+        var totalDias = (hoje - inicio).Days + 1;
+        var datas = Enumerable.Range(0, totalDias).Select(i => inicio.AddDays(i)).ToList();
         var cotacaoPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());

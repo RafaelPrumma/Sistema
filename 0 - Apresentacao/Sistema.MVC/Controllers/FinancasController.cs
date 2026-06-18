@@ -16,8 +16,31 @@ public class FinancasController(IFinancasAppService service) : Controller
 
     [HttpGet("/Financas")]
     [HttpGet("/Financas/Index")]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
-        => View(await _service.ObterDashboardAsync(cancellationToken));
+    public IActionResult Index()
+        => View();
+
+    [HttpGet("/Financas/Dashboard/Preparar")]
+    public async Task<IActionResult> PrepararDashboard(CancellationToken cancellationToken)
+    {
+        await _service.PrepararDashboardAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("/Financas/Dashboard/Patrimonio")]
+    public async Task<IActionResult> DashboardPatrimonio(CancellationToken cancellationToken)
+        => Json(await _service.ObterPatrimonioDashboardAsync(cancellationToken));
+
+    [HttpGet("/Financas/Dashboard/Carteiras")]
+    public async Task<IActionResult> DashboardCarteiras(CancellationToken cancellationToken)
+        => PartialView("_DashboardCarteiras", await _service.ObterCarteirasDashboardAsync(cancellationToken));
+
+    [HttpGet("/Financas/Dashboard/Importacao")]
+    public async Task<IActionResult> DashboardImportacao(CancellationToken cancellationToken)
+        => PartialView("_DashboardImportacao", await _service.ObterImportacaoDashboardAsync(cancellationToken));
+
+    [HttpGet("/Financas/Dashboard/Operacional")]
+    public async Task<IActionResult> DashboardOperacional(CancellationToken cancellationToken)
+        => PartialView("_DashboardOperacional", await _service.ObterOperacionalDashboardAsync(cancellationToken));
 
     [HttpPost]
     [ValidateAntiForgeryToken]

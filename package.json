@@ -4,9 +4,12 @@
   "description": "Projeto de exemplo em .NET 8 utilizando arquitetura em camadas.",
   "main": "index.js",
   "scripts": {
-    "build": "vite build",
-    "watch": "vite build --watch --mode development",
-    "dev": "vite",
+    "css:build": "node \"node_modules/sass/sass.js\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.css\" --style=expanded --no-source-map",
+    "css:min": "node \"node_modules/sass/sass.js\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss\" \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.min.css\" --style=compressed --no-source-map",
+    "css:watch": "node \"node_modules/sass/sass.js\" --watch \"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.scss\":\"0 - Apresentacao/Sistema.MVC/wwwroot/css/site.css\" --style=expanded --no-source-map",
+    "build": "npm run css:build && npm run css:min && node \"node_modules/vite/bin/vite.js\" build",
+    "watch": "node \"node_modules/vite/bin/vite.js\" build --watch --mode development",
+    "dev": "node \"node_modules/vite/bin/vite.js\"",
     "test": "echo \"No tests\"",
     "test:layout": "node artifacts/screenshots/capture-layout.mjs"
   },

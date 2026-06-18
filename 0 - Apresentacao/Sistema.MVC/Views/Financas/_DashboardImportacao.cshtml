@@ -1,0 +1,54 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasImportacaoDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C", br);
+}
+
+<div class="card finance-data-section" data-aos="fade-up" data-aos-duration="220">
+    <div class="card-body">
+        <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#financeDados" aria-expanded="false">
+            <i class="bi bi-database"></i>
+            <span class="fw-semibold">Dados &amp; importação</span>
+            <i class="bi bi-chevron-down small"></i>
+        </button>
+        <div class="collapse mt-3" id="financeDados">
+            <div class="finance-command-bar mb-3">
+                <div>
+                    <div class="small text-secondary">Pasta monitorada</div>
+                    <div class="fw-semibold">@(Model.ImportacaoArquivos.PastaMonitorada ?? "Não configurada")</div>
+                    <div class="small text-secondary">
+                        @Model.ImportacaoArquivos.DocumentosProcessados.ToString("N0", br) documentos processados &middot;
+                        Cotações: @(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "pendente")
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <form asp-action="ImportarPasta" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-folder-symlink me-1"></i>Importar arquivos</button>
+                    </form>
+                    <form asp-action="AtualizarCotacoes" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Atualizar cotações</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3">
+            @foreach (var kpi in Model.Kpis)
+            {
+                <div class="col-md-6 col-xl-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="text-secondary small">@kpi.Titulo</div>
+                            <div class="fs-5 fw-semibold">@(kpi.Monetario ? Money(kpi.Valor) : kpi.Valor.ToString("N0", br))</div>
+                            <div class="small text-secondary">@kpi.Subtitulo</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            </div>
+        </div>
+    </div>
+</div>

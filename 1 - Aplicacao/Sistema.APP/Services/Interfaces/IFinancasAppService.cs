@@ -5,6 +5,11 @@ namespace Sistema.APP.Services.Interfaces;
 
 public interface IFinancasAppService
 {
+    Task PrepararDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasOperacionalDto> ObterOperacionalDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<DocumentoFinanceiroDto>> BuscarDocumentosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<(DocumentoFinanceiroDto? Documento, IReadOnlyList<ConteudoBrutoFinanceiroDto> Conteudos)> ObterDocumentoAsync(int id, CancellationToken cancellationToken = default);

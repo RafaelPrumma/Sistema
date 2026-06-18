@@ -42,6 +42,10 @@ html {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
+html.splash-seen .app-splash {
+  display: none;
+}
+
 .app-splash-card {
   display: grid;
   justify-items: center;
@@ -150,10 +154,48 @@ header.navbar {
 }
 
 .notification-menu {
+  position: fixed;
+  inset: var(--topbar-height) 0.75rem auto auto;
   width: min(340px, calc(100vw - 1rem));
+  margin: 0;
   padding: 0.5rem;
+  border: 1px solid var(--bs-border-color);
   border-radius: 0.5rem;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  box-shadow: 0 20px 45px var(--surface-shadow);
+  opacity: 0;
+  transform: translateY(-0.4rem) scale(0.98);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    display 160ms allow-discrete,
+    overlay 160ms allow-discrete;
+}
+
+.notification-menu:popover-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@starting-style {
+  .notification-menu:popover-open {
+    opacity: 0;
+    transform: translateY(-0.4rem) scale(0.98);
+  }
+}
+
+#communicationMenu {
+  anchor-name: --communication-menu-anchor;
+}
+
+@supports (position-anchor: --communication-menu-anchor) {
+  .notification-menu {
+    position-anchor: --communication-menu-anchor;
+    inset: auto;
+    position-area: bottom span-left;
+    margin-block-start: 0.4rem;
+  }
 }
 
 .notification-menu-header {
@@ -291,6 +333,14 @@ header.navbar {
   background: rgba(var(--bs-body-bg-rgb), 0.72);
 }
 
+.segmented-control label:has(input:checked) {
+  font-weight: 650;
+}
+
+.theme-panel-section:has(input:invalid) {
+  border-color: color-mix(in srgb, var(--bs-danger) 55%, var(--bs-border-color));
+}
+
 .theme-panel-section-title {
   display: flex;
   align-items: center;
@@ -346,4 +396,20 @@ header.navbar {
 .form-check-input:checked {
   background-color: var(--bs-primary);
   border-color: var(--bs-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

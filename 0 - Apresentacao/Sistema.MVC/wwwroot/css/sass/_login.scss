@@ -1,0 +1,18 @@
+.login-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.login-left {
+  background-color: #0058a3;
+  color: #fff;
+}
+
+.auth-modal-content {
+  padding: 1.5rem;
+}
+
+.login-container .form-control:focus {
+  border-color: #0058a3;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, #0058a3 25%, transparent);
+}
