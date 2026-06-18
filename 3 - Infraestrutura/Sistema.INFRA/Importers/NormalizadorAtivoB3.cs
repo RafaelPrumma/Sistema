@@ -74,7 +74,7 @@ public static class NormalizadorAtivoB3
         ["FII HECTARE CI"] = new("HCTR11", ClasseAtivo.FII),
         ["FII HSI MALL CI"] = new("HSML11", ClasseAtivo.FII),
         ["FII IRIDIUM CI"] = new("IRDM11", ClasseAtivo.FII),
-        ["FII IRIM CI"] = new("IRIM11", ClasseAtivo.FII),
+        ["FII IRIM CI"] = new("IRDM11", ClasseAtivo.FII), // mesmo fundo que IRIDIUM (nome abreviado na nota)
         ["FII KINEA IP CI"] = new("KNIP11", ClasseAtivo.FII),
         ["FII KINEA RI CI"] = new("KNCR11", ClasseAtivo.FII),
         ["FII KINEA SC CI"] = new("KNSC11", ClasseAtivo.FII),
