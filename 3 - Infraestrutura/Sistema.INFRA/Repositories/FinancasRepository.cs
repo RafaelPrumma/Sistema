@@ -146,6 +146,26 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var query = _context.RendimentosInvestimento.AsNoTracking().Include(x => x.Asset).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(x =>
+                x.IncomeType.Contains(termo) ||
+                x.Source.Contains(termo) ||
+                (x.Asset != null && (x.Asset.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)))));
+
+        return await query.OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
+        => await _context.RendimentosInvestimento
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .Where(x => x.PaymentDate != null && x.PaymentDate >= inicio && x.PaymentDate <= fim)
+            .OrderBy(x => x.PaymentDate)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<AtivoFinanceiro>> BuscarAtivosComPosicaoAbertaAsync(CancellationToken cancellationToken = default)
     {
         var cargaId = await ObterCargaIdAsync(cancellationToken);

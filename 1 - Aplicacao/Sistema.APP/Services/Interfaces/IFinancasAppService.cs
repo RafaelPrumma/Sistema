@@ -14,6 +14,8 @@ public interface IFinancasAppService
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> BuscarAlertasAsync(CancellationToken cancellationToken = default);
     Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
     Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default);
+    Task AtualizarProventosAsync(CancellationToken cancellationToken = default);
+    Task<ProventosPaginaDto> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
 
     Task<EvolucaoPatrimonioDto> ObterEvolucaoPatrimonioAsync(CancellationToken cancellationToken = default);
     Task<ResumoAnaliticoDto> ObterResumoAnaliticoAsync(DateTime? inicio, DateTime? fim, CancellationToken cancellationToken = default);

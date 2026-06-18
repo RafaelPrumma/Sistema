@@ -84,7 +84,8 @@ public enum TipoDocumentoFinanceiro
     BinanceSpotOrders = 7,
     BinanceConvertOrders = 8,
     BinanceDeposits = 9,
-    CsvBinance = 10
+    CsvBinance = 10,
+    InformeRendimentos = 11
 }
 
 public enum StatusParseDocumentoFinanceiro
@@ -369,10 +370,13 @@ public class EstimativaPosicaoCarteira : AuditableEntity
     public string RawJson { get; set; } = "{}";
 }
 
+// Provento recebido (dividendo, JCP, rendimento de FII). Pode vir da importação (atrelado a uma
+// carga) ou de busca automática na Brapi (CargaFinanceiraId nulo). A ChaveNatural torna o job
+// recorrente idempotente: o mesmo provento não entra duas vezes mesmo rodando todo dia.
 public class RendimentoInvestimento : AuditableEntity
 {
     public int Id { get; set; }
-    public int CargaFinanceiraId { get; set; }
+    public int? CargaFinanceiraId { get; set; }
     public CargaFinanceira? CargaFinanceira { get; set; }
     public int? SourceDocumentId { get; set; }
     public int? AssetId { get; set; }
@@ -383,9 +387,16 @@ public class RendimentoInvestimento : AuditableEntity
     public string Source { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal TaxWithheld { get; set; }
+    public decimal? Quantity { get; set; }
+    public decimal? RatePerShare { get; set; }
     public string Currency { get; set; } = "BRL";
     public string Taxation { get; set; } = string.Empty;
     public string RawJson { get; set; } = "{}";
+
+    // Origem do provento (Brapi|Manual|fonte do arquivo). Distingue o que foi buscado automaticamente.
+    public string Fonte { get; set; } = string.Empty;
+    // Chave natural (Fonte|Ativo|data-pagamento|tipo|valor-por-ação) — índice único filtrado.
+    public string? ChaveNatural { get; set; }
 }
 
 public class AgregadoFinanceiro : AuditableEntity

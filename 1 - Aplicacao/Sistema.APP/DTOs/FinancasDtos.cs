@@ -68,6 +68,62 @@ public record PosicaoFinanceiraDto(
 
 public record RendimentoInvestimentoDto(string Tipo, string Fonte, decimal Valor, string Tributacao);
 
+public record ProventoDto(
+    int Id,
+    DateTime? DataPagamento,
+    DateTime? DataCom,
+    string Ticker,
+    string Nome,
+    string Classe,
+    string Tipo,
+    decimal? Quantidade,
+    decimal? ValorPorAcao,
+    decimal Valor,
+    decimal ImpostoRetido,
+    decimal ValorLiquido,
+    string Tributacao,
+    string Fonte);
+
+public record ProventosResumoDto(
+    decimal RecebidoMes,
+    decimal RecebidoAno,
+    decimal RecebidoTotal,
+    decimal AReceber,
+    int Quantidade);
+
+public record ProventoPeriodoDto(
+    string Codigo,
+    string Rotulo,
+    decimal Recebido,
+    decimal AReceber,
+    int Quantidade,
+    decimal Percentual);
+
+public record ProventoBaldeDto(
+    string Codigo,
+    string Rotulo,
+    decimal Valor,
+    decimal Percentual,
+    int Quantidade,
+    string Status);
+
+public record ProventoMensalDto(
+    string Rotulo,
+    int Ano,
+    int Mes,
+    decimal Recebido,
+    decimal AReceber);
+
+public record ProventosPaginaDto(
+    IReadOnlyList<ProventoDto> Itens,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    ProventosResumoDto Resumo,
+    IReadOnlyList<ProventoPeriodoDto> Periodos,
+    IReadOnlyList<ProventoBaldeDto> Baldes,
+    IReadOnlyList<ProventoMensalDto> Mensais);
+
 public record AlertaConfiabilidadeDto(
     int Id,
     string Entidade,
@@ -94,6 +150,19 @@ public record CotacaoAtivoDto(
     string Status,
     string Confianca);
 
+public record CarteiraAtivoResumoDto(
+    int AtivoId,
+    string Ativo,
+    string Classe,
+    string Symbol,
+    decimal Quantidade,
+    decimal ValorMercado,
+    decimal PercentualCarteira,
+    decimal? VariacaoDiaPercentual,
+    decimal ResultadoNaoRealizado,
+    decimal ResultadoNaoRealizadoPercentual,
+    string Status);
+
 public record CarteiraFinanceiraResumoDto(
     int Id,
     string Nome,
@@ -103,7 +172,9 @@ public record CarteiraFinanceiraResumoDto(
     decimal ResultadoNaoRealizado,
     decimal ResultadoNaoRealizadoPercentual,
     decimal VariacaoDiaPercentual,
-    int Ativos);
+    decimal PercentualPatrimonio,
+    int Ativos,
+    IReadOnlyList<CarteiraAtivoResumoDto> Itens);
 
 public record PeriodoPerformanceDto(string Codigo, string Label, decimal VariacaoPercentual, decimal VariacaoValor);
 
@@ -173,7 +244,9 @@ public record ResumoAtivoDto(
     decimal ValorMercado,
     decimal PlNaoRealizado,
     decimal PlPercentual,
-    decimal ResultadoRealizadoPeriodo);
+    decimal ResultadoRealizadoPeriodo,
+    decimal ProventosPeriodo,
+    decimal RetornoTotalPeriodo);
 
 public record VendaRealizadaDto(
     DateTime Data,
@@ -196,6 +269,8 @@ public record ResumoAnaliticoDto(
     decimal CustoTotal,
     decimal ValorMercadoTotal,
     decimal PlNaoRealizadoTotal,
+    decimal ProventosRecebidos,
+    decimal RetornoTotal,
     IReadOnlyList<ResumoAtivoDto> Ativos,
     IReadOnlyList<VendaRealizadaDto> Vendas);
 
@@ -229,4 +304,5 @@ public class FinancasDashboardDto
     public decimal CustoEstimadoTotal { get; set; }
     public decimal ResultadoNaoRealizadoTotal { get; set; }
     public string? DashboardJson { get; set; }
+    public IReadOnlyList<ProventoMensalDto> ProventosMensais { get; set; } = [];
 }

@@ -113,10 +113,17 @@ using (var scope = app.Services.CreateScope())
                 "financas-cotacoes",
                 s => s.AtualizarCotacoesAsync(false, CancellationToken.None),
                 cron);
+
+            // Proventos mudam poucas vezes ao mês: busca diária na Brapi é suficiente (job idempotente).
+            RecurringJob.AddOrUpdate<IFinancasMarketDataService>(
+                "financas-proventos",
+                s => s.AtualizarProventosAsync(false, CancellationToken.None),
+                Cron.Daily());
         }
         else
         {
             RecurringJob.RemoveIfExists("financas-cotacoes");
+            RecurringJob.RemoveIfExists("financas-proventos");
         }
     }
 }

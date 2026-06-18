@@ -84,6 +84,23 @@
 </div>
 
 <div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card h-100"><div class="card-body">
+            <div class="text-secondary small">Proventos recebidos no período</div>
+            <div class="fs-4 fw-semibold @Cls(Model.ProventosRecebidos)">@Money(Model.ProventosRecebidos)</div>
+            <div class="small text-secondary">dividendos, JCP e rendimentos (líquidos)</div>
+        </div></div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100 border-primary"><div class="card-body">
+            <div class="text-secondary small">Retorno total no período</div>
+            <div class="fs-4 fw-semibold @Cls(Model.RetornoTotal)">@Money(Model.RetornoTotal)</div>
+            <div class="small text-secondary">não realizado + realizado + proventos</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
     <div class="col-xl-6">
         <div class="card h-100"><div class="card-body">
             <h6 class="text-success"><i class="bi bi-arrow-up-right me-1"></i>Melhores do período</h6>
@@ -143,6 +160,8 @@
                         <th class="text-end">Valor mercado</th>
                         <th class="text-end">L/P não realiz.</th>
                         <th class="text-end">Realizado período</th>
+                        <th class="text-end">Proventos</th>
+                        <th class="text-end">Retorno total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,11 +176,13 @@
                             <td class="text-end">@Money(a.ValorMercado)</td>
                             <td class="text-end @Cls(a.PlNaoRealizado)">@Money(a.PlNaoRealizado)<div class="small @Cls(a.PlPercentual)">@Pct(a.PlPercentual)</div></td>
                             <td class="text-end @Cls(a.ResultadoRealizadoPeriodo)">@Money(a.ResultadoRealizadoPeriodo)</td>
+                            <td class="text-end @(a.ProventosPeriodo > 0 ? "text-success" : "text-secondary")">@(a.ProventosPeriodo > 0 ? Money(a.ProventosPeriodo) : "—")</td>
+                            <td class="text-end fw-semibold @Cls(a.RetornoTotalPeriodo)">@Money(a.RetornoTotalPeriodo)</td>
                         </tr>
                     }
                     @if (!Model.Ativos.Any())
                     {
-                        <tr><td colspan="8" class="text-center text-secondary py-3">Nenhuma posição no período.</td></tr>
+                        <tr><td colspan="10" class="text-center text-secondary py-3">Nenhuma posição no período.</td></tr>
                     }
                 </tbody>
             </table>
