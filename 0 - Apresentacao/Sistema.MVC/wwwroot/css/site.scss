@@ -2,6 +2,7 @@
 @use 'sass/mixins';
 @use 'sass/base';
 @use 'sass/menu';
+@use 'sass/login';
 
 :root {
   --header-bg:    #0d6efd;
@@ -14,6 +15,7 @@
   --topbar-height: 58px;
   --layout-offset-top: 0px;
   --layout-offset-bottom: 0px;
+  --surface-shadow: light-dark(rgba(15, 23, 42, 0.08), rgba(0, 0, 0, 0.28));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +34,42 @@
 
 body.tema-sidebar-open {
   overflow: hidden;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+.layout-content {
+  view-transition-name: main-content;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(main-content) {
+  animation: app-content-out 140ms ease both;
+}
+
+::view-transition-new(main-content) {
+  animation: app-content-in 220ms ease both;
+}
+
+@keyframes app-content-out {
+  to {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+}
+
+@keyframes app-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
 }
 
 .layout-main > header.navbar.fixed-top {
@@ -60,6 +98,79 @@ body.tema-sidebar-open {
 
 .finance-shell .card {
   border-radius: 0.5rem;
+}
+
+.finance-island {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.finance-island[aria-busy="true"] {
+  cursor: progress;
+}
+
+.finance-island:has(.finance-island-error) {
+  border-color: color-mix(in srgb, var(--bs-danger) 38%, var(--bs-border-color));
+}
+
+.finance-island-error {
+  min-height: 8rem;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  border: 1px dashed color-mix(in srgb, var(--bs-danger) 45%, transparent);
+  border-radius: 0.75rem;
+  color: var(--bs-danger);
+  text-align: center;
+}
+
+.finance-skeleton {
+  position: relative;
+  overflow: hidden;
+  min-height: 8rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--bs-secondary-bg) 82%, var(--bs-body-bg));
+}
+
+.finance-skeleton--hero {
+  min-height: 28rem;
+}
+
+.finance-skeleton--table {
+  min-height: 20rem;
+}
+
+.finance-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  translate: -100% 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--bs-body-bg) 70%, transparent),
+    transparent
+  );
+  animation: finance-skeleton-shimmer 1.25s infinite;
+}
+
+@keyframes finance-skeleton-shimmer {
+  to { translate: 100% 0; }
+}
+
+@container (width < 680px) {
+  .finance-command-bar,
+  .finance-island-header {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .finance-assets th:nth-child(2),
+  .finance-assets td:nth-child(2),
+  .finance-assets th:nth-child(3),
+  .finance-assets td:nth-child(3) {
+    display: none;
+  }
 }
 
 .finance-command-bar,

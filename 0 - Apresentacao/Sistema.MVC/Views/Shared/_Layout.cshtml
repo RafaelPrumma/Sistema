@@ -1,7 +1,9 @@
 @using Microsoft.AspNetCore.Http
 @using System.Globalization
+@using Microsoft.Extensions.Hosting
 @inject Sistema.APP.Services.Interfaces.ITemaAppService TemaService
 @inject Sistema.APP.Services.Interfaces.IMensagemAppService MensagemService
+@inject IWebHostEnvironment HostEnvironment
 @{
     var sessionUserId = Context.Session.GetInt32("UserId");
     var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -85,6 +87,9 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+        if (sessionStorage.getItem('appSplashSeen') === 'true') document.documentElement.classList.add('splash-seen');
+    </script>
     <title>@ViewData["Title"] - Sistema.MVC</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.css" />
@@ -92,7 +97,7 @@
     <link rel="stylesheet" href="~/lib/izimodal/css/iziModal.min.css" />
     <link rel="stylesheet" href="~/lib/aos/aos.css" />
     <link rel="stylesheet" href="~/lib/datatables/css/dataTables.bootstrap5.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="@(HostEnvironment.IsDevelopment() ? Url.Content("~/css/site.css") : Url.Content("~/css/site.min.css"))" asp-append-version="true" />
 </head>
 <body class="@(headerFixo ? "layout-header-fixed" : string.Empty) @(footerFixo ? "layout-footer-fixed" : string.Empty)" data-bs-theme="@(modoEscuro ? "dark" : "light")">
     <div id="appSplash" class="app-splash" aria-hidden="true">
@@ -109,7 +114,7 @@
         <div class="layout-main">
             @await Html.PartialAsync("_AppHeader", headerModel)
 
-            <main id="main" role="main" class="layout-content p-3 p-lg-4" data-aos="fade" data-aos-delay="0" data-aos-duration="320" data-aos-easing="ease-out">
+            <main id="main" role="main" class="layout-content p-3 p-lg-4">
                 <a class="visually-hidden-focusable" href="#main">Pular para conteúdo</a>
                 @RenderBody()
             </main>

@@ -37,6 +37,10 @@ html {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
+html.splash-seen .app-splash {
+  display: none;
+}
+
 .app-splash-card {
   display: grid;
   justify-items: center;
@@ -156,12 +160,44 @@ header.navbar {
 }
 
 .notification-menu {
+  position: fixed;
+  inset: var(--topbar-height) 0.75rem auto auto;
   width: min(340px, 100vw - 1rem);
+  margin: 0;
   padding: 0.5rem;
+  border: 1px solid var(--bs-border-color);
   border-radius: 0.5rem;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  box-shadow: 0 20px 45px var(--surface-shadow);
+  opacity: 0;
+  transform: translateY(-0.4rem) scale(0.98);
+  transition: opacity 160ms ease, transform 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete;
 }
 
+.notification-menu:popover-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@starting-style {
+  .notification-menu:popover-open {
+    opacity: 0;
+    transform: translateY(-0.4rem) scale(0.98);
+  }
+}
+#communicationMenu {
+  anchor-name: --communication-menu-anchor;
+}
+
+@supports (position-anchor: --communication-menu-anchor) {
+  .notification-menu {
+    position-anchor: --communication-menu-anchor;
+    inset: auto;
+    position-area: bottom span-left;
+    margin-block-start: 0.4rem;
+  }
+}
 .notification-menu-header {
   display: flex;
   justify-content: space-between;
@@ -291,6 +327,14 @@ header.navbar {
   background: rgba(var(--bs-body-bg-rgb), 0.72);
 }
 
+.segmented-control label:has(input:checked) {
+  font-weight: 650;
+}
+
+.theme-panel-section:has(input:invalid) {
+  border-color: color-mix(in srgb, var(--bs-danger) 55%, var(--bs-border-color));
+}
+
 .theme-panel-section-title {
   display: flex;
   align-items: center;
@@ -346,10 +390,25 @@ header.navbar {
   border-color: var(--bs-primary);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
 .layout-root {
   display: flex;
   flex-direction: row;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   background: var(--bs-body-bg);
 }
@@ -360,6 +419,7 @@ header.navbar {
   flex: 1 1 0;
   min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .layout-content {
@@ -374,6 +434,7 @@ header.navbar {
   flex-shrink: 0;
   width: var(--sidebar-width);
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   z-index: 200;
@@ -618,6 +679,7 @@ header.navbar {
     position: sticky;
     top: 0;
     height: 100vh;
+    height: 100dvh;
     align-self: flex-start;
   }
   body.menu-collapsed .app-menu {
@@ -724,6 +786,7 @@ header.navbar {
     top: 0;
     left: 0;
     height: 100vh;
+    height: 100dvh;
     width: min(var(--sidebar-width), 88vw);
     z-index: 300;
     transform: translateX(-100%);
@@ -738,12 +801,32 @@ header.navbar {
   }
   .layout-main {
     min-height: 100vh;
+    min-height: 100dvh;
     width: 100%;
   }
   .user-chip-name {
     display: none;
   }
 }
+.login-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.login-left {
+  background-color: #0058a3;
+  color: #fff;
+}
+
+.auth-modal-content {
+  padding: 1.5rem;
+}
+
+.login-container .form-control:focus {
+  border-color: #0058a3;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, #0058a3 25%, transparent);
+}
+
 :root {
   --header-bg: #0d6efd;
   --app-accent: #0d6efd;
@@ -755,6 +838,7 @@ header.navbar {
   --topbar-height: 58px;
   --layout-offset-top: 0px;
   --layout-offset-bottom: 0px;
+  --surface-shadow: light-dark(rgba(15, 23, 42, 0.08), rgba(0, 0, 0, 0.28));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -785,6 +869,39 @@ body.tema-sidebar-open {
   overflow: hidden;
 }
 
+@view-transition {
+  navigation: auto;
+}
+.layout-content {
+  view-transition-name: main-content;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(main-content) {
+  animation: app-content-out 140ms ease both;
+}
+
+::view-transition-new(main-content) {
+  animation: app-content-in 220ms ease both;
+}
+
+@keyframes app-content-out {
+  to {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+}
+@keyframes app-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+}
 .layout-main > header.navbar.fixed-top {
   position: sticky !important;
   top: 0;
@@ -812,6 +929,73 @@ body.tema-sidebar-open {
   border-radius: 0.5rem;
 }
 
+.finance-island {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.finance-island[aria-busy=true] {
+  cursor: progress;
+}
+
+.finance-island:has(.finance-island-error) {
+  border-color: color-mix(in srgb, var(--bs-danger) 38%, var(--bs-border-color));
+}
+
+.finance-island-error {
+  min-height: 8rem;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  border: 1px dashed color-mix(in srgb, var(--bs-danger) 45%, transparent);
+  border-radius: 0.75rem;
+  color: var(--bs-danger);
+  text-align: center;
+}
+
+.finance-skeleton {
+  position: relative;
+  overflow: hidden;
+  min-height: 8rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--bs-secondary-bg) 82%, var(--bs-body-bg));
+}
+
+.finance-skeleton--hero {
+  min-height: 28rem;
+}
+
+.finance-skeleton--table {
+  min-height: 20rem;
+}
+
+.finance-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  translate: -100% 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bs-body-bg) 70%, transparent), transparent);
+  animation: finance-skeleton-shimmer 1.25s infinite;
+}
+
+@keyframes finance-skeleton-shimmer {
+  to {
+    translate: 100% 0;
+  }
+}
+@container (width < 680px) {
+  .finance-command-bar,
+  .finance-island-header {
+    display: grid;
+    align-items: stretch;
+  }
+  .finance-assets th:nth-child(2),
+  .finance-assets td:nth-child(2),
+  .finance-assets th:nth-child(3),
+  .finance-assets td:nth-child(3) {
+    display: none;
+  }
+}
 .finance-command-bar,
 .finance-period-strip {
   display: flex;
