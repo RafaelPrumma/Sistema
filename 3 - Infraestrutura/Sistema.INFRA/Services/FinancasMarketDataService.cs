@@ -56,6 +56,301 @@ public class FinancasMarketDataService(
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task AtualizarProventosAsync(bool force = false, CancellationToken cancellationToken = default)
+    {
+        var algumGravado = await AtualizarProventosB3Async(cancellationToken);
+        algumGravado |= await AtualizarProventosCriptoEarnAsync(cancellationToken);
+        if (algumGravado)
+            await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Proventos de renda variável B3 (dividendo/JCP/rendimento) via Brapi, cruzados com a posição na data-com.
+    private async Task<bool> AtualizarProventosB3Async(CancellationToken cancellationToken)
+    {
+        // Reconstrói a linha do tempo de quantidade por ativo (a partir da tabela única) para saber
+        // quanto eu detinha na data-com de cada provento. Só renda variável B3 (Brapi paga proventos).
+        var movimentos = await _context.TransacoesFinanceiras
+            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.IsCrypto)
+            .Select(x => new { x.AssetId, x.OperationType, x.Quantity, x.Date, Asset = x.Asset! })
+            .ToListAsync(cancellationToken);
+        if (movimentos.Count == 0)
+            return false;
+
+        var timelines = new Dictionary<int, (AtivoFinanceiro Asset, List<(DateTime Date, decimal Delta)> Movs)>();
+        foreach (var m in movimentos)
+        {
+            var delta = m.OperationType switch
+            {
+                TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Deposito or TipoOperacaoFinanceira.Rendimento => m.Quantity,
+                TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque or TipoOperacaoFinanceira.Taxa => -m.Quantity,
+                _ => 0m
+            };
+            if (!timelines.TryGetValue(m.AssetId, out var t))
+            {
+                t = (m.Asset, new List<(DateTime, decimal)>());
+                timelines[m.AssetId] = t;
+            }
+            t.Movs.Add((m.Date.Date, delta));
+        }
+
+        // Busca proventos de quem já esteve em carteira com saldo positivo; vender depois da
+        // data-com não elimina o direito ao provento.
+        var emCarteira = timelines.Where(kv => TeveSaldoPositivo(kv.Value.Movs)).ToList();
+        if (emCarteira.Count == 0)
+            return false;
+
+        var token = await _config.ObterTextoAsync("Financas", "MarketData:BrapiToken", null, cancellationToken);
+        var client = _httpClientFactory.CreateClient("Brapi");
+        var limiteInferior = DateTime.UtcNow.Date.AddYears(-3);
+        var algumGravado = false;
+
+        foreach (var (assetId, dados) in emCarteira)
+        {
+            var symbol = ResolverTickerB3(dados.Asset);
+            if (string.IsNullOrWhiteSpace(symbol))
+                continue;
+            // Sem token, a Brapi não devolve proventos da maioria dos tickers (mesma limitação da cotação).
+            if (string.IsNullOrWhiteSpace(token) && !IsBrapiFreeTicker(symbol))
+                continue;
+
+            var movs = dados.Movs.OrderBy(x => x.Date).ToList();
+            decimal QtdEm(DateTime data) => movs.Where(x => x.Date <= data.Date).Sum(x => x.Delta);
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"api/quote/{WebUtility.UrlEncode(symbol)}?dividends=true");
+                if (!string.IsNullOrWhiteSpace(token))
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                using var response = await client.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                    continue;
+
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
+                    continue;
+                if (!results[0].TryGetProperty("dividendsData", out var dividendsData) || dividendsData.ValueKind != JsonValueKind.Object)
+                    continue;
+                if (!dividendsData.TryGetProperty("cashDividends", out var cash) || cash.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var ev in cash.EnumerateArray())
+                {
+                    var rate = GetDecimal(ev, "rate") ?? 0m;
+                    if (rate <= 0m)
+                        continue;
+                    var pagamento = TryParseDateTime(GetString(ev, "paymentDate"));
+                    if (pagamento is null || pagamento.Value.Date < limiteInferior)
+                        continue;
+
+                    var dataCom = TryParseDateTime(GetString(ev, "lastDatePrior")) ?? pagamento;
+                    var qtd = QtdEm(dataCom.Value);
+                    if (qtd <= 0.000000001m)
+                        continue; // não detinha o ativo na data-com → não recebeu.
+
+                    var label = (GetString(ev, "label") ?? GetString(ev, "relatedTo") ?? "Provento").Trim();
+                    var bruto = Math.Round(qtd * rate, 2);
+                    var (tipo, tributacao, irrf) = ClassificarProvento(label, bruto);
+                    algumGravado |= UpsertProvento(
+                        assetId,
+                        pagamento.Value.Date,
+                        dataCom.Value.Date,
+                        tipo,
+                        "Brapi",
+                        "Brapi",
+                        qtd,
+                        rate,
+                        bruto,
+                        irrf,
+                        "BRL",
+                        tributacao,
+                        ev.GetRawText());
+                }
+            }
+            catch (Exception ex)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/proventos", ex.Message);
+            }
+        }
+
+        return algumGravado;
+    }
+
+    private static bool TeveSaldoPositivo(IEnumerable<(DateTime Date, decimal Delta)> movimentos)
+    {
+        var saldo = 0m;
+        foreach (var mov in movimentos.OrderBy(x => x.Date))
+        {
+            saldo += mov.Delta;
+            if (saldo > 0.000000001m)
+                return true;
+        }
+
+        return false;
+    }
+
+    // Earn/staking/rewards da Binance: ficam no staging cripto (sem preço → não entram como trade).
+    // Aqui entram como PROVENTO, valorados em BRL pelo preço da data do recebimento (histórico diário,
+    // com fallback na cotação atual). Não alteram a quantidade da posição — é renda, como o dividendo.
+    private async Task<bool> AtualizarProventosCriptoEarnAsync(CancellationToken cancellationToken)
+    {
+        var earns = await _context.TransacoesCripto
+            .Where(x => x.Amount > 0m && x.TransactionDate != null &&
+                (x.OperationType == TipoOperacaoFinanceira.Rendimento ||
+                 x.RawType.Contains("EARN") || x.RawType.Contains("STAK") || x.RawType.Contains("REWARD") ||
+                 x.RawType.Contains("INTEREST") || x.RawType.Contains("DISTRIBUTION") || x.RawType.Contains("AIRDROP") ||
+                 x.RawType.Contains("SAVINGS")))
+            .ToListAsync(cancellationToken);
+        if (earns.Count == 0)
+            return false;
+
+        var ativos = (await _context.AtivosFinanceiros.Where(a => a.IsCrypto).ToListAsync(cancellationToken))
+            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        if (ativos.Count == 0)
+            return false;
+
+        var assetIds = ativos.Values.Select(a => a.Id).ToHashSet();
+
+        // Earn que já virou trade canônico (raro: tinha preço) é ignorado aqui para não contar em dobro.
+        var materializados = (await _context.TransacoesFinanceiras
+                .Where(x => x.StagingTipo == "TransacaoCripto" && x.StagingId != null)
+                .Select(x => x.StagingId!.Value)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        // Preço histórico diário (BRL) por ativo para valorar o earn na data; fallback na cotação atual.
+        var historico = (await _context.PrecosHistoricosAtivosFinanceiros
+                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.Interval == "1d" && assetIds.Contains(x.AtivoFinanceiroId))
+                .Select(x => new { x.AtivoFinanceiroId, x.Date, x.CloseBRL })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Date).Select(x => (x.Date, x.CloseBRL)).ToList());
+
+        var cotacaoAtual = (await _context.CotacoesAtivosFinanceiros
+                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.PriceBRL > 0m && assetIds.Contains(x.AtivoFinanceiroId))
+                .Select(x => new { x.AtivoFinanceiroId, x.PriceBRL, x.RetrievedAt })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.RetrievedAt).First().PriceBRL);
+
+        decimal? PrecoEm(int assetId, DateTime data)
+        {
+            if (historico.TryGetValue(assetId, out var serie) && serie.Count > 0)
+            {
+                decimal? close = null;
+                foreach (var (d, c) in serie)
+                {
+                    if (d.Date <= data.Date) close = c;
+                    else break;
+                }
+                if (close is > 0m) return close;
+                if (serie[0].CloseBRL > 0m) return serie[0].CloseBRL; // earn anterior ao 1º candle: usa o mais antigo.
+            }
+            return cotacaoAtual.TryGetValue(assetId, out var atual) ? atual : (decimal?)null;
+        }
+
+        var algum = false;
+        foreach (var tx in earns)
+        {
+            if (materializados.Contains(tx.Id))
+                continue;
+            if (string.IsNullOrWhiteSpace(tx.AssetSymbol) || !ativos.TryGetValue(tx.AssetSymbol, out var ativo))
+                continue;
+
+            var data = tx.TransactionDate!.Value.Date;
+            var qtd = tx.Amount;
+            var preco = tx.Total is > 0m ? tx.Total!.Value / qtd : PrecoEm(ativo.Id, data);
+            var valorBrl = tx.Total is > 0m ? Math.Round(tx.Total!.Value, 2) : (preco.HasValue ? Math.Round(qtd * preco.Value, 2) : 0m);
+            if (valorBrl <= 0m)
+                continue; // sem preço para valorar — não dá pra somar no retorno; fica fora.
+
+            algum |= UpsertProvento(
+                ativo.Id,
+                data,
+                data,
+                "Rendimento (Earn)",
+                "Binance",
+                "Binance",
+                qtd,
+                preco,
+                valorBrl,
+                0m,
+                "BRL",
+                "Tributável (cripto)",
+                tx.RawJson);
+        }
+
+        return algum;
+    }
+
+    private bool UpsertProvento(
+        int assetId,
+        DateTime? pagamento,
+        DateTime? referencia,
+        string tipo,
+        string source,
+        string fonte,
+        decimal? quantidade,
+        decimal? valorPorAcao,
+        decimal valor,
+        decimal irrf,
+        string currency,
+        string tributacao,
+        string rawJson)
+    {
+        var chave = ProventoDedup.ChaveEconomica(assetId, referencia, pagamento, tipo);
+        var provento = _context.RendimentosInvestimento.Local.FirstOrDefault(x => x.ChaveNatural == chave)
+            ?? _context.RendimentosInvestimento.FirstOrDefault(x => x.ChaveNatural == chave);
+        if (provento is not null)
+        {
+            if (!ProventoDedup.MesmoValor(provento.Amount, valor))
+            {
+                FinancasMarketDataLogMessages.ProventoDivergente(_logger, chave, provento.Amount, valor, fonte);
+                return false;
+            }
+
+            provento.Fonte = provento.Fonte.Contains(fonte, StringComparison.OrdinalIgnoreCase)
+                ? provento.Fonte
+                : string.IsNullOrWhiteSpace(provento.Fonte) ? fonte : $"{provento.Fonte}+{fonte}";
+            return false;
+        }
+
+        _context.RendimentosInvestimento.Add(new RendimentoInvestimento
+        {
+            AssetId = assetId,
+            PaymentDate = pagamento?.Date,
+            ReferenceDate = referencia?.Date,
+            IncomeType = tipo,
+            Source = source,
+            Fonte = fonte,
+            Quantity = quantidade,
+            RatePerShare = valorPorAcao,
+            Amount = valor,
+            TaxWithheld = irrf,
+            Currency = currency,
+            Taxation = tributacao,
+            ChaveNatural = chave,
+            RawJson = rawJson,
+            UsuarioInclusao = UsuarioSistema
+        });
+        return true;
+    }
+
+    // Classifica o provento pela descrição da Brapi e devolve (tipo, tributação, IRRF retido).
+    // Dividendo é isento p/ PF; JCP tem 15% retido na fonte; rendimento de FII é isento p/ PF.
+    private static (string Tipo, string Tributacao, decimal Irrf) ClassificarProvento(string label, decimal bruto)
+    {
+        var l = (label ?? string.Empty).ToUpperInvariant();
+        if (l.Contains("JCP") || l.Contains("JRS") || l.Contains("JURO") || l.Contains("CAPITAL PROPRIO") || l.Contains("CAPITAL PRÓPRIO"))
+            return ("JCP", "JCP (15% IRRF)", Math.Round(bruto * 0.15m, 2));
+        if (l.Contains("RENDIMENTO"))
+            return ("Rendimento", "Isento (FII)", 0m);
+        if (l.Contains("DIVIDENDO") || l.Contains("DIVIDEND"))
+            return ("Dividendo", "Isento", 0m);
+        return (string.IsNullOrWhiteSpace(label) ? "Provento" : label!, string.Empty, 0m);
+    }
+
     public async Task<ValidacaoAtivoResultado> ValidarAtivoAsync(string ticker, CancellationToken cancellationToken = default)
     {
         var symbol = (ticker ?? string.Empty).Trim().ToUpperInvariant();
@@ -584,4 +879,7 @@ internal static partial class FinancasMarketDataLogMessages
 {
     [LoggerMessage(EventId = 41, Level = LogLevel.Warning, Message = "Falha ao atualizar cotações via {Provider}: {Message}")]
     public static partial void FalhaCotacao(ILogger logger, string provider, string message);
+
+    [LoggerMessage(EventId = 42, Level = LogLevel.Warning, Message = "Provento duplicado com valor divergente ({Chave}): existente={ValorExistente}, novo={ValorNovo}, fonte={Fonte}.")]
+    public static partial void ProventoDivergente(ILogger logger, string chave, decimal valorExistente, decimal valorNovo, string fonte);
 }

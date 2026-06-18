@@ -2,7 +2,7 @@
 @using Sistema.APP.DTOs
 @model FinancasDashboardDto
 @{
-    ViewData["Title"] = "Finanças";
+    ViewData["Title"] = "Financas";
     var br = CultureInfo.GetCultureInfo("pt-BR");
     string Money(decimal value) => value.ToString("C", br);
     string Percent(decimal value) => value.ToString("N2", br) + "%";
@@ -10,8 +10,8 @@
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
-    Title = "Finanças",
-    Description = "Acompanhe a evolução do patrimônio, o desempenho por setor e seus ativos — estilo Google Finance."
+    Title = "Financas",
+    Description = "Acompanhe a evolucao do patrimonio, o desempenho por carteira e seus ativos."
 })
 
 @await Html.PartialAsync("_FlashMessages")
@@ -21,7 +21,7 @@
     {
         <div class="alert alert-info d-flex align-items-center gap-2">
             <i class="bi bi-info-circle"></i>
-            <div>Comece <strong>adicionando uma transação</strong> ou importando seus relatórios da B3/Binance. O gráfico e os setores aparecem assim que houver dados e cotações.</div>
+            <div>Comece <strong>adicionando uma transacao</strong> ou importando seus relatorios da B3/Binance. O grafico e as carteiras aparecem assim que houver dados.</div>
         </div>
     }
 
@@ -29,7 +29,7 @@
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
                 <div>
-                    <div class="text-secondary small" id="financeHeaderTitulo">Patrimônio total</div>
+                    <div class="text-secondary small" id="financeHeaderTitulo">Patrimonio total</div>
                     <div class="finance-hero-value" id="financeHeaderValor">@Money(Model.ValorMercadoTotal)</div>
                     <div class="finance-hero-delta @(Model.ResultadoNaoRealizadoTotal >= 0 ? "text-success" : "text-danger")" id="financeHeaderDelta">
                         @Money(Model.ResultadoNaoRealizadoTotal)
@@ -37,10 +37,10 @@
                 </div>
                 <div class="d-flex flex-column align-items-end gap-2">
                     <button class="btn btn-primary" type="button" data-abrir-modal="novaTransacaoModal">
-                        <i class="bi bi-plus-circle me-1"></i>Adicionar transação
+                        <i class="bi bi-plus-circle me-1"></i>Adicionar transacao
                     </button>
                     <a class="btn btn-outline-secondary btn-sm" asp-action="Resumo" asp-route-preset="mes">
-                        <i class="bi bi-clipboard-data me-1"></i>Resumo do período
+                        <i class="bi bi-clipboard-data me-1"></i>Resumo do periodo
                     </a>
                 </div>
             </div>
@@ -48,59 +48,99 @@
             <div class="finance-period-bar" id="financePeriodos"></div>
             <div id="financeEvolucao" class="finance-chart" data-evolucao-url="@Url.Action("Evolucao", "Financas")"></div>
             <div class="small text-secondary mt-2">
-                <i class="bi bi-info-circle me-1"></i>Leitura estimada a partir das suas transações e cotações públicas. Não é recomendação de investimento.
+                <i class="bi bi-info-circle me-1"></i>Leitura estimada a partir das suas transacoes e cotacoes publicas. Nao e recomendacao de investimento.
             </div>
         </div>
     </div>
 
-    <h5 class="mb-2">Setores</h5>
+    <h5 class="mb-2">Carteiras</h5>
     <div class="finance-sectors mb-4" id="financeSetores">
-        <div class="text-secondary small">Carregando setores...</div>
+        <div class="text-secondary small">Carregando carteiras...</div>
     </div>
 
     <div class="card mb-3">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <h5 class="mb-0">Ativos monitorados</h5>
-                <a class="btn btn-sm btn-outline-primary" asp-action="Transacoes"><i class="bi bi-list-ul me-1"></i>Ver transações</a>
+                <h5 class="mb-0">Carteiras</h5>
+                <a class="btn btn-sm btn-outline-primary" asp-action="Transacoes"><i class="bi bi-list-ul me-1"></i>Ver transacoes</a>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle finance-assets">
                     <thead>
                         <tr>
-                            <th>Ativo</th>
-                            <th class="text-end">Qtde</th>
-                            <th class="text-end">Preço médio</th>
-                            <th class="text-end">Preço atual</th>
+                            <th>Carteira</th>
+                            <th class="text-end">% patrimonio</th>
                             <th class="text-end">Dia</th>
-                            <th class="text-end">Mercado</th>
-                            <th class="text-end">Retorno total</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end">Resultado</th>
+                            <th class="text-end">Ativos</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var ativo in Model.AtivosCotados.OrderByDescending(x => x.ValorMercado))
+                        @foreach (var carteira in Model.Carteiras)
                         {
-                            var retClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
-                            var diaClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
+                            var retClass = carteira.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                            var diaClass = carteira.VariacaoDiaPercentual >= 0 ? "text-success" : "text-danger";
+                            var collapseId = $"carteira-{carteira.Id}";
                             <tr>
                                 <td>
-                                    <div class="fw-semibold">@ativo.Ativo</div>
-                                    <div class="small text-secondary">@ativo.Classe · @ativo.Symbol</div>
+                                    <button class="btn btn-link p-0 text-decoration-none fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false">
+                                        <i class="bi bi-chevron-down me-1"></i>@carteira.Nome
+                                    </button>
+                                    <div class="small text-secondary">@carteira.Tipo</div>
                                 </td>
-                                <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
-                                <td class="text-end">@Money(ativo.PrecoMedio)</td>
-                                <td class="text-end">@(ativo.PrecoAtual.HasValue ? Money(ativo.PrecoAtual.Value) : "-")</td>
-                                <td class="text-end @diaClass">@(ativo.VariacaoDiaPercentual.HasValue ? Percent(ativo.VariacaoDiaPercentual.Value) : "-")</td>
-                                <td class="text-end">@Money(ativo.ValorMercado)</td>
+                                <td class="text-end">@Percent(carteira.PercentualPatrimonio)</td>
+                                <td class="text-end @diaClass">@Percent(carteira.VariacaoDiaPercentual)</td>
+                                <td class="text-end">@Money(carteira.ValorMercado)</td>
                                 <td class="text-end @retClass">
-                                    @Money(ativo.ResultadoNaoRealizado)
-                                    <div class="small @retClass">@Percent(ativo.ResultadoNaoRealizadoPercentual)</div>
+                                    @Money(carteira.ResultadoNaoRealizado)
+                                    <div class="small @retClass">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>
+                                </td>
+                                <td class="text-end">@carteira.Ativos.ToString("N0", br)</td>
+                            </tr>
+                            <tr class="collapse" id="@collapseId">
+                                <td colspan="6" class="bg-body-tertiary">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ativo</th>
+                                                    <th class="text-end">% carteira</th>
+                                                    <th class="text-end">Qtde</th>
+                                                    <th class="text-end">Dia</th>
+                                                    <th class="text-end">Valor</th>
+                                                    <th class="text-end">Resultado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var ativo in carteira.Itens)
+                                                {
+                                                    var ativoRetClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                                                    var ativoDiaClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
+                                                    <tr>
+                                                        <td>
+                                                            <div class="fw-semibold">@ativo.Ativo</div>
+                                                            <div class="small text-secondary">@ativo.Classe &middot; @ativo.Symbol &middot; @ativo.Status</div>
+                                                        </td>
+                                                        <td class="text-end">@Percent(ativo.PercentualCarteira)</td>
+                                                        <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
+                                                        <td class="text-end @ativoDiaClass">@(ativo.VariacaoDiaPercentual.HasValue ? Percent(ativo.VariacaoDiaPercentual.Value) : "-")</td>
+                                                        <td class="text-end">@Money(ativo.ValorMercado)</td>
+                                                        <td class="text-end @ativoRetClass">
+                                                            @Money(ativo.ResultadoNaoRealizado)
+                                                            <div class="small @ativoRetClass">@Percent(ativo.ResultadoNaoRealizadoPercentual)</div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </td>
                             </tr>
                         }
-                        @if (!Model.AtivosCotados.Any())
+                        @if (!Model.Carteiras.Any())
                         {
-                            <tr><td colspan="7" class="text-center text-secondary py-3">Nenhum ativo com posição aberta. Adicione transações ou importe seus relatórios.</td></tr>
+                            <tr><td colspan="6" class="text-center text-secondary py-3">Nenhuma carteira com posicao aberta. Adicione transacoes ou importe seus relatorios.</td></tr>
                         }
                     </tbody>
                 </table>
@@ -111,17 +151,17 @@
     <div class="card finance-data-section">
         <div class="card-body">
             <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#financeDados" aria-expanded="false">
-                <i class="bi bi-database"></i><span class="fw-semibold">Dados &amp; importação</span>
+                <i class="bi bi-database"></i><span class="fw-semibold">Dados &amp; importacao</span>
                 <i class="bi bi-chevron-down small"></i>
             </button>
             <div class="collapse mt-3" id="financeDados">
                 <div class="finance-command-bar mb-3">
                     <div>
                         <div class="small text-secondary">Pasta monitorada</div>
-                        <div class="fw-semibold">@(Model.ImportacaoArquivos?.PastaMonitorada ?? "Não configurada")</div>
+                        <div class="fw-semibold">@(Model.ImportacaoArquivos?.PastaMonitorada ?? "Nao configurada")</div>
                         <div class="small text-secondary">
-                            @((Model.ImportacaoArquivos?.DocumentosProcessados ?? 0).ToString("N0", br)) documentos processados ·
-                            Cotações: @(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "pendente")
+                            @((Model.ImportacaoArquivos?.DocumentosProcessados ?? 0).ToString("N0", br)) documentos processados &middot;
+                            Cotacoes: @(Model.CotacoesAtualizadasEm?.ToString("dd/MM/yyyy HH:mm", br) ?? "pendente")
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
@@ -131,7 +171,7 @@
                         </form>
                         <form asp-action="AtualizarCotacoes" method="post">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Atualizar cotações</button>
+                            <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Atualizar cotacoes</button>
                         </form>
                     </div>
                 </div>
@@ -153,12 +193,12 @@
                     <div class="col-xl-6">
                         <div class="card h-100"><div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">Posições estimadas (importação)</h6>
+                                <h6 class="mb-0">Posicoes estimadas (importacao)</h6>
                                 <a class="btn btn-sm btn-outline-secondary" asp-action="Posicoes" asp-route-abertas="true">Ver todas</a>
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle mb-0">
-                                    <thead><tr><th>Ativo</th><th>Classe</th><th class="text-end">Qtde</th><th>Confiança</th></tr></thead>
+                                    <thead><tr><th>Ativo</th><th>Classe</th><th class="text-end">Qtde</th><th>Confianca</th></tr></thead>
                                     <tbody>
                                         @foreach (var item in Model.PosicoesAbertas)
                                         {

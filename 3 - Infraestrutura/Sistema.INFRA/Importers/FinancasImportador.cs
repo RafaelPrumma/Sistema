@@ -11,11 +11,12 @@ using Microsoft.Extensions.Logging;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.INFRA.Data;
+using Sistema.INFRA.Services;
 using UglyToad.PdfPig;
 
 namespace Sistema.INFRA.Importers;
 
-public partial class FinancasImportador(AppDbContext context, IConfiguration configuration, IConfiguracaoLeitura config, IHostEnvironment hostEnvironment, ILogger<FinancasImportador> logger) : IFinancasImportador
+public partial class FinancasImportador(AppDbContext context, IConfiguration configuration, IConfiguracaoLeitura config, IHostEnvironment hostEnvironment, ILogger<FinancasImportador> logger, FinancasDataRepairService repairService) : IFinancasImportador
 {
     private static readonly string[] CryptoQuotes = ["BRL", "USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB"];
     private const string ParserVersion = "financeiro-v1";
@@ -25,6 +26,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     private readonly IConfiguracaoLeitura _config = config;
     private readonly IHostEnvironment _hostEnvironment = hostEnvironment;
     private readonly ILogger<FinancasImportador> _logger = logger;
+    private readonly FinancasDataRepairService _repairService = repairService;
 
     public async Task GarantirCargaInicialAsync(CancellationToken cancellationToken = default)
     {
@@ -36,6 +38,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 await ImportarAsync(source.Value.JsonBytes, sha, source.Value.SourcePath, cancellationToken);
         }
 
+        await _repairService.RepararAsync(cancellationToken);
         await GarantirCarteirasPadraoAsync(cancellationToken);
 
         var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
@@ -91,6 +94,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (Path.GetExtension(file).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                await ProcessarZipMonitoradoAsync(file, carga, batch, ativos, cancellationToken);
+                continue;
+            }
+
             var bytes = await File.ReadAllBytesAsync(file, cancellationToken);
             var sha = Sha256(bytes);
             if (await _context.DocumentosFinanceiros.AnyAsync(x => x.Sha256 == sha, cancellationToken))
@@ -137,9 +146,75 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         await SincronizarTransacoesCanonicasAsync(cancellationToken);
     }
 
+    private async Task ProcessarZipMonitoradoAsync(string zipFile, CargaFinanceira carga, ImportacaoFinanceiraArquivo batch, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(zipFile);
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        var importouArquivo = false;
+
+        foreach (var entry in zip.Entries.Where(e => e.Length > 0 && IsSupportedFile(e.FullName) && !Path.GetExtension(e.FullName).Equals(".zip", StringComparison.OrdinalIgnoreCase)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await using var entryStream = entry.Open();
+            using var ms = new MemoryStream();
+            await entryStream.CopyToAsync(ms, cancellationToken);
+            var bytes = ms.ToArray();
+            var sha = Sha256(bytes);
+            if (await _context.DocumentosFinanceiros.AnyAsync(x => x.Sha256 == sha, cancellationToken))
+            {
+                batch.FilesSkipped++;
+                continue;
+            }
+
+            var tempDir = Path.Combine(Path.GetTempPath(), "SistemaFinancasImport");
+            Directory.CreateDirectory(tempDir);
+            var tempFile = Path.Combine(tempDir, $"{Guid.NewGuid():N}{Path.GetExtension(entry.Name)}");
+            await File.WriteAllBytesAsync(tempFile, bytes, cancellationToken);
+
+            try
+            {
+                var sourcePath = $"{zipFile}!{entry.FullName}";
+                var documentKind = ClassificarDocumento(sourcePath);
+                var documento = new DocumentoFinanceiro
+                {
+                    CargaFinanceira = carga,
+                    ImportacaoFinanceiraArquivo = batch,
+                    Colecao = "watched-folder-zip",
+                    Path = sourcePath,
+                    StoredPath = zipFile,
+                    FileName = entry.Name,
+                    FileType = Path.GetExtension(entry.Name).TrimStart('.').ToLowerInvariant(),
+                    Source = "watched-folder-zip",
+                    Sha256 = sha,
+                    SizeBytes = bytes.LongLength,
+                    ReferenceYear = ExtrairAno(sourcePath),
+                    DocumentKind = documentKind,
+                    ParserVersion = ParserVersion,
+                    ParseStatus = StatusParseDocumentoFinanceiro.Pendente,
+                    Status = StatusDocumentoFinanceiro.Importado,
+                    RawMetadataJson = JsonSerializer.Serialize(new { zipFile, entry = entry.FullName, sha256 = sha, documentKind }),
+                    UsuarioInclusao = "financas-importador"
+                };
+                _context.DocumentosFinanceiros.Add(documento);
+
+                var structuredRows = await ProcessarDocumentoMonitoradoAsync(documento, tempFile, carga, ativos, cancellationToken);
+                batch.StructuredRowsImported += structuredRows;
+                batch.FilesImported++;
+                importouArquivo = true;
+            }
+            finally
+            {
+                TryDeleteTempFile(tempFile);
+            }
+        }
+
+        if (!importouArquivo)
+            batch.FilesSkipped++;
+    }
+
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 3;
+    private const int MaterializacaoVersao = 5;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
@@ -453,9 +528,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         {
             foreach (var op in EnumerarArray(ops))
             {
-                var assetKey = GetString(op, "assetKey") ?? GetString(op, "assetTitle") ?? "SEM_ATIVO";
-                var assetTitle = GetString(op, "assetTitle") ?? assetKey;
-                var ativo = ObterOuCriarAtivo(ativos, assetKey, assetTitle, MapClasseAtivo(GetString(op, "assetClass")), false);
+                var assetKeyRaw = GetString(op, "assetKey") ?? GetString(op, "assetTitle") ?? "SEM_ATIVO";
+                var assetTitle = GetString(op, "assetTitle") ?? assetKeyRaw;
+                var canonica = NormalizadorAtivoB3.ChaveCanonica(assetTitle);
+                var alias = NormalizadorAtivoB3.Normalizar(assetTitle) ?? NormalizadorAtivoB3.Normalizar(assetKeyRaw);
+                var assetKey = alias?.Ticker ?? canonica;
+                var ativo = ObterOuCriarAtivo(ativos, assetKey, canonica, alias?.Classe ?? MapClasseAtivo(GetString(op, "assetClass")), false, alias?.Ticker);
                 var sourceFile = GetString(op, "sourceFile") ?? string.Empty;
                 var isDuplicate = GetBool(op, "isDuplicateAcrossSources");
 
@@ -491,9 +569,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         {
             foreach (var item in EnumerarArray(positions))
             {
-                var assetKey = GetString(item, "assetKey") ?? "SEM_ATIVO";
-                var assetTitle = GetString(item, "assetTitle") ?? assetKey;
-                var ativo = ObterOuCriarAtivo(ativos, assetKey, assetTitle, MapClasseAtivo(GetString(item, "assetClass")), false);
+                var assetKeyRaw = GetString(item, "assetKey") ?? "SEM_ATIVO";
+                var assetTitle = GetString(item, "assetTitle") ?? assetKeyRaw;
+                var canonica = NormalizadorAtivoB3.ChaveCanonica(assetTitle);
+                var alias = NormalizadorAtivoB3.Normalizar(assetTitle) ?? NormalizadorAtivoB3.Normalizar(assetKeyRaw);
+                var assetKey = alias?.Ticker ?? canonica;
+                var ativo = ObterOuCriarAtivo(ativos, assetKey, canonica, alias?.Classe ?? MapClasseAtivo(GetString(item, "assetClass")), false, alias?.Ticker);
 
                 _context.EstimativasPosicaoCarteira.Add(new EstimativaPosicaoCarteira
                 {
@@ -706,7 +787,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 return await ProcessarXlsxAsync(documento, file, carga, ativos, cancellationToken);
 
             if (ext == ".pdf")
-                return ProcessarPdf(documento, file, carga, ativos);
+                return await ProcessarPdfAsync(documento, file, carga, ativos, cancellationToken);
 
             documento.ParseStatus = StatusParseDocumentoFinanceiro.SemDadosEstruturados;
             return 0;
@@ -815,12 +896,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         return imported;
     }
 
-    private int ProcessarPdf(DocumentoFinanceiro documento, string file, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos)
+    private async Task<int> ProcessarPdfAsync(DocumentoFinanceiro documento, string file, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
     {
         var imported = 0;
         try
         {
-            using var pdf = PdfDocument.Open(file);
+            using var pdf = await AbrirPdfAsync(file, cancellationToken);
             documento.PageCount = pdf.NumberOfPages;
             foreach (var page in pdf.GetPages())
             {
@@ -836,6 +917,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
                 if (documento.DocumentKind == TipoDocumentoFinanceiro.NotaNegociacaoB3)
                     imported += ImportarOperacoesB3Pdf(text, documento, carga, ativos, page.Number);
+                else if (documento.DocumentKind == TipoDocumentoFinanceiro.InformeRendimentos)
+                    imported += ImportarInformeRendimentosPdf(text, documento, carga, ativos, page.Number);
             }
         }
         catch (Exception ex)
@@ -871,6 +954,20 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         return imported;
     }
 
+    private async Task<PdfDocument> AbrirPdfAsync(string file, CancellationToken cancellationToken)
+    {
+        var senhas = new List<string>();
+        var senhaConfigurada = await _config.ObterTextoAsync("Financas", "InformeRendimentosSenha", null, cancellationToken)
+            ?? await _config.ObterTextoAsync("Financas", "CpfPrimeiros4", null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(senhaConfigurada))
+            senhas.Add(senhaConfigurada.Trim());
+
+        if (senhas.Count == 0)
+            return PdfDocument.Open(file);
+
+        return PdfDocument.Open(file, new ParsingOptions { Passwords = senhas });
+    }
+
     private int ImportarOperacoesB3Pdf(string text, DocumentoFinanceiro documento, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos, int pageNumber)
     {
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
@@ -897,8 +994,11 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                         && (lines[j + 3] == "D" || lines[j + 3] == "C"))
                     {
                         var assetTitle = string.Join(' ', titleParts).Trim();
-                        var assetKey = string.IsNullOrWhiteSpace(assetTitle) ? "SEM_ATIVO" : assetTitle.ToUpperInvariant();
-                        var ativo = ObterOuCriarAtivo(ativos, assetKey, assetTitle, MapClasseAtivo(assetTitle), false);
+                        // Chave canônica (sem marcadores ex-dividendo) + ticker, pra não fragmentar o papel.
+                        var canonica = NormalizadorAtivoB3.ChaveCanonica(assetTitle);
+                        var tickerB3 = NormalizadorAtivoB3.Ticker(assetTitle);
+                        var assetKey = tickerB3 ?? canonica;
+                        var ativo = ObterOuCriarAtivo(ativos, assetKey, canonica, MapClasseAtivo(assetTitle), false, tickerB3);
                         var rawBlock = string.Join('\n', lines.Skip(i).Take(j + 4 - i));
                         var duplicateGroupKey = $"{tradeDate:yyyyMMdd}|{sideCode}|{assetKey}|{lines[j]}|{lines[j + 1]}|{lines[j + 2]}";
                         var isDuplicate = _context.OperacoesB3.Local.Any(x => x.DuplicateGroupKey == duplicateGroupKey && x.IsCanonical)
@@ -945,6 +1045,125 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         return imported;
     }
 
+    private int ImportarInformeRendimentosPdf(string text, DocumentoFinanceiro documento, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos, int pageNumber)
+    {
+        var linhas = InformeRendimentosParser.Extrair(text);
+        var imported = 0;
+        foreach (var linha in linhas)
+        {
+            var ativo = ObterOuCriarAtivo(
+                ativos,
+                linha.Ticker,
+                linha.Ticker,
+                linha.Ticker.EndsWith("11", StringComparison.OrdinalIgnoreCase) ? ClasseAtivo.FII : ClasseAtivo.Acao,
+                false,
+                linha.Ticker);
+
+            if (UpsertRendimento(
+                    carga,
+                    documento,
+                    ativo.Id,
+                    linha.DataPagamento,
+                    linha.DataReferencia,
+                    linha.Tipo,
+                    "Informe de Rendimentos",
+                    $"InformeIR{documento.ReferenceYear ?? linha.DataPagamento.Year}",
+                    null,
+                    null,
+                    linha.Valor,
+                    0m,
+                    "BRL",
+                    linha.Tributacao,
+                    JsonSerializer.Serialize(new { page = pageNumber, raw = linha.RawText })))
+            {
+                imported++;
+            }
+        }
+
+        if (imported == 0 && text.Contains("rendimentos", StringComparison.OrdinalIgnoreCase))
+        {
+            _context.AlertasConfiabilidade.Add(new AlertaConfiabilidade
+            {
+                CargaFinanceira = carga,
+                EntityType = nameof(DocumentoFinanceiro),
+                Severity = SeveridadeAlerta.Atencao,
+                Code = "INFORME_RENDIMENTOS_SEM_LINHAS",
+                Message = $"O informe {documento.FileName} foi lido, mas nenhum provento estruturado foi reconhecido na pagina {pageNumber}.",
+                UsuarioInclusao = "financas-importador"
+            });
+        }
+
+        return imported;
+    }
+
+    private bool UpsertRendimento(
+        CargaFinanceira carga,
+        DocumentoFinanceiro? documento,
+        int assetId,
+        DateTime? pagamento,
+        DateTime? referencia,
+        string tipo,
+        string source,
+        string fonte,
+        decimal? quantidade,
+        decimal? valorPorAcao,
+        decimal valor,
+        decimal irrf,
+        string currency,
+        string tributacao,
+        string rawJson)
+    {
+        var chave = ProventoDedup.ChaveEconomica(assetId, referencia, pagamento, tipo);
+        var existente = _context.RendimentosInvestimento.Local.FirstOrDefault(x => x.ChaveNatural == chave)
+            ?? _context.RendimentosInvestimento.FirstOrDefault(x => x.ChaveNatural == chave);
+        if (existente is not null)
+        {
+            if (!ProventoDedup.MesmoValor(existente.Amount, valor))
+            {
+                _context.AlertasConfiabilidade.Add(new AlertaConfiabilidade
+                {
+                    CargaFinanceira = carga,
+                    EntityType = nameof(RendimentoInvestimento),
+                    EntityId = existente.Id == 0 ? null : existente.Id,
+                    Severity = SeveridadeAlerta.Atencao,
+                    Code = "PROVENTO_DUPLICADO_VALOR_DIVERGENTE",
+                    Message = $"Provento duplicado com valor divergente na fonte {fonte}. Evento preservado sem sobrescrever.",
+                    Details = JsonSerializer.Serialize(new { chave, valorExistente = existente.Amount, novoValor = valor, fonte }),
+                    UsuarioInclusao = "financas-importador"
+                });
+                return false;
+            }
+
+            existente.Source = string.IsNullOrWhiteSpace(existente.Source) ? source : existente.Source;
+            existente.Fonte = existente.Fonte.Contains(fonte, StringComparison.OrdinalIgnoreCase)
+                ? existente.Fonte
+                : string.IsNullOrWhiteSpace(existente.Fonte) ? fonte : $"{existente.Fonte}+{fonte}";
+            return false;
+        }
+
+        _context.RendimentosInvestimento.Add(new RendimentoInvestimento
+        {
+            CargaFinanceira = carga,
+            SourceDocumentId = documento?.Id > 0 ? documento.Id : null,
+            AssetId = assetId,
+            PaymentDate = pagamento?.Date,
+            ReferenceDate = referencia?.Date,
+            IncomeType = tipo,
+            Source = source,
+            Fonte = fonte,
+            Quantity = quantidade,
+            RatePerShare = valorPorAcao,
+            Amount = valor,
+            TaxWithheld = irrf,
+            Currency = currency,
+            Taxation = tributacao,
+            ChaveNatural = chave,
+            RawJson = rawJson,
+            UsuarioInclusao = "financas-importador"
+        });
+        return true;
+    }
+
     private int ImportarTransacaoBinanceRow(Dictionary<string, string> row, DocumentoFinanceiro documento, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos, string tipo)
     {
         var symbol = tipo switch
@@ -988,20 +1207,24 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         return 1;
     }
 
-    private AtivoFinanceiro ObterOuCriarAtivo(Dictionary<string, AtivoFinanceiro> ativos, string assetKey, string name, ClasseAtivo classe, bool isCrypto)
+    private AtivoFinanceiro ObterOuCriarAtivo(Dictionary<string, AtivoFinanceiro> ativos, string assetKey, string name, ClasseAtivo classe, bool isCrypto, string? tickerHint = null)
     {
         assetKey = string.IsNullOrWhiteSpace(assetKey) ? "SEM_ATIVO" : assetKey.Trim();
         if (ativos.TryGetValue(assetKey, out var ativo))
         {
             if (string.IsNullOrWhiteSpace(ativo.Ticker))
-                ativo.Ticker = ExtrairTicker(assetKey) ?? ExtrairTicker(name);
+                ativo.Ticker = tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name);
+            if (ativo.AssetClass == ClasseAtivo.Outro && classe != ClasseAtivo.Outro)
+                ativo.AssetClass = classe;
+            if (string.IsNullOrWhiteSpace(ativo.Market))
+                ativo.Market = isCrypto ? "Binance" : "B3";
             return ativo;
         }
 
         ativo = new AtivoFinanceiro
         {
             AssetKey = assetKey,
-            Ticker = isCrypto ? assetKey.ToUpperInvariant() : ExtrairTicker(assetKey) ?? ExtrairTicker(name),
+            Ticker = isCrypto ? assetKey.ToUpperInvariant() : tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name),
             Name = string.IsNullOrWhiteSpace(name) ? assetKey : name.Trim(),
             AssetClass = classe,
             Market = isCrypto ? "Binance" : "B3",
@@ -1074,6 +1297,9 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         var links = await _context.CarteirasAtivosFinanceiros.ToListAsync(cancellationToken);
         foreach (var ativo in ativos)
         {
+            if (links.Any(x => x.AtivoFinanceiroId == ativo.Id))
+                continue;
+
             foreach (var slug in ResolverCarteirasAtivo(ativo))
             {
                 var carteira = carteiras.FirstOrDefault(x => x.Slug == slug);
@@ -1122,7 +1348,20 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     }
 
     private static bool IsSupportedFile(string file)
-        => Path.GetExtension(file).ToLowerInvariant() is ".pdf" or ".xlsx" or ".csv";
+        => Path.GetExtension(file).ToLowerInvariant() is ".pdf" or ".xlsx" or ".csv" or ".zip";
+
+    private static void TryDeleteTempFile(string file)
+    {
+        try
+        {
+            if (File.Exists(file))
+                File.Delete(file);
+        }
+        catch
+        {
+            // Best effort cleanup only.
+        }
+    }
 
     private static TipoDocumentoFinanceiro ClassificarDocumento(string file)
     {
@@ -1133,6 +1372,10 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         if (name.Contains("convert")) return TipoDocumentoFinanceiro.BinanceConvertOrders;
         if (name.Contains("dep")) return TipoDocumentoFinanceiro.BinanceDeposits;
         if (name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) return TipoDocumentoFinanceiro.CsvBinance;
+        if (name.Contains("informe") && name.Contains("rend"))
+            return TipoDocumentoFinanceiro.InformeRendimentos;
+        if (name.Contains("imposto") && name.Contains("renda"))
+            return TipoDocumentoFinanceiro.InformeRendimentos;
         if (name.Contains("notas_de_negociacao") || name.Contains("nota"))
             return TipoDocumentoFinanceiro.NotaNegociacaoB3;
         if (name.StartsWith("nu_40648231", StringComparison.OrdinalIgnoreCase))

@@ -44,6 +44,7 @@ public static class InfrastructureExtensions
         services.AddScoped<IMensagemRepository, MensagemRepository>();
         services.AddScoped<IFinancasRepository, FinancasRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<FinancasDataRepairService>();
         services.AddScoped<IFinancasImportador, FinancasImportador>();
         services.AddScoped<IFinancasMarketDataService, FinancasMarketDataService>();
         services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));

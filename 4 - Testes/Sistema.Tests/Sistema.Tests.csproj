@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\0 - Apresentacao\Sistema.MVC\Sistema.MVC.csproj" />
     <ProjectReference Include="..\..\1 - Aplicacao\Sistema.APP\Sistema.APP.csproj" />
     <ProjectReference Include="..\..\2 - Dominio\Sistema.CORE\Sistema.CORE.csproj" />
+    <ProjectReference Include="..\..\3 - Infraestrutura\Sistema.INFRA\Sistema.INFRA.csproj" />
   </ItemGroup>
 
 </Project>

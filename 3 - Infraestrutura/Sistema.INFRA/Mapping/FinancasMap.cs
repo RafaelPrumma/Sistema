@@ -262,12 +262,19 @@ public class RendimentoInvestimentoMap : IEntityTypeConfiguration<RendimentoInve
         builder.HasKey(x => x.Id);
         builder.Property(x => x.IncomeType).HasMaxLength(160);
         builder.Property(x => x.Source).HasMaxLength(160);
+        builder.Property(x => x.Fonte).HasMaxLength(80);
         builder.Property(x => x.Currency).HasMaxLength(10);
         builder.Property(x => x.Taxation).HasMaxLength(80);
         builder.Property(x => x.Amount).HasPrecision(24, 8);
         builder.Property(x => x.TaxWithheld).HasPrecision(24, 8);
+        builder.Property(x => x.Quantity).HasPrecision(28, 12);
+        builder.Property(x => x.RatePerShare).HasPrecision(28, 12);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(200);
         builder.Property(x => x.RawJson).IsRequired();
-        builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(x => new { x.AssetId, x.PaymentDate });
+        // Idempotência do job de proventos: o mesmo evento não entra duas vezes (filtrado p/ não-excluídos).
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
     }
 }

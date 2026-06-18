@@ -60,6 +60,32 @@ public class FinancasController(IFinancasAppService service) : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> Proventos(string? termo, int page = 1, CancellationToken cancellationToken = default)
+    {
+        ViewBag.Termo = termo;
+        return View(await _service.BuscarProventosAsync(page, 25, termo, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarProventos(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Busca proventos (Brapi p/ B3 + earn da Binance) em segundo plano — pode levar alguns segundos.
+            BackgroundJob.Enqueue<IFinancasAppService>(s => s.AtualizarProventosAsync(CancellationToken.None));
+            TempData["MensagemSucesso"] = "Busca de proventos iniciada em segundo plano. Atualize a página em instantes.";
+        }
+        catch
+        {
+            await _service.AtualizarProventosAsync(cancellationToken);
+            TempData["MensagemSucesso"] = "Proventos atualizados.";
+        }
+
+        return RedirectToAction(nameof(Proventos));
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Documentos(string? termo, int page = 1, CancellationToken cancellationToken = default)
     {
         ViewBag.Termo = termo;

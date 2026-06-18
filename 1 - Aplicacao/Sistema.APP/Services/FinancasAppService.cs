@@ -10,6 +10,9 @@ namespace Sistema.APP.Services;
 
 public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador, IFinancasMarketDataService marketData, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IFinancasAppService
 {
+    private const decimal QuantidadeAbertaMinima = 0.000000001m;
+    private const decimal ValorDustCriptoMaximoBrl = 10m;
+
     private readonly IUnitOfWork _uow = uow;
     private readonly IFinancasImportador _importador = importador;
     private readonly IFinancasMarketDataService _marketData = marketData;
@@ -30,8 +33,11 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var documentosMonitorados = await _uow.Financas.BuscarDocumentosMonitoradosAsync(cancellationToken);
         var ultimaImportacao = await _uow.Financas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
         var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
-        var posicoesTabela = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > 0.000000001m).ToList();
-        var ativosCotados = CriarAtivosCotadosDaTabela(posicoesTabela, cotacoes);
+        var posicoesTabela = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+        var ativosCotados = CriarAtivosCotadosDaTabela(posicoesTabela, cotacoes)
+            .Where(EhAtivoCotadoVisivel)
+            .ToList();
+        var valorMercadoTotal = ativosCotados.Sum(x => x.ValorMercado);
 
         var dashboard = new FinancasDashboardDto
         {
@@ -45,11 +51,11 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             BinanceMoedas = (await _uow.Financas.BuscarAgregadosAsync("binance-coin", cancellationToken)).Select(MapDistribuicao).Take(12).ToList(),
             UltimasOperacoesB3 = (await _uow.Financas.BuscarUltimasOperacoesB3Async(12, cancellationToken)).Select(MapOperacaoB3).ToList(),
             UltimasTransacoesCripto = (await _uow.Financas.BuscarUltimasTransacoesCriptoAsync(12, cancellationToken)).Select(MapTransacaoCripto).ToList(),
-            PosicoesAbertas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.AbertaOuResidual).Take(12).Select(MapPosicao).ToList(),
+            PosicoesAbertas = posicoes.Where(EhPosicaoEstimativaAbertaVisivel).Take(12).Select(MapPosicao).ToList(),
             PosicoesEncerradas = posicoes.Where(p => p.Status == StatusEstimativaPosicao.EncerradaPorOperacoes).Take(8).Select(MapPosicao).ToList(),
             Alertas = alertas.Take(8).Select(MapAlerta).ToList(),
             AtivosCotados = ativosCotados,
-            Carteiras = CriarResumoCarteiras(carteiras, ativosCotados),
+            Carteiras = CriarResumoCarteiras(carteiras, ativosCotados, valorMercadoTotal),
             Periodos = [],
             ImportacaoArquivos = new ImportacaoFinanceiraResumoDto(
                 ultimaImportacao?.FinishedAt ?? ultimaImportacao?.StartedAt,
@@ -58,7 +64,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 documentosMonitorados.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
                 ultimaImportacao?.SourceFolder),
             CotacoesAtualizadasEm = cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault(),
-            ValorMercadoTotal = ativosCotados.Sum(x => x.ValorMercado),
+            ValorMercadoTotal = valorMercadoTotal,
             CustoEstimadoTotal = ativosCotados.Sum(x => x.CustoEstimado),
             ResultadoNaoRealizadoTotal = ativosCotados.Sum(x => x.ResultadoNaoRealizado)
         };
@@ -102,6 +108,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
         var result = await _uow.Financas.BuscarPosicoesAsync(somenteAbertas, cancellationToken);
+        if (somenteAbertas == true)
+            result = result.Where(EhPosicaoEstimativaAbertaVisivel).ToList();
         return result.Select(MapPosicao).ToList();
     }
 
@@ -136,6 +144,168 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     public async Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default)
         => await _marketData.AtualizarCotacoesAsync(force: true, cancellationToken);
 
+    public async Task AtualizarProventosAsync(CancellationToken cancellationToken = default)
+        => await _marketData.AtualizarProventosAsync(force: true, cancellationToken);
+
+    public async Task<ProventosPaginaDto> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        var paged = await _uow.Financas.BuscarProventosAsync(page, pageSize, termo, cancellationToken);
+
+        var hoje = DateTime.UtcNow.Date;
+        var todos = await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hoje.AddYears(5), cancellationToken);
+        var recebidos = todos.Where(x => x.PaymentDate <= hoje).ToList();
+        var resumo = new ProventosResumoDto(
+            Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year && x.PaymentDate!.Value.Month == hoje.Month).Sum(ValorLiquido), 2),
+            Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year).Sum(ValorLiquido), 2),
+            Math.Round(recebidos.Sum(ValorLiquido), 2),
+            Math.Round(todos.Where(x => x.PaymentDate > hoje).Sum(ValorLiquido), 2),
+            todos.Count);
+
+        var periodos = CriarPeriodosProventos(todos, hoje);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var baldes = CriarBaldesProventos(transacoes, recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year).ToList(), hoje);
+        var mensais = CriarProventosMensais(todos, hoje);
+
+        return new ProventosPaginaDto(paged.Items.Select(MapProvento).ToList(), paged.Page, paged.PageSize, paged.TotalCount, resumo, periodos, baldes, mensais);
+    }
+
+    // Série dos últimos 12 meses (estilo TradeMap): cada mês = soma líquida dos proventos pagos.
+    // Meses futuros (data de pagamento à frente de hoje) vão como "a receber".
+    private static IReadOnlyList<ProventoMensalDto> CriarProventosMensais(IReadOnlyList<RendimentoInvestimento> proventos, DateTime hoje)
+    {
+        var meses = Enumerable.Range(0, 12)
+            .Select(i => new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-11 + i))
+            .ToList();
+
+        var cultura = CultureInfo.GetCultureInfo("pt-BR");
+        return meses.Select(m =>
+        {
+            var doMes = proventos.Where(x => x.PaymentDate.HasValue
+                && x.PaymentDate.Value.Year == m.Year && x.PaymentDate.Value.Month == m.Month).ToList();
+            var recebido = doMes.Where(x => x.PaymentDate!.Value.Date <= hoje).Sum(ValorLiquido);
+            var aReceber = doMes.Where(x => x.PaymentDate!.Value.Date > hoje).Sum(ValorLiquido);
+            return new ProventoMensalDto(
+                $"{cultura.DateTimeFormat.GetAbbreviatedMonthName(m.Month)}/{m:yy}",
+                m.Year, m.Month,
+                Math.Round(recebido, 2),
+                Math.Round(aReceber, 2));
+        }).ToList();
+    }
+
+    private static decimal ValorLiquido(RendimentoInvestimento r) => r.Amount - r.TaxWithheld;
+
+    private static IReadOnlyList<ProventoPeriodoDto> CriarPeriodosProventos(IReadOnlyList<RendimentoInvestimento> proventos, DateTime hoje)
+    {
+        var inicioSemana = hoje.AddDays(-((int)hoje.DayOfWeek));
+        var inicioQuinzena = hoje.Day <= 15 ? new DateTime(hoje.Year, hoje.Month, 1) : new DateTime(hoje.Year, hoje.Month, 16);
+        var fimQuinzena = hoje.Day <= 15 ? new DateTime(hoje.Year, hoje.Month, 15) : new DateTime(hoje.Year, hoje.Month, DateTime.DaysInMonth(hoje.Year, hoje.Month));
+        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1);
+        var fimMes = inicioMes.AddMonths(1).AddDays(-1);
+        var inicioAno = new DateTime(hoje.Year, 1, 1);
+        var fimAno = new DateTime(hoje.Year, 12, 31);
+
+        var specs = new (string Codigo, string Rotulo, DateTime Inicio, DateTime Fim)[]
+        {
+            ("SEMANA", "Semana", inicioSemana, inicioSemana.AddDays(6)),
+            ("QUINZENA", "Quinzena", inicioQuinzena, fimQuinzena),
+            ("MES", "Mes", inicioMes, fimMes),
+            ("ANO", "Ano", inicioAno, fimAno)
+        };
+
+        var valores = specs
+            .Select(s =>
+            {
+                var itens = proventos.Where(x => x.PaymentDate.HasValue && x.PaymentDate.Value.Date >= s.Inicio && x.PaymentDate.Value.Date <= s.Fim).ToList();
+                var recebidos = itens.Where(x => x.PaymentDate!.Value.Date <= hoje).ToList();
+                var recebido = recebidos.Sum(ValorLiquido);
+                var aReceber = itens.Where(x => x.PaymentDate!.Value.Date > hoje).Sum(ValorLiquido);
+                return (s.Codigo, s.Rotulo, Recebido: Math.Round(recebido, 2), AReceber: Math.Round(aReceber, 2), Quantidade: itens.Count);
+            })
+            .ToList();
+        var maior = valores.Select(x => x.Recebido + x.AReceber).DefaultIfEmpty(0m).Max();
+
+        return valores
+            .Select(x => new ProventoPeriodoDto(
+                x.Codigo,
+                x.Rotulo,
+                x.Recebido,
+                x.AReceber,
+                x.Quantidade,
+                maior == 0m ? 0m : Math.Round((x.Recebido + x.AReceber) / maior * 100m, 2)))
+            .ToList();
+    }
+
+    private static ProventoDto MapProvento(RendimentoInvestimento r)
+        => new(
+            r.Id,
+            r.PaymentDate,
+            r.ReferenceDate,
+            r.Asset?.Ticker ?? r.Asset?.AssetKey ?? string.Empty,
+            r.Asset?.Name ?? string.Empty,
+            r.Asset?.AssetClass.ToString() ?? string.Empty,
+            string.IsNullOrWhiteSpace(r.IncomeType) ? "Provento" : r.IncomeType,
+            r.Quantity,
+            r.RatePerShare,
+            Math.Round(r.Amount, 2),
+            Math.Round(r.TaxWithheld, 2),
+            Math.Round(r.Amount - r.TaxWithheld, 2),
+            r.Taxation,
+            string.IsNullOrWhiteSpace(r.Fonte) ? r.Source : r.Fonte);
+
+    private static IReadOnlyList<ProventoBaldeDto> CriarBaldesProventos(IReadOnlyList<TransacaoFinanceira> transacoes, IReadOnlyList<RendimentoInvestimento> proventosAno, DateTime hoje)
+    {
+        var inicioAno = new DateTime(hoje.Year, 1, 1);
+        var fimAno = new DateTime(hoje.Year, 12, 31);
+        var estado = new Dictionary<int, PosicaoAcumulada>();
+        decimal resultadoTrade = 0m;
+        var vendas = 0;
+
+        foreach (var t in transacoes.Where(t => t.Asset is not null && t.Date.Date <= fimAno).OrderBy(t => t.Date).ThenBy(t => t.Id))
+        {
+            if (!estado.TryGetValue(t.AssetId, out var pos))
+            {
+                pos = new PosicaoAcumulada { Asset = t.Asset! };
+                estado[t.AssetId] = pos;
+            }
+
+            var delta = DeltaQuantidade(t);
+            if (delta > 0m)
+            {
+                pos.Custo += t.Quantity * t.UnitPrice + t.Fees;
+                pos.Quantidade += t.Quantity;
+            }
+            else if (delta < 0m)
+            {
+                var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
+                if (t.OperationType == TipoOperacaoFinanceira.Venda && t.Date.Date >= inicioAno)
+                {
+                    resultadoTrade += t.Quantity * (t.UnitPrice - precoMedio) - t.Fees;
+                    vendas++;
+                }
+
+                var reduz = Math.Min(t.Quantity, pos.Quantidade);
+                pos.Custo -= reduz * precoMedio;
+                pos.Quantidade -= t.Quantity;
+                if (pos.Quantidade <= 0.000000000001m)
+                {
+                    pos.Quantidade = 0m;
+                    pos.Custo = 0m;
+                }
+            }
+        }
+
+        var rendimentos = proventosAno.Sum(ValorLiquido);
+        var totalAbs = Math.Abs(resultadoTrade) + Math.Abs(rendimentos);
+        decimal Percent(decimal valor) => totalAbs == 0m ? 0m : Math.Round(Math.Abs(valor) / totalAbs * 100m, 2);
+
+        return
+        [
+            new ProventoBaldeDto("TRADE", "Trade", Math.Round(resultadoTrade, 2), Percent(resultadoTrade), vendas, resultadoTrade >= 0m ? "Lucro realizado" : "Prejuizo realizado"),
+            new ProventoBaldeDto("RENDIMENTOS", "Rendimentos", Math.Round(rendimentos, 2), Percent(rendimentos), proventosAno.Count, "Proventos recebidos")
+        ];
+    }
+
     public Task<ValidacaoAtivoResultado> ValidarAtivoAsync(string ticker, CancellationToken cancellationToken = default)
         => _marketData.ValidarAtivoAsync(ticker, cancellationToken);
 
@@ -151,6 +321,10 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
         var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
         var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(c => c.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());
 
         // Agrupa por carteira/grupo (Setor, Tese de cripto, Classe de FII...). Cada ativo cai na
         // primeira carteira que o contém, na ordem definida. Ativos sem grupo vão para "Outros".
@@ -175,6 +349,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         foreach (var grupo in transacoes.GroupBy(t => t.AssetId))
         {
             var txs = grupo.OrderBy(t => t.Date).ToList();
+            var assetGrupo = txs.FirstOrDefault(t => t.Asset is not null)?.Asset;
+            if (assetGrupo is null)
+                continue;
             precosPorAtivo.TryGetValue(grupo.Key, out var candles);
             var setor = setorPorAtivo.TryGetValue(grupo.Key, out var s) ? s : "Outros";
             if (!seriesSetor.TryGetValue(setor, out var arrSetor))
@@ -184,6 +361,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             }
 
             decimal quantidade = 0m;
+            decimal custo = 0m;
             decimal ultimoPreco = 0m;
             int ti = 0, ci = 0;
 
@@ -192,7 +370,25 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var d = datas[di];
                 while (ti < txs.Count && txs[ti].Date.Date <= d)
                 {
-                    quantidade += DeltaQuantidade(txs[ti]);
+                    var tx = txs[ti];
+                    var delta = DeltaQuantidade(tx);
+                    if (delta > 0m)
+                    {
+                        custo += tx.Quantity * tx.UnitPrice + tx.Fees;
+                        quantidade += tx.Quantity;
+                    }
+                    else if (delta < 0m)
+                    {
+                        var precoMedioVenda = quantidade > 0m ? custo / quantidade : 0m;
+                        var reduz = Math.Min(tx.Quantity, quantidade);
+                        custo -= reduz * precoMedioVenda;
+                        quantidade -= tx.Quantity;
+                        if (quantidade <= 0.000000000001m)
+                        {
+                            quantidade = 0m;
+                            custo = 0m;
+                        }
+                    }
                     ti++;
                 }
                 if (candles is not null)
@@ -202,7 +398,16 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                         ci++;
                     }
 
-                var valor = quantidade > 0.000000000001m ? quantidade * ultimoPreco : 0m;
+                var precoMedio = quantidade > 0m ? custo / quantidade : 0m;
+                var preco = ultimoPreco > 0m ? ultimoPreco : precoMedio;
+                if (di == totalDias - 1
+                    && cotacaoPorAtivo.TryGetValue(grupo.Key, out var cotAtual)
+                    && cotAtual.PriceBRL > 0m)
+                    preco = cotAtual.PriceBRL;
+
+                var valor = quantidade > QuantidadeAbertaMinima ? quantidade * preco : 0m;
+                if (!EhValorPosicaoVisivel(assetGrupo, quantidade, valor))
+                    valor = 0m;
                 total[di] += valor;
                 arrSetor[di] += valor;
             }
@@ -229,25 +434,23 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         };
 
         // Variação do dia por setor e total, a partir das cotações ao vivo (não do histórico diário).
-        var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
-        var cotacaoPorAtivo = cotacoes
-            .GroupBy(c => c.AtivoFinanceiroId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());
         var posicoesAtuais = CalcularPosicoes(transacoes);
 
         var diaPorSetor = new Dictionary<string, (decimal Valor, decimal VarValor)>(StringComparer.OrdinalIgnoreCase);
-        decimal valorVivoTotal = 0m, varDiaValorTotal = 0m;
-        foreach (var pos in posicoesAtuais.Values.Where(p => p.Quantidade > 0m))
+        decimal valorCotadoDiaTotal = 0m, varDiaValorTotal = 0m;
+        foreach (var pos in posicoesAtuais.Values.Where(p => p.Quantidade > QuantidadeAbertaMinima))
         {
             if (!cotacaoPorAtivo.TryGetValue(pos.Asset.Id, out var cot) || cot.PriceBRL <= 0m)
                 continue;
 
             var valorAtual = pos.Quantidade * cot.PriceBRL;
+            if (!EhValorPosicaoVisivel(pos.Asset, pos.Quantidade, valorAtual))
+                continue;
             var varValor = valorAtual * ((cot.ChangePercent ?? 0m) / 100m);
             var setorAtivo = setorPorAtivo.TryGetValue(pos.Asset.Id, out var s) ? s : "Outros";
             diaPorSetor.TryGetValue(setorAtivo, out var acc);
             diaPorSetor[setorAtivo] = (acc.Valor + valorAtual, acc.VarValor + varValor);
-            valorVivoTotal += valorAtual;
+            valorCotadoDiaTotal += valorAtual;
             varDiaValorTotal += varValor;
         }
 
@@ -262,13 +465,13 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .Where(x => x.Valores.Any(v => v != 0m))
             .ToList();
 
-        var variacaoDiaTotal = valorVivoTotal == 0m ? 0m : Math.Round(varDiaValorTotal / valorVivoTotal * 100m, 2);
+        var variacaoDiaTotal = valorCotadoDiaTotal == 0m ? 0m : Math.Round(varDiaValorTotal / valorCotadoDiaTotal * 100m, 2);
 
         return new EvolucaoPatrimonioDto(
             datas.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList(),
             total.Select(v => Math.Round(v, 2)).ToList(),
             variacaoDiaTotal,
-            Math.Round(valorVivoTotal, 2),
+            Math.Round(atual, 2),
             setores,
             periodos);
     }
@@ -290,6 +493,13 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var precoAtualPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+
+        // Proventos líquidos recebidos no período, por ativo — entram no retorno total (ganho de capital
+        // sozinho ignora dividendos/JCP/rendimentos de FII).
+        var proventosPorAtivo = (await _uow.Financas.BuscarProventosPorPeriodoAsync(inicioPeriodo, fimPeriodo, cancellationToken))
+            .Where(x => x.AssetId.HasValue)
+            .GroupBy(x => x.AssetId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(ValorLiquido));
 
         var estado = new Dictionary<int, PosicaoAcumulada>();
         decimal totalComprado = 0m, totalVendido = 0m, resultadoRealizado = 0m;
@@ -345,10 +555,11 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         }
 
         var ativos = new List<ResumoAtivoDto>();
-        decimal custoTotal = 0m, valorTotal = 0m;
+        decimal custoTotal = 0m, valorTotal = 0m, proventosTotal = 0m;
         foreach (var (ativoId, pos) in estado)
         {
-            if (pos.Quantidade <= 0m && pos.RealizadoPeriodo == 0m)
+            proventosPorAtivo.TryGetValue(ativoId, out var proventoAtivo);
+            if (pos.Quantidade <= 0m && pos.RealizadoPeriodo == 0m && proventoAtivo == 0m)
                 continue;
 
             var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
@@ -357,8 +568,10 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             var valorMercado = pos.Quantidade * (precoAtual ?? precoMedio);
             var pl = valorMercado - pos.Custo;
             var plPercentual = pos.Custo > 0m ? pl / pos.Custo * 100m : 0m;
+            var retornoTotalAtivo = pl + pos.RealizadoPeriodo + proventoAtivo;
             custoTotal += pos.Custo;
             valorTotal += valorMercado;
+            proventosTotal += proventoAtivo;
 
             ativos.Add(new ResumoAtivoDto(
                 TickerDe(pos.Asset),
@@ -371,9 +584,12 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 Math.Round(valorMercado, 2),
                 Math.Round(pl, 2),
                 Math.Round(plPercentual, 2),
-                Math.Round(pos.RealizadoPeriodo, 2)));
+                Math.Round(pos.RealizadoPeriodo, 2),
+                Math.Round(proventoAtivo, 2),
+                Math.Round(retornoTotalAtivo, 2)));
         }
 
+        var plNaoRealizadoTotal = valorTotal - custoTotal;
         return new ResumoAnaliticoDto(
             $"{inicioPeriodo:dd/MM/yyyy} a {fimPeriodo:dd/MM/yyyy}",
             inicioPeriodo,
@@ -385,12 +601,47 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             numeroOperacoes,
             Math.Round(custoTotal, 2),
             Math.Round(valorTotal, 2),
-            Math.Round(valorTotal - custoTotal, 2),
+            Math.Round(plNaoRealizadoTotal, 2),
+            Math.Round(proventosTotal, 2),
+            Math.Round(plNaoRealizadoTotal + resultadoRealizado + proventosTotal, 2),
             ativos.OrderByDescending(a => a.ValorMercado).ToList(),
             vendas.OrderByDescending(v => v.Data).ToList());
     }
 
     private static string TickerDe(AtivoFinanceiro a) => a.Ticker ?? a.AssetKey ?? a.Name ?? string.Empty;
+
+    private static bool EhAtivoCotadoVisivel(CotacaoAtivoDto ativo)
+    {
+        if (ativo.Quantidade <= QuantidadeAbertaMinima)
+            return false;
+
+        return !string.Equals(ativo.Classe, ClasseAtivo.Cripto.ToString(), StringComparison.OrdinalIgnoreCase)
+            || ativo.ValorMercado >= ValorDustCriptoMaximoBrl;
+    }
+
+    private static bool EhValorPosicaoVisivel(AtivoFinanceiro ativo, decimal quantidade, decimal valorMercado)
+    {
+        if (quantidade <= QuantidadeAbertaMinima)
+            return false;
+
+        return (!ativo.IsCrypto && ativo.AssetClass != ClasseAtivo.Cripto)
+            || valorMercado >= ValorDustCriptoMaximoBrl;
+    }
+
+    private static bool EhPosicaoEstimativaAbertaVisivel(EstimativaPosicaoCarteira posicao)
+    {
+        if (posicao.Status != StatusEstimativaPosicao.AbertaOuResidual || posicao.Quantity <= QuantidadeAbertaMinima)
+            return false;
+
+        var ativo = posicao.Asset;
+        if (ativo is null || (!ativo.IsCrypto && ativo.AssetClass != ClasseAtivo.Cripto))
+            return true;
+
+        var valor = posicao.EstimatedCurrentPosition != 0m
+            ? Math.Abs(posicao.EstimatedCurrentPosition)
+            : Math.Abs(posicao.Quantity * posicao.AveragePrice);
+        return valor >= ValorDustCriptoMaximoBrl;
+    }
 
     private sealed class PosicaoAcumulada
     {
@@ -726,7 +977,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .ToList();
     }
 
-    private static IReadOnlyList<CarteiraFinanceiraResumoDto> CriarResumoCarteiras(IReadOnlyList<CarteiraFinanceira> carteiras, IReadOnlyList<CotacaoAtivoDto> ativos)
+    private static IReadOnlyList<CarteiraFinanceiraResumoDto> CriarResumoCarteiras(IReadOnlyList<CarteiraFinanceira> carteiras, IReadOnlyList<CotacaoAtivoDto> ativos, decimal valorPatrimonio)
     {
         var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
         return carteiras
@@ -740,6 +991,21 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var custo = itens.Sum(x => x.CustoEstimado);
                 var resultado = valor - custo;
                 var variacaoDiaValor = itens.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m));
+                var itensResumo = itens
+                    .OrderByDescending(x => x.ValorMercado)
+                    .Select(x => new CarteiraAtivoResumoDto(
+                        x.AtivoId,
+                        x.Ativo,
+                        x.Classe,
+                        x.Symbol,
+                        x.Quantidade,
+                        Math.Round(x.ValorMercado, 2),
+                        valor == 0m ? 0m : Math.Round(x.ValorMercado / valor * 100m, 2),
+                        x.VariacaoDiaPercentual,
+                        Math.Round(x.ResultadoNaoRealizado, 2),
+                        Math.Round(x.ResultadoNaoRealizadoPercentual, 2),
+                        x.Status))
+                    .ToList();
 
                 return new CarteiraFinanceiraResumoDto(
                     carteira.Id,
@@ -750,7 +1016,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     resultado,
                     custo == 0 ? 0 : resultado / custo * 100m,
                     valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
-                    itens.Count);
+                    valorPatrimonio == 0m ? 0m : valor / valorPatrimonio * 100m,
+                    itens.Count,
+                    itensResumo);
             })
             .Where(x => x.Ativos > 0)
             .OrderByDescending(x => x.ValorMercado)
