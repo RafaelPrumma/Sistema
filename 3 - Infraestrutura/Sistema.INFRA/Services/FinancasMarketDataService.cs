@@ -64,6 +64,109 @@ public class FinancasMarketDataService(
             await _context.SaveChangesAsync(cancellationToken);
     }
 
+    // Busca desdobramentos/grupamentos na Brapi (dividendsData.stockDividends) e faz upsert idempotente
+    // de EventoCorporativo. Sem token a Brapi não devolve o dado → loga p/ cadastro manual. Dedup por
+    // janela (ticker + ~data): não duplica splits já semeados/manuais (a data de corte da Brapi difere
+    // ~1 dia da data-ex). Chave canônica via EventoCorporativo.GerarChaveNatural (mesma do seed/manual).
+    public async Task AtualizarEventosCorporativosAsync(bool force = false, CancellationToken cancellationToken = default)
+    {
+        var token = await _config.ObterTextoAsync("Financas", "MarketData:BrapiToken", null, cancellationToken);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            // "Fonte não tem o dado": sem token a Brapi não devolve stockDividends da maioria dos tickers.
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/eventos",
+                "sem token: auto-busca de eventos corporativos indisponível — cadastre splits manualmente em /Financas/Eventos.");
+            return;
+        }
+
+        var assetIds = await _context.TransacoesFinanceiras
+            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.IsCrypto)
+            .Select(x => x.AssetId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        if (assetIds.Count == 0)
+            return;
+
+        var assets = await _context.AtivosFinanceiros
+            .Where(a => assetIds.Contains(a.Id) && !a.IsCrypto)
+            .ToListAsync(cancellationToken);
+
+        // Eventos já existentes (semeados/manuais): (ativo, data) p/ dedup por janela e chaves p/ exato.
+        var cobertos = (await _context.EventosCorporativos
+                .Select(e => new { e.AtivoFinanceiroId, e.Data })
+                .ToListAsync(cancellationToken))
+            .Select(e => (e.AtivoFinanceiroId, e.Data))
+            .ToList();
+        var chaves = (await _context.EventosCorporativos
+                .Where(e => e.ChaveNatural != null)
+                .Select(e => e.ChaveNatural!)
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var client = _httpClientFactory.CreateClient("Brapi");
+        var novos = new List<EventoCorporativo>();
+
+        foreach (var asset in assets)
+        {
+            var symbol = ResolverTickerB3(asset);
+            if (string.IsNullOrWhiteSpace(symbol))
+                continue;
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"api/quote/{WebUtility.UrlEncode(symbol)}?dividends=true");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                using var response = await client.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                    continue;
+
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
+                    continue;
+                if (!results[0].TryGetProperty("dividendsData", out var dividendsData) || dividendsData.ValueKind != JsonValueKind.Object)
+                    continue;
+                if (!dividendsData.TryGetProperty("stockDividends", out var stock) || stock.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var ev in stock.EnumerateArray())
+                {
+                    var mapped = EventoCorporativoBrapiParser.Mapear(ev);
+                    if (mapped is null)
+                        continue; // sem fator/data utilizável, ou bonificação ambígua (não auto-insere).
+                    if (EventoCorporativoBrapiParser.JaCoberto(asset.Id, mapped.Data, cobertos))
+                        continue; // já semeado/manual (janela cobre a diferença de convenção de data).
+
+                    var chave = EventoCorporativo.GerarChaveNatural(symbol, mapped.Data, mapped.Fator);
+                    if (!chaves.Add(chave))
+                        continue;
+
+                    novos.Add(new EventoCorporativo
+                    {
+                        AtivoFinanceiroId = asset.Id,
+                        Tipo = mapped.Tipo,
+                        Data = mapped.Data,
+                        Fator = mapped.Fator,
+                        Fonte = "Brapi",
+                        ChaveNatural = chave,
+                        UsuarioInclusao = "financas-importador"
+                    });
+                    cobertos.Add((asset.Id, mapped.Data)); // evita duplicar dentro da mesma execução.
+                }
+            }
+            catch (Exception ex)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/eventos", ex.Message);
+            }
+        }
+
+        if (novos.Count > 0)
+        {
+            _context.EventosCorporativos.AddRange(novos);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     // Proventos de renda variável B3 (dividendo/JCP/rendimento) via Brapi, cruzados com a posição na data-com.
     private async Task<bool> AtualizarProventosB3Async(CancellationToken cancellationToken)
     {
