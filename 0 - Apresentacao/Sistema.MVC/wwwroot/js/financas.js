@@ -15,7 +15,8 @@
     patrimonio: document.getElementById('financePatrimonioIsland'),
     carteiras: document.getElementById('financeCarteirasIsland'),
     importacao: document.getElementById('financeImportacaoIsland'),
-    operacional: document.getElementById('financeOperacionalIsland')
+    posicoes: document.getElementById('financePosicoesIsland'),
+    alertas: document.getElementById('financeAlertasIsland')
   };
 
   const PERIODOS = [
@@ -314,7 +315,8 @@
       loadPatrimonio(),
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
-      loadPartial(islands.operacional, dashboard.dataset.operacionalUrl)
+      loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
+      loadPartial(islands.alertas, dashboard.dataset.alertasUrl)
     ]);
   }
 

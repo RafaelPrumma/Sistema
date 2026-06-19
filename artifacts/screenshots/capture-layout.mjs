@@ -77,7 +77,8 @@ async function verifyRoute(page, url, name, file) {
     await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
     await page.waitForSelector('#financeCarteirasIsland[aria-busy="false"]');
     await page.waitForSelector('#financeImportacaoIsland[aria-busy="false"]');
-    await page.waitForSelector('#financeOperacionalIsland[aria-busy="false"]');
+    await page.waitForSelector('#financePosicoesIsland[aria-busy="false"]');
+    await page.waitForSelector('#financeAlertasIsland[aria-busy="false"]');
   }
   await ensureNoLayoutBreak(page, name);
   await screenshot(page, file);
@@ -131,12 +132,13 @@ try {
   await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
   await page.unroute('**/Financas/Dashboard/Patrimonio', delayedPatrimonio);
 
-  const failOperacional = route => route.fulfill({ status: 500, body: 'falha simulada' });
-  await page.route('**/Financas/Dashboard/Operacional', failOperacional);
+  const failAlertas = route => route.fulfill({ status: 500, body: 'falha simulada' });
+  await page.route('**/Financas/Dashboard/Alertas', failAlertas);
   await page.goto(`${baseUrl}/Financas`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('#financeOperacionalIsland .finance-island-error');
+  await page.waitForSelector('#financeAlertasIsland .finance-island-error');
+  await page.waitForSelector('#financePosicoesIsland[aria-busy="false"]');
   await page.waitForSelector('#financePatrimonioIsland[aria-busy="false"]');
-  await page.unroute('**/Financas/Dashboard/Operacional', failOperacional);
+  await page.unroute('**/Financas/Dashboard/Alertas', failAlertas);
 
   const routes = [
     ['/Home/Index', 'home', '05-home.png'],

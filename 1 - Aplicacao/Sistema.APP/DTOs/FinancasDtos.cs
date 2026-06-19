@@ -311,10 +311,6 @@ public record FinancasImportacaoDto(
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,
     DateTime? CotacoesAtualizadasEm);
 
-public record FinancasOperacionalDto(
-    IReadOnlyList<PosicaoFinanceiraDto> PosicoesAbertas,
-    IReadOnlyList<AlertaConfiabilidadeDto> Alertas);
-
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;

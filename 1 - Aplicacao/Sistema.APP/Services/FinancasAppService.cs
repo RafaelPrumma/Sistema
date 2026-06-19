@@ -74,14 +74,20 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault());
     }
 
-    public async Task<FinancasOperacionalDto> ObterOperacionalDashboardAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PosicaoFinanceiraDto>> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default)
     {
         var posicoes = await _uow.Financas.BuscarPosicoesAsync(true, cancellationToken);
-        var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
+        return posicoes
+            .Where(EhPosicaoEstimativaAbertaVisivel)
+            .Take(12)
+            .Select(MapPosicao)
+            .ToList();
+    }
 
-        return new FinancasOperacionalDto(
-            posicoes.Where(EhPosicaoEstimativaAbertaVisivel).Take(12).Select(MapPosicao).ToList(),
-            alertas.Take(8).Select(MapAlerta).ToList());
+    public async Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
+        return alertas.Take(8).Select(MapAlerta).ToList();
     }
 
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)

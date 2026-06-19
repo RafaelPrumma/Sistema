@@ -45,12 +45,14 @@ public class FinancasControllerTests
             [],
             new ImportacaoFinanceiraResumoDto(null, 0, 0, 0, null),
             null);
-        var operacional = new FinancasOperacionalDto([], []);
+        IReadOnlyList<PosicaoFinanceiraDto> posicoes = [];
+        IReadOnlyList<AlertaConfiabilidadeDto> alertas = [];
 
         service.Setup(x => x.ObterPatrimonioDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(patrimonio);
         service.Setup(x => x.ObterCarteirasDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(carteiras);
         service.Setup(x => x.ObterImportacaoDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(importacao);
-        service.Setup(x => x.ObterOperacionalDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(operacional);
+        service.Setup(x => x.ObterPosicoesDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(posicoes);
+        service.Setup(x => x.ObterAlertasDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(alertas);
         var controller = new FinancasController(service.Object);
 
         var patrimonioResult = Assert.IsType<JsonResult>(await controller.DashboardPatrimonio(CancellationToken.None));
@@ -58,15 +60,19 @@ public class FinancasControllerTests
         var carteirasModel = carteirasResult.Model;
         var importacaoResult = Assert.IsType<PartialViewResult>(await controller.DashboardImportacao(CancellationToken.None));
         var importacaoModel = importacaoResult.Model;
-        var operacionalResult = Assert.IsType<PartialViewResult>(await controller.DashboardOperacional(CancellationToken.None));
-        var operacionalModel = operacionalResult.Model;
+        var posicoesResult = Assert.IsType<PartialViewResult>(await controller.DashboardPosicoes(CancellationToken.None));
+        var posicoesModel = posicoesResult.Model;
+        var alertasResult = Assert.IsType<PartialViewResult>(await controller.DashboardAlertas(CancellationToken.None));
+        var alertasModel = alertasResult.Model;
 
         Assert.Same(patrimonio, patrimonioResult.Value);
         Assert.Equal("_DashboardCarteiras", carteirasResult.ViewName);
         Assert.Same(carteiras, carteirasModel);
         Assert.Equal("_DashboardImportacao", importacaoResult.ViewName);
         Assert.Same(importacao, importacaoModel);
-        Assert.Equal("_DashboardOperacional", operacionalResult.ViewName);
-        Assert.Same(operacional, operacionalModel);
+        Assert.Equal("_DashboardPosicoes", posicoesResult.ViewName);
+        Assert.Same(posicoes, posicoesModel);
+        Assert.Equal("_DashboardAlertas", alertasResult.ViewName);
+        Assert.Same(alertas, alertasModel);
     }
 }
