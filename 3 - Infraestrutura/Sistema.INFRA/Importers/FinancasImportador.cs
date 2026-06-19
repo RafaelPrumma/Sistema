@@ -214,7 +214,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 5;
+    private const int MaterializacaoVersao = 6;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
@@ -279,6 +279,66 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 ChaveNatural = chaveNatural,
                 IsCanonical = true,
                 ConfidenceLevel = op.ConfidenceLevel,
+                RawJson = "{}",
+                UsuarioInclusao = "financas-importador"
+            });
+        }
+
+        // Negociações do extrato consolidado da B3 (agregado mensal). Precedência §3.1: a nota
+        // (granular) manda onde existe; o agregado B3 só preenche ticker×mês AUSENTE nas notas.
+        // Cobertos = (assetId, ano, mês) com transação de NOTA (já no banco + as recém-criadas aqui).
+        var notasExistentes = await _context.TransacoesFinanceiras
+            .Where(x => x.Origem == OrigemTransacao.Importacao && x.Fonte == "Nubank B3")
+            .Select(x => new { x.AssetId, x.Date })
+            .ToListAsync(cancellationToken);
+        var cobertosPorNotas = notasExistentes
+            .Select(x => (x.AssetId, x.Date.Year, x.Date.Month))
+            .ToHashSet();
+        foreach (var nota in novas.Where(x => x.Fonte == "Nubank B3"))
+            cobertosPorNotas.Add((nota.AssetId, nota.Date.Year, nota.Date.Month));
+
+        var negociacoesB3 = await _context.NegociacoesMensaisB3.ToListAsync(cancellationToken);
+        foreach (var neg in negociacoesB3)
+        {
+            var chave = $"NegociacaoMensalB3#{neg.Id}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
+
+            var ano = neg.AnoMes / 100;
+            var mes = neg.AnoMes % 100;
+            if (!ExtratoB3Materializador.DeveMaterializarNegociacaoB3(neg.AssetId, ano, mes, cobertosPorNotas))
+                continue;
+
+            var quantidade = Math.Abs(neg.Quantity);
+            if (quantidade <= 0m)
+                continue;
+
+            var data = (neg.PeriodoFinal ?? new DateTime(ano, mes, DateTime.DaysInMonth(ano, mes))).Date;
+            var chaveNatural = GerarChaveNatural(FonteExtratoB3, neg.AssetId, data, neg.OperationType, quantidade, neg.UnitPrice);
+            if (!chavesNaturais.Add(chaveNatural))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
+            {
+                Origem = OrigemTransacao.Importacao,
+                AssetId = neg.AssetId,
+                Date = data,
+                OperationType = neg.OperationType,
+                Quantity = quantidade,
+                UnitPrice = neg.UnitPrice,
+                GrossAmount = neg.GrossAmount,
+                Fees = 0m,
+                Currency = "BRL",
+                Broker = string.IsNullOrWhiteSpace(neg.Broker) ? "NU Invest" : neg.Broker,
+                Fonte = FonteExtratoB3,
+                SourceDocumentId = neg.SourceDocumentId,
+                CargaFinanceiraId = neg.CargaFinanceiraId,
+                StagingTipo = "NegociacaoMensalB3",
+                StagingId = neg.Id,
+                DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
+                IsCanonical = true,
+                ConfidenceLevel = NivelConfianca.Media,
                 RawJson = "{}",
                 UsuarioInclusao = "financas-importador"
             });
@@ -786,7 +846,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             if (ext == ".xlsx")
             {
                 if (documento.DocumentKind == TipoDocumentoFinanceiro.ExtratoConsolidadoB3)
-                    return await ProcessarExtratoB3Async(documento, file, cancellationToken);
+                    return await ProcessarExtratoB3Async(documento, file, carga, ativos, cancellationToken);
 
                 return await ProcessarXlsxAsync(documento, file, carga, ativos, cancellationToken);
             }

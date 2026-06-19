@@ -352,6 +352,32 @@ public class TransacaoFinanceira : AuditableEntity
     public string? ChaveNatural { get; set; }
 }
 
+// Staging do extrato consolidado da B3 (aba Negociações). É um AGREGADO mensal por ticker:
+// até 1 compra + 1 venda por ticker/mês (preço = preço médio do mês). Materializa em
+// TransacaoFinanceira só onde as notas (granular) NÃO cobrem o ticker×mês (precedência §3.1).
+public class NegociacaoMensalB3 : AuditableEntity
+{
+    public int Id { get; set; }
+    public int CargaFinanceiraId { get; set; }
+    public CargaFinanceira? CargaFinanceira { get; set; }
+    public int? SourceDocumentId { get; set; }
+    public DocumentoFinanceiro? SourceDocument { get; set; }
+    public int AssetId { get; set; }
+    public AtivoFinanceiro? Asset { get; set; }
+    // Ano-mês do extrato no formato yyyyMM (ex.: 202209). Vem do nome do arquivo.
+    public int AnoMes { get; set; }
+    public TipoOperacaoFinanceira OperationType { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal GrossAmount { get; set; }
+    public DateTime? PeriodoInicial { get; set; }
+    public DateTime? PeriodoFinal { get; set; }
+    public string Broker { get; set; } = string.Empty;
+    // Chave natural do agregado (fonte + ticker + ano-mês + sentido + corretora) — índice único filtrado.
+    public string? ChaveNatural { get; set; }
+    public string RawJson { get; set; } = "{}";
+}
+
 public class EstimativaPosicaoCarteira : AuditableEntity
 {
     public int Id { get; set; }

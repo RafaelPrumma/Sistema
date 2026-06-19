@@ -235,6 +235,28 @@ public class TransacaoFinanceiraMap : IEntityTypeConfiguration<TransacaoFinancei
     }
 }
 
+public class NegociacaoMensalB3Map : IEntityTypeConfiguration<NegociacaoMensalB3>
+{
+    public void Configure(EntityTypeBuilder<NegociacaoMensalB3> builder)
+    {
+        builder.ToTable("FinanceiroNegociacaoMensalB3");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Broker).HasMaxLength(120);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(200);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.Property(x => x.Quantity).HasPrecision(28, 12);
+        builder.Property(x => x.UnitPrice).HasPrecision(28, 12);
+        builder.Property(x => x.GrossAmount).HasPrecision(28, 12);
+        builder.HasIndex(x => new { x.AssetId, x.AnoMes });
+        builder.HasIndex(x => x.CargaFinanceiraId);
+        // Mesmo agregado (ticker×mês×sentido) não entra duas vezes, mesmo reimportando o arquivo.
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.SourceDocument).WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
 public class EstimativaPosicaoCarteiraMap : IEntityTypeConfiguration<EstimativaPosicaoCarteira>
 {
     public void Configure(EntityTypeBuilder<EstimativaPosicaoCarteira> builder)

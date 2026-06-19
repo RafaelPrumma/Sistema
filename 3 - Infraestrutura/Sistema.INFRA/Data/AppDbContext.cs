@@ -38,6 +38,7 @@ public class AppDbContext : DbContext
     public DbSet<OperacaoB3> OperacoesB3 => Set<OperacaoB3>();
     public DbSet<TransacaoCripto> TransacoesCripto => Set<TransacaoCripto>();
     public DbSet<TransacaoFinanceira> TransacoesFinanceiras => Set<TransacaoFinanceira>();
+    public DbSet<NegociacaoMensalB3> NegociacoesMensaisB3 => Set<NegociacaoMensalB3>();
     public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();
     public DbSet<RendimentoInvestimento> RendimentosInvestimento => Set<RendimentoInvestimento>();
     public DbSet<AgregadoFinanceiro> AgregadosFinanceiros => Set<AgregadoFinanceiro>();
