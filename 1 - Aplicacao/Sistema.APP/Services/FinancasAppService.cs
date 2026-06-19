@@ -905,7 +905,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         }
 
         var fonte = string.IsNullOrWhiteSpace(input.Fonte) ? "Manual" : input.Fonte!.Trim();
-        var chaveNatural = $"Manual|{ticker}|{input.Data:yyyy-MM-dd}|{input.Fator:G}";
+        // Chave canônica (independe da fonte) → dedup contra seed e Brapi: o mesmo split não entra 2×.
+        var chaveNatural = EventoCorporativo.GerarChaveNatural(ticker, input.Data, input.Fator);
 
         var evento = new EventoCorporativo
         {

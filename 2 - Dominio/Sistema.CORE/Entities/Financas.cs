@@ -482,4 +482,9 @@ public class EventoCorporativo : AuditableEntity
     public string Fonte { get; set; } = string.Empty;
     // Chave natural: idempotência do seed/import (ticker|data|fator).
     public string? ChaveNatural { get; set; }
+
+    // Chave natural canônica do evento. Independe da fonte (seed, manual ou Brapi geram a MESMA
+    // chave para o mesmo evento) → o índice único deduplica entre fontes e evita aplicar o fator 2×.
+    public static string GerarChaveNatural(string ticker, DateTime data, decimal fator)
+        => $"{ticker.Trim().ToUpperInvariant()}|{data:yyyyMMdd}|{fator.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }

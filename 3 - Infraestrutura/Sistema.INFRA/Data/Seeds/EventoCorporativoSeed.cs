@@ -16,9 +16,9 @@ public static class EventoCorporativoSeed
     public static IEnumerable<(string Ticker, TipoEventoCorporativo Tipo, DateTime Data, decimal Fator, string Fonte, string ChaveNatural)> GetDefinicoes() =>
     [
         // BCFF11 — desdobramento 1:8 em 28/11/2023 (confirmado B3/informe do fundo).
-        ("BCFF11", TipoEventoCorporativo.Desdobramento, new DateTime(2023, 11, 28), 8m, "Seed/B3", "BCFF11|20231128|8"),
+        ("BCFF11", TipoEventoCorporativo.Desdobramento, new DateTime(2023, 11, 28), 8m, "Seed/B3", EventoCorporativo.GerarChaveNatural("BCFF11", new DateTime(2023, 11, 28), 8m)),
 
         // GGRC11 — desdobramento 1:10 em 06/03/2024 (confirmado B3/informe do fundo).
-        ("GGRC11", TipoEventoCorporativo.Desdobramento, new DateTime(2024, 3, 6), 10m, "Seed/B3", "GGRC11|20240306|10"),
+        ("GGRC11", TipoEventoCorporativo.Desdobramento, new DateTime(2024, 3, 6), 10m, "Seed/B3", EventoCorporativo.GerarChaveNatural("GGRC11", new DateTime(2024, 3, 6), 10m)),
     ];
 }

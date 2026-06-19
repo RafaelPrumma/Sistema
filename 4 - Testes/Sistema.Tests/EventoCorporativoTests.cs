@@ -14,6 +14,22 @@ namespace Sistema.Tests;
 /// </summary>
 public class EventoCorporativoTests
 {
+    // --- Chave natural canônica (dedup entre seed / manual / Brapi) ---
+
+    [Fact]
+    public void GerarChaveNatural_NormalizaTickerEBateComOSeed()
+    {
+        // Deve produzir exatamente o literal histórico do seed (BCFF11|20231128|8) e normalizar o case.
+        Assert.Equal("BCFF11|20231128|8", EventoCorporativo.GerarChaveNatural("bcff11", new DateTime(2023, 11, 28), 8m));
+    }
+
+    [Fact]
+    public void GerarChaveNatural_FatorFracionarioUsaPontoInvariante()
+    {
+        // Fator não-inteiro NUNCA pode virar vírgula (pt-BR) — senão o dedup entre fontes quebra.
+        Assert.Equal("CPTS11|20230515|1.66", EventoCorporativo.GerarChaveNatural("CPTS11", new DateTime(2023, 5, 15), 1.66m));
+    }
+
     // --- Cenário principal: compra pré-split + venda pós-split ---
 
     [Fact]
