@@ -214,13 +214,14 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 6;
+    private const int MaterializacaoVersao = 7;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
-    // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
-    // (spot trades e converts) — o restante do ledger da Binance (Simple Earn, staking, juros,
-    // airdrops, taxas e o detalhamento sem preço dos trades) fica no staging para auditoria,
-    // mas não polui a carteira. Idempotente por "{StagingTipo}#{StagingId}".
+    // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
+    // completa (cada operação = pernas assinadas pelo campo Alterar) e passa por MaterializarCriptoNetting:
+    // permuta abate a origem, earn/staking/airdrop entram como Rendimento (custo 0) e BRL/fiat ficam fora
+    // da posição. Spot/Convert/Depósitos ficam no staging para auditoria mas não são materializados (o
+    // ledger já cobre o efeito econômico). Idempotente por "{StagingTipo}#{StagingId}".
     private async Task SincronizarTransacoesCanonicasAsync(CancellationToken cancellationToken)
     {
         var jaMaterializadas = new HashSet<string>(
@@ -344,72 +345,127 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             });
         }
 
-        var cryptos = await _context.TransacoesCripto
-            .Where(x => x.Price != null && x.Price > 0m)
-            .ToListAsync(cancellationToken);
-        if (cryptos.Count > 0)
-        {
-            var assetIdPorChave = (await _context.AtivosFinanceiros
-                    .Where(a => a.IsCrypto)
-                    .ToListAsync(cancellationToken))
-                .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var tx in cryptos)
-            {
-                var chave = $"TransacaoCripto#{tx.Id}";
-                if (!jaMaterializadas.Add(chave))
-                    continue;
-                if (string.IsNullOrWhiteSpace(tx.AssetSymbol) || !assetIdPorChave.TryGetValue(tx.AssetSymbol, out var assetId))
-                    continue;
-
-                var quantidade = Math.Abs(tx.Amount);
-                if (quantidade <= 0m)
-                    continue;
-
-                var preco = tx.Price!.Value;
-                var tipo = tx.OperationType is TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque
-                    ? TipoOperacaoFinanceira.Venda
-                    : TipoOperacaoFinanceira.Compra;
-
-                // Cripto da Binance tem o horário exato (até o segundo): a chave usa data+hora.
-                var chaveNatural = tx.TransactionDate.HasValue
-                    ? GerarChaveNatural("Binance", assetId, tx.TransactionDate.Value, tipo, quantidade, preco)
-                    : null;
-                if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
-                    continue;
-
-                novas.Add(new TransacaoFinanceira
-                {
-                    Origem = OrigemTransacao.Importacao,
-                    AssetId = assetId,
-                    Date = tx.TransactionDate ?? tx.DataInclusao,
-                    OperationType = tipo,
-                    Quantity = quantidade,
-                    UnitPrice = preco,
-                    GrossAmount = tx.Total ?? quantidade * preco,
-                    Fees = tx.FeeAmount ?? 0m,
-                    Currency = "BRL",
-                    Broker = string.IsNullOrWhiteSpace(tx.Exchange) ? "Binance" : tx.Exchange,
-                    Fonte = "Binance",
-                    SourceDocumentId = tx.SourceDocumentId,
-                    CargaFinanceiraId = tx.CargaFinanceiraId,
-                    StagingTipo = "TransacaoCripto",
-                    StagingId = tx.Id,
-                    DuplicateGroupKey = chave,
-                    ChaveNatural = chaveNatural,
-                    IsCanonical = true,
-                    ConfidenceLevel = NivelConfianca.Media,
-                    RawJson = "{}",
-                    UsuarioInclusao = "financas-importador"
-                });
-            }
-        }
+        await MaterializarCriptoNettingAsync(novas, jaMaterializadas, chavesNaturais, cancellationToken);
 
         if (novas.Count > 0)
         {
             await _context.TransacoesFinanceiras.AddRangeAsync(novas, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // F1 (cripto) — netting da Binance: materializa a posição correta por QUANTIDADE a partir do ledger
+    // ("Histórico de Transações"/CSV), que cobre TUDO como pernas assinadas (Alterar) com o mesmo
+    // timestamp. A lógica de classificação/netting (pura) está em CriptoNetting; aqui fica só o que é
+    // stateful: resolver o preço da perna pelo PM corrente do ativo (→ realizado ≈ 0 na F1; valoração
+    // BRL é F2) e gravar em TransacaoFinanceira. As pernas de permuta/earn que a regra antiga ignorava
+    // (sem Price) agora entram → a origem das trocas é abatida (somem fantasmas/negativos) e BRL/fiat
+    // sai da posição. Spot/Convert/Depósitos continuam no staging para auditoria, mas NÃO são
+    // materializados (o ledger já cobre o efeito econômico deles — evita dobrar).
+    private async Task MaterializarCriptoNettingAsync(
+        List<TransacaoFinanceira> novas,
+        HashSet<string> jaMaterializadas,
+        HashSet<string> chavesNaturais,
+        CancellationToken cancellationToken)
+    {
+        // Só o ledger (Histórico de Transações .xlsx + CSV de mesmo formato) — é a fonte completa das
+        // pernas assinadas. Os demais documentos Binance (spot/convert/depósitos) ficam de fora.
+        var docsLedger = await _context.DocumentosFinanceiros
+            .Where(d => d.DocumentKind == TipoDocumentoFinanceiro.BinanceTransactions
+                        || d.DocumentKind == TipoDocumentoFinanceiro.CsvBinance)
+            .Select(d => d.Id)
+            .ToListAsync(cancellationToken);
+        var idsLedger = docsLedger.ToHashSet();
+
+        var staging = await _context.TransacoesCripto
+            .Where(x => x.SourceDocumentId != null)
+            .OrderBy(x => x.TransactionDate)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+        staging = staging.Where(x => idsLedger.Contains(x.SourceDocumentId!.Value)).ToList();
+        if (staging.Count == 0)
+            return;
+
+        var assetIdPorChave = (await _context.AtivosFinanceiros
+                .Where(a => a.IsCrypto)
+                .ToListAsync(cancellationToken))
+            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+        // Lógica pura: classifica e neta as pernas. Mantém a ordem (timestamp, id) para o PM corrente.
+        var brutos = staging.Select(tx => new MovimentoCriptoBruto(
+            tx.AssetSymbol, tx.TransactionDate, tx.RawType, tx.Amount, tx.Id));
+        var canonicos = CriptoNetting.Netar(brutos);
+
+        // PM corrente por ativo (estoque + custo), reconstruído na ordem cronológica para precificar a
+        // perna de saída ao PM do ativo (realizado ≈ 0). Custo aqui é placeholder da F1 (1 por unidade
+        // nas compras de troca; 0 no earn) — a valoração real em BRL é F2.
+        var estoque = new Dictionary<int, (decimal Qtd, decimal Custo)>();
+
+        foreach (var mov in canonicos)
+        {
+            var chave = $"TransacaoCripto#{mov.SourceStagingId}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
+            if (!assetIdPorChave.TryGetValue(mov.AssetSymbol, out var assetId))
+                continue;
+
+            estoque.TryGetValue(assetId, out var pos);
+            var pm = pos.Qtd > 0m ? pos.Custo / pos.Qtd : 0m;
+
+            // Preço da perna: earn = 0; saída = PM corrente (→ realizado ≈ 0); entrada de troca = PM
+            // corrente do destino se já houver estoque, senão 1 (placeholder; valoração é F2).
+            decimal preco;
+            if (mov.PrecoZero)
+                preco = 0m;
+            else if (mov.OperationType == TipoOperacaoFinanceira.Venda)
+                preco = pm;
+            else
+                preco = pm > 0m ? pm : 1m;
+
+            // Atualiza o estoque para o próximo PM.
+            if (mov.OperationType is TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Rendimento)
+            {
+                estoque[assetId] = (pos.Qtd + mov.Quantity, pos.Custo + mov.Quantity * preco);
+            }
+            else // Venda: abate ao PM corrente.
+            {
+                var reduz = Math.Min(mov.Quantity, pos.Qtd);
+                var novaQtd = pos.Qtd - mov.Quantity;
+                var novoCusto = pos.Custo - reduz * pm;
+                if (novaQtd <= 0.000000000001m)
+                    (novaQtd, novoCusto) = (0m, 0m);
+                estoque[assetId] = (novaQtd, novoCusto);
+            }
+
+            var chaveNatural = mov.Timestamp.HasValue
+                ? GerarChaveNatural(CriptoNetting.Fonte, assetId, mov.Timestamp.Value, mov.OperationType, mov.Quantity, preco)
+                : null;
+            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
+            {
+                Origem = OrigemTransacao.Importacao,
+                AssetId = assetId,
+                Date = mov.Timestamp ?? DateTime.UtcNow,
+                OperationType = mov.OperationType,
+                Quantity = mov.Quantity,
+                UnitPrice = preco,
+                GrossAmount = mov.Quantity * preco,
+                Fees = 0m,
+                Currency = "BRL",
+                Broker = "Binance",
+                Fonte = CriptoNetting.Fonte,
+                StagingTipo = "TransacaoCripto",
+                StagingId = mov.SourceStagingId,
+                DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
+                IsCanonical = true,
+                ConfidenceLevel = NivelConfianca.Media,
+                RawJson = "{}",
+                UsuarioInclusao = "financas-importador"
+            });
         }
     }
 
