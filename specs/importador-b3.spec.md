@@ -59,3 +59,12 @@ Arquivos em `arquivos/b3/` (ver `arquivos/b3/README.md`). Contêm CPF e dados de
 
 ## 9. Verificação
 `dotnet build` + `dotnet test` verde (teste do parser com os `.xlsx` reais e do dedup/precedência). Conferir uma posição mensal contra a aba de Posição correspondente.
+
+## 10. Plano: reimport limpa com B3 como base (decidido jun/2026)
+Motivo: as notas Nubank são incompletas (fantasmas) → B3 vira a fonte de verdade (§3.1). Passos:
+1. **Fazer a B3 entrar:** o importador hoje varre só `WatchedFolderPath` (`arquivos/financeiro`); os extratos estão em `arquivos/b3`. → ensinar o importador a varrer **também** `arquivos/b3` (ou pasta configurável `Financas/B3FolderPath`), classificando por nome (`relatorio-consolidado-mensal-*`).
+2. **Inverter a precedência** em `SincronizarTransacoesCanonicasAsync`: **B3 manda por ticker×mês onde houver `NegociacaoMensalB3`; a nota Nubank só materializa onde a B3 não cobre** (meses < set/2021, outras corretoras). (Hoje é o contrário.)
+3. **Bump `MaterializacaoVersao`** → o resync apaga as transações de importação e reconstrói do staging com a regra nova (**não precisa apagar tabela à mão**). Staging (OperacaoB3/NegociacaoMensalB3/TransacaoCripto) é preservado.
+4. **Reconciliar pela Posição** (F3): para o mês mais recente de cada ticker, a **quantidade da aba Posição** é a verdade; sinalizar/zerar divergências que nem a Negociação corrigiu (vendas parciais nas notas, troca de ticker).
+5. **Validar** contra a Posição B3 2025-07 (7 ações + 9 FIIs). Casos fora de escopo desta fase: **troca de ticker** (TAEE3→TAEE4) e **alias IRDM11** (IRIDIUM/IRIM). Cripto é trilha à parte (#9 netting Binance).
+> Aceite real só fecha rodando o app contra o SQL Server do usuário (não mexer no banco sem OK).
