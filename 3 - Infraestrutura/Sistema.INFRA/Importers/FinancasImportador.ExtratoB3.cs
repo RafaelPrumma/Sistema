@@ -81,7 +81,7 @@ public partial class FinancasImportador
         if (periodo is not null)
         {
             PovoarNegociacoesMensaisB3(extrato, documento, carga, periodo.Value, ativos);
-            MaterializarProventosExtratoB3(extrato, documento, carga, ativos);
+            await MaterializarProventosExtratoB3(extrato, documento, carga, ativos, cancellationToken);
         }
 
         documento.ParseStatus = totalLinhas > 0
@@ -149,7 +149,7 @@ public partial class FinancasImportador
 
     // Aba "Proventos Recebidos": provento realizado oficial (inclui FII). Usa o UpsertRendimento
     // compartilhado (dedup econômico por ticker+data+tipo) — não reescreve a lógica de dedup.
-    private void MaterializarProventosExtratoB3(ExtratoConsolidadoB3Documento extrato, DocumentoFinanceiro documento, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos)
+    private async Task MaterializarProventosExtratoB3(ExtratoConsolidadoB3Documento extrato, DocumentoFinanceiro documento, CargaFinanceira carga, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
     {
         var aba = extrato.Aba("Proventos Recebidos");
         if (aba is null || aba.Linhas.Count < 2)
@@ -165,6 +165,12 @@ public partial class FinancasImportador
 
             var classe = ExtratoB3Materializador.ClassePorTicker(provento.Ticker);
             var ativo = ObterOuCriarAtivo(ativos, provento.Ticker, provento.Produto ?? provento.Ticker, classe, false, provento.Ticker);
+
+            // Ativo recém-criado tem Id=0 até salvar; o provento referencia o AssetId por ESCALAR
+            // (UpsertRendimento), então persistimos o ativo novo ANTES — senão o insert do
+            // RendimentoInvestimento viola a FK FinanceiroRendimento→FinanceiroAtivo (AssetId=0).
+            if (ativo.Id == 0)
+                await _context.SaveChangesAsync(cancellationToken);
 
             UpsertRendimento(
                 carga,
