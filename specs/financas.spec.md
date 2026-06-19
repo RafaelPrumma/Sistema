@@ -23,14 +23,16 @@ O módulo Finanças deixa de ser só "carteira" e passa a ter **3 submódulos** 
 | #9 Baldes Trade/Rendimentos (earn) | Investimentos | 🟡 parcial |
 | #10 Mobile | — | ⛔ descartado |
 | Ideias novas A–E (YoC, risco, preço-teto, calendário, comparador) | Investimentos | ⚪ |
-| Import do export oficial da B3 | Investimentos | ⚪ (substitui "Conexão B3") |
+| Import do export oficial da B3 | Investimentos | 🟡 spec `importador-b3.spec.md` — **#1** |
 | Gestão de gastos | **Gastos** (submódulo novo) | ⚪ |
 
 ## Sobre a "Conexão B3"
 API ao vivo (estilo Kinvo) exige convênio institucional com a B3 / Open Finance — **inviável para app pessoal**. Caminho real: importar o **export da Área do Investidor B3** (Posição + Extrato de Movimentação/Proventos), que é a fonte oficial e resolve compras faltantes + rendimento de FII. Detalhe em `investimentos.spec.md`.
 
 ## Priorização sugerida
-1. #2 eventos (em andamento) · 2. #6 IR cripto 2026 (urgente, regra nova) · 3. import export B3 (destrava posição + FII proventos) · 4. #3 rentabilidade+benchmark · 5. #9 baldes + #4 aportes · 6. Gastos (pilar novo) · 7. #8 metas/rebal + #7 alertas · 8. ideias A–E.
+1. **import B3** (`importador-b3.spec.md`) — destrava compras faltantes + proventos de FII; snapshot mensal p/ aceite e detecção de split · 2. #2 eventos (split) · 3. #6 IR cripto 2026 (urgente, regra nova) · 4. #3 rentabilidade+benchmark · 5. #9 baldes + #4 aportes · 6. Gastos (pilar novo) · 7. #8 metas/rebal + #7 alertas · 8. ideias A–E.
+
+> Reordenado em jun/2026: o import da B3 subiu para #1 (fonte oficial chegando aos poucos; resolve dado faltante que destrava o resto). Os demais desceram uma posição.
 
 ## Fontes de dados
 `arquivos/financeiro/` (notas, Binance, extratos, faturas) e `arquivos/ir/` (informes). Reimport lê de `arquivos/financeiro`.

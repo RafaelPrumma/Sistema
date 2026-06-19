@@ -19,8 +19,8 @@ Sobrepor **custo acumulado (aportes)** × **patrimônio** no gráfico de evoluç
 ### F-D · Unificar fallback de preço — #5
 Hoje ativo sem cotação contribui 0 no histórico e custo no card (inconsistente). Unificar: usar custo como fallback consistente e sinalizar status "sem cotação".
 
-### F-E · Import do export oficial da B3
-Substitui a "Conexão B3" (inviável p/ app pessoal). Importar **Posição** + **Extrato de Movimentação/Proventos** exportados da Área do Investidor B3. Fonte oficial → completa compras faltantes e traz **rendimento de FII** (que não está em informe nenhum). Novo `DocumentKind` + parser.
+### F-E · Import do export oficial da B3 — **prioridade #1**
+Ver `importador-b3.spec.md` (detalhado). Substitui a "Conexão B3" (inviável p/ app pessoal). Importa o **relatório consolidado mensal** da Área do Investidor B3 (1 `.xlsx`/mês, 6 abas) → completa compras faltantes (aba **Negociações**) e traz **rendimento de FII** (aba **Proventos Recebidos**, que não está em informe nenhum); abas de **Posição** dão snapshot para aceite e detecção de split. Novo `DocumentKind` + parser.
 
 ### F-F · Baldes Trade/Rendimentos — #9
 Earn/staking cripto entra na **posição** (não só como renda), em balde separado do "Trade", com custo = valor de mercado na data (sem lucro artificial). Preço médio limpo só dos trades; total = soma dos baldes (bate com a corretora).
