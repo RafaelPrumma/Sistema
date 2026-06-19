@@ -784,7 +784,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 return await ProcessarCsvAsync(documento, file, carga, ativos, cancellationToken);
 
             if (ext == ".xlsx")
+            {
+                if (documento.DocumentKind == TipoDocumentoFinanceiro.ExtratoConsolidadoB3)
+                    return await ProcessarExtratoB3Async(documento, file, cancellationToken);
+
                 return await ProcessarXlsxAsync(documento, file, carga, ativos, cancellationToken);
+            }
 
             if (ext == ".pdf")
                 return await ProcessarPdfAsync(documento, file, carga, ativos, cancellationToken);
@@ -1366,6 +1371,10 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     private static TipoDocumentoFinanceiro ClassificarDocumento(string file)
     {
         var name = Path.GetFileName(file).ToLowerInvariant();
+        // Extrato consolidado mensal da Área do Investidor B3 (.xlsx com shared strings).
+        // Vem antes das regras Binance para não colidir com "transa"/"dep"/"ordens".
+        if (name.Contains("relatorio-consolidado-mensal") || name.Contains("consolidado"))
+            return TipoDocumentoFinanceiro.ExtratoConsolidadoB3;
         if (name.Contains("transa")) return TipoDocumentoFinanceiro.BinanceTransactions;
         if (name.Contains("trades-spot")) return TipoDocumentoFinanceiro.BinanceSpotTrades;
         if (name.Contains("ordens-spot") || name.Contains("ordens spot")) return TipoDocumentoFinanceiro.BinanceSpotOrders;

@@ -85,7 +85,8 @@ public enum TipoDocumentoFinanceiro
     BinanceConvertOrders = 8,
     BinanceDeposits = 9,
     CsvBinance = 10,
-    InformeRendimentos = 11
+    InformeRendimentos = 11,
+    ExtratoConsolidadoB3 = 12
 }
 
 public enum StatusParseDocumentoFinanceiro
