@@ -39,7 +39,7 @@ Posição = **balde Trade** (compras/vendas, PM limpo) + **balde Rendimentos** (
 - **IN 1888:** sinalizar mês com operações > R$ 30.000.
 
 ## 8. Fases
-- **F1 — Netting (corrige a posição):** modelar **permuta como duas pernas** (abater a origem) no `SincronizarTransacoesCanonicasAsync`/staging cripto; **earn como entrada valorada**; **BRL = caixa** (fora da posição). → fantasmas e negativos somem; posição bate com a corretora.
+- **F1 — Netting (corrige a posição): ✅ feito (jun/2026).** `CriptoNetting` (puro/testável) classifica o ledger da Binance e neta as pernas assinadas (permuta abate a origem; BRL/fiat fora; earn = Rendimento custo 0; transferência interna ignorada). `MaterializarCriptoNettingAsync` usa **só o ledger** (fonte completa; spot/convert não materializam → evita dobrar), preço da perna = PM corrente (realizado ≈ 0 nesta fase). `MaterializacaoVersao` 6→7 (resync no próximo start). 18 testes, suíte 94/94. ⚠️ Pressupõe que o **ledger** ("Histórico de Transações") esteja presente — é a fonte única. Aceite real (posição bate, sem fantasma/negativo) só valida rodando o app.
 - **F2 — Valoração + baldes:** preço BRL na data p/ permutas; baldes Trade/Rendimentos; alertas de valor faltante.
 - **F3 — Ponte IR cripto:** gerar Operacoes_Ganho (com permutas), Rendimentos_Rewards, B&D com código, Aplic_Fin_Exterior, flag IN 1888 — consumido pela `CalculadoraIr`/export.
 
