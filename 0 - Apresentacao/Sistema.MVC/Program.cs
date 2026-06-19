@@ -119,11 +119,18 @@ using (var scope = app.Services.CreateScope())
                 "financas-proventos",
                 s => s.AtualizarProventosAsync(false, CancellationToken.None),
                 Cron.Daily());
+
+            // Eventos corporativos (desdobramento/grupamento) raros: busca diária na Brapi, upsert idempotente.
+            RecurringJob.AddOrUpdate<IFinancasMarketDataService>(
+                "financas-eventos-corporativos",
+                s => s.AtualizarEventosCorporativosAsync(false, CancellationToken.None),
+                Cron.Daily());
         }
         else
         {
             RecurringJob.RemoveIfExists("financas-cotacoes");
             RecurringJob.RemoveIfExists("financas-proventos");
+            RecurringJob.RemoveIfExists("financas-eventos-corporativos");
         }
     }
 }

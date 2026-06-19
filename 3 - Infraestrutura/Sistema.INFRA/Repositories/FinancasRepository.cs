@@ -217,13 +217,47 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TransacaoFinanceira>> BuscarTodasTransacoesAsync(CancellationToken cancellationToken = default)
-        => await _context.TransacoesFinanceiras
+    {
+        var transacoes = await _context.TransacoesFinanceiras
             .AsNoTracking()
             .Include(x => x.Asset)
             .Where(x => x.IsCanonical && x.Asset != null)
             .OrderBy(x => x.Date)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+        var eventos = await _context.EventosCorporativos
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        if (eventos.Count == 0)
+            return transacoes;
+
+        // Agrupa eventos por ativo: para cada transação pré-Data, aplica o produto dos fatores.
+        var eventosPorAtivo = eventos
+            .GroupBy(e => e.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(e => e.Data).ToList());
+
+        foreach (var t in transacoes)
+        {
+            if (!eventosPorAtivo.TryGetValue(t.AssetId, out var evs))
+                continue;
+
+            // Produto dos fatores de todos os eventos posteriores à data da transação.
+            var fatorAcumulado = evs
+                .Where(e => t.Date < e.Data)
+                .Aggregate(1m, (acc, e) => acc * e.Fator);
+
+            if (fatorAcumulado == 1m)
+                continue;
+
+            t.Quantity *= fatorAcumulado;
+            t.UnitPrice /= fatorAcumulado;
+            // GrossAmount permanece inalterado (= Quantity_pré × UnitPrice_pré = Quantity_pós × UnitPrice_pós).
+        }
+
+        return transacoes;
+    }
 
     public async Task<PagedResult<TransacaoFinanceira>> BuscarTransacoesAsync(int page, int pageSize, string? termo, OrigemTransacao? origem, CancellationToken cancellationToken = default)
     {
@@ -289,6 +323,28 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
 
     public async Task AdicionarAtivoAsync(AtivoFinanceiro ativo, CancellationToken cancellationToken = default)
         => await _context.AtivosFinanceiros.AddAsync(ativo, cancellationToken);
+
+    public async Task<PagedResult<EventoCorporativo>> BuscarEventosCorporativosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var query = _context.EventosCorporativos.AsNoTracking().Include(x => x.AtivoFinanceiro).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(x =>
+                (x.AtivoFinanceiro != null && (x.AtivoFinanceiro.Ticker != null && x.AtivoFinanceiro.Ticker.Contains(termo)))
+                || x.Fonte.Contains(termo));
+        return await query.OrderByDescending(x => x.Data).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
+    }
+
+    public Task<EventoCorporativo?> ObterEventoCorporativoAsync(int id, CancellationToken cancellationToken = default)
+        => _context.EventosCorporativos.Include(x => x.AtivoFinanceiro).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task AdicionarEventoCorporativoAsync(EventoCorporativo evento, CancellationToken cancellationToken = default)
+        => await _context.EventosCorporativos.AddAsync(evento, cancellationToken);
+
+    public void AtualizarEventoCorporativo(EventoCorporativo evento)
+        => _context.EventosCorporativos.Update(evento);
+
+    public void RemoverEventoCorporativo(EventoCorporativo evento)
+        => _context.EventosCorporativos.Remove(evento);
 
     private async Task<int> ObterCargaIdAsync(CancellationToken cancellationToken)
     {

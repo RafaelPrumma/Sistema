@@ -391,6 +391,18 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
     }
 
+    // Apuração de IR (cola): usa o carregador central (já com ajuste de split) + os proventos.
+    public async Task<ApuracaoIrDto> ObterApuracaoIrAsync(int ano, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var rendimentos = await _uow.Financas.BuscarRendimentosAsync(cancellationToken);
+        return CalculadoraIr.Apurar(ano, transacoes, rendimentos);
+    }
+
+    public async Task<byte[]> ExportarApuracaoIrExcelAsync(int ano, CancellationToken cancellationToken = default)
+        => ExcelApuracaoIr.Gerar(await ObterApuracaoIrAsync(ano, cancellationToken));
+
     private static EvolucaoPatrimonioDto CriarEvolucaoPatrimonio(
         IReadOnlyList<TransacaoFinanceira> transacoes,
         IReadOnlyList<PrecoHistoricoAtivoFinanceiro> historico,
@@ -863,6 +875,117 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         await _uow.ConfirmarAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação excluída.");
     }
+
+    public async Task<PagedResult<EventoCorporativoDto>> BuscarEventosCorporativosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var result = await _uow.Financas.BuscarEventosCorporativosAsync(page, pageSize, termo, cancellationToken);
+        return new PagedResult<EventoCorporativoDto>(result.Items.Select(MapEventoCorporativo).ToList(), result.TotalCount, result.Page, result.PageSize);
+    }
+
+    public async Task<ResultadoOperacao> RegistrarEventoCorporativoManualAsync(NovoEventoCorporativoInput input, CancellationToken cancellationToken = default)
+    {
+        if (input is null || string.IsNullOrWhiteSpace(input.Ticker))
+            return new ResultadoOperacao(false, "Informe o ticker do ativo.");
+        if (input.Fator <= 0m)
+            return new ResultadoOperacao(false, "Fator deve ser maior que zero.");
+        if (!Enum.TryParse<TipoEventoCorporativo>(input.Tipo, true, out var tipo))
+            return new ResultadoOperacao(false, "Tipo de evento inválido.");
+
+        var ticker = input.Ticker.Trim().ToUpperInvariant();
+        var ativo = await _uow.Financas.ObterAtivoPorChaveOuTickerAsync(ticker, cancellationToken);
+        if (ativo is null)
+        {
+            var validacao = await _marketData.ValidarAtivoAsync(ticker, cancellationToken);
+            if (!validacao.Valido)
+                return new ResultadoOperacao(false, validacao.Mensagem ?? "Ativo inválido.");
+
+            var classe = Enum.TryParse<ClasseAtivo>(validacao.Classe, true, out var c) ? c : ClasseAtivo.Outro;
+            ativo = new AtivoFinanceiro
+            {
+                AssetKey = ticker,
+                Ticker = ticker,
+                Name = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
+                AssetClass = classe,
+                Market = validacao.IsCrypto ? "Binance" : "B3",
+                Currency = "BRL",
+                IsCrypto = validacao.IsCrypto,
+                IsActive = true,
+                UsuarioInclusao = "financas-manual"
+            };
+            await _uow.Financas.AdicionarAtivoAsync(ativo, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
+        }
+
+        var fonte = string.IsNullOrWhiteSpace(input.Fonte) ? "Manual" : input.Fonte!.Trim();
+        // Chave canônica (independe da fonte) → dedup contra seed e Brapi: o mesmo split não entra 2×.
+        var chaveNatural = EventoCorporativo.GerarChaveNatural(ticker, input.Data, input.Fator);
+
+        var evento = new EventoCorporativo
+        {
+            AtivoFinanceiroId = ativo.Id,
+            Tipo = tipo,
+            Data = input.Data.Date,
+            Fator = input.Fator,
+            Fonte = fonte,
+            ChaveNatural = chaveNatural,
+            UsuarioInclusao = UsuarioAtual
+        };
+        await _uow.Financas.AdicionarEventoCorporativoAsync(evento, cancellationToken);
+        await _log.RegistrarFinanceiroAsync(
+            "EventoCorporativo", "CriarManual", true,
+            $"Evento {tipo} de {ticker} em {input.Data:yyyy-MM-dd} fator {input.Fator}",
+            LogTipo.Sucesso, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Evento corporativo registrado.", evento.Id);
+    }
+
+    public async Task<ResultadoOperacao> EditarEventoCorporativoAsync(int id, NovoEventoCorporativoInput input, CancellationToken cancellationToken = default)
+    {
+        var evento = await _uow.Financas.ObterEventoCorporativoAsync(id, cancellationToken);
+        if (evento is null)
+            return new ResultadoOperacao(false, "Evento corporativo não encontrado.");
+        if (input.Fator <= 0m)
+            return new ResultadoOperacao(false, "Fator deve ser maior que zero.");
+        if (!Enum.TryParse<TipoEventoCorporativo>(input.Tipo, true, out var tipo))
+            return new ResultadoOperacao(false, "Tipo de evento inválido.");
+
+        evento.Tipo = tipo;
+        evento.Data = input.Data.Date;
+        evento.Fator = input.Fator;
+        evento.Fonte = string.IsNullOrWhiteSpace(input.Fonte) ? evento.Fonte : input.Fonte!.Trim();
+        _uow.Financas.AtualizarEventoCorporativo(evento);
+        await _log.RegistrarFinanceiroAsync(
+            "EventoCorporativo", "Editar", true,
+            $"Evento #{evento.Id} editado ({tipo} fator {input.Fator})",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Evento corporativo atualizado.", evento.Id);
+    }
+
+    public async Task<ResultadoOperacao> ExcluirEventoCorporativoAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var evento = await _uow.Financas.ObterEventoCorporativoAsync(id, cancellationToken);
+        if (evento is null)
+            return new ResultadoOperacao(false, "Evento corporativo não encontrado.");
+
+        _uow.Financas.RemoverEventoCorporativo(evento);
+        await _log.RegistrarFinanceiroAsync(
+            "EventoCorporativo", "Excluir", true,
+            $"Evento #{evento.Id} excluído ({evento.Tipo} fator {evento.Fator})",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Evento corporativo excluído.");
+    }
+
+    private static EventoCorporativoDto MapEventoCorporativo(EventoCorporativo e)
+        => new(
+            e.Id,
+            e.AtivoFinanceiro?.Ticker ?? e.AtivoFinanceiro?.AssetKey ?? string.Empty,
+            e.AtivoFinanceiro?.Name ?? string.Empty,
+            e.Tipo.ToString(),
+            e.Data,
+            e.Fator,
+            e.Fonte);
 
     private static IReadOnlyList<FinanceiroKpiDto> CriarKpis(CargaFinanceira? carga)
     {

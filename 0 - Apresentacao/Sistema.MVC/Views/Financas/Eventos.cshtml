@@ -1,0 +1,266 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<EventoCorporativoDto>
+@{
+    ViewData["Title"] = "Eventos Corporativos";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    var hoje = DateTime.Now.ToString("yyyy-MM-dd");
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Eventos Corporativos",
+    Description = "Desdobramentos, grupamentos e bonificacoes. Ao salvar, o calculo de posicao passa a considerar o fator automaticamente (transacoes anteriores a data-ex sao ajustadas somente no calculo)."
+})
+
+@await Html.PartialAsync("_FlashMessages")
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex gap-2">
+        <input class="form-control form-control-sm" name="termo" value="@ViewBag.Termo" placeholder="Buscar por ticker ou fonte" style="max-width:220px" />
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Buscar</button>
+        @if (!string.IsNullOrWhiteSpace(ViewBag.Termo as string))
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Eventos">Limpar</a>
+        }
+    </form>
+    <button class="btn btn-primary" type="button" data-abrir-modal="novoEventoModal">
+        <i class="bi bi-plus-circle me-1"></i>Adicionar evento
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Ativo</th>
+                    <th>Tipo</th>
+                    <th>Data-ex</th>
+                    <th class="text-end">Fator</th>
+                    <th>Fonte</th>
+                    <th class="text-end">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ev in Model.Items)
+                {
+                    <tr>
+                        <td class="fw-semibold">@ev.Ticker</td>
+                        <td class="small text-secondary">@ev.AtivoNome</td>
+                        <td>
+                            <span class="badge @(ev.Tipo == "Desdobramento" ? "text-bg-primary" : ev.Tipo == "Grupamento" ? "text-bg-warning" : "text-bg-info")">
+                                @ev.Tipo
+                            </span>
+                        </td>
+                        <td>@ev.Data.ToString("dd/MM/yyyy", br)</td>
+                        <td class="text-end">@ev.Fator.ToString("G", br)</td>
+                        <td class="small">@ev.Fonte</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary js-editar-evento"
+                                    data-id="@ev.Id"
+                                    data-ticker="@ev.Ticker"
+                                    data-tipo="@ev.Tipo"
+                                    data-data="@ev.Data.ToString("yyyy-MM-dd")"
+                                    data-fator="@ev.Fator.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                    data-fonte="@ev.Fonte"
+                                    title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger js-excluir-evento"
+                                    data-id="@ev.Id"
+                                    data-ticker="@ev.Ticker"
+                                    title="Excluir">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Items.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-secondary py-4">Nenhum evento corporativo cadastrado.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="small text-secondary">@Model.TotalCount evento(s)</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+               asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")"
+               asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo">Proxima</a>
+        </div>
+    </div>
+</div>
+
+@* Modal — novo evento *@
+<div id="novoEventoModal" data-titulo="Adicionar evento corporativo" data-icone="bi bi-calendar-event" data-largura="560" style="display:none">
+    <form method="post" asp-action="Eventos" id="formNovoEvento" class="p-3">
+        @Html.AntiForgeryToken()
+        <div class="mb-3">
+            <label class="form-label">Ativo (ticker)</label>
+            <div class="input-group">
+                <input class="form-control text-uppercase" name="Ticker" id="evTicker" placeholder="Ex.: KNSC11, CPTS11, BCFF11" autocomplete="off" required />
+                <button class="btn btn-outline-secondary" type="button" id="evValidar">Validar</button>
+            </div>
+            <div class="form-text" id="evFeedback">Digite o ticker do ativo e clique em Validar.</div>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Tipo</label>
+                <select class="form-select" name="Tipo" required>
+                    <option value="Desdobramento">Desdobramento</option>
+                    <option value="Grupamento">Grupamento</option>
+                    <option value="Bonificacao">Bonificacao</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Data-ex</label>
+                <input class="form-control" type="date" name="Data" value="@hoje" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Fator</label>
+                <input class="form-control" type="number" step="any" min="0.0001" name="Fator" id="evFator" placeholder="Ex.: 8 (1:8), 0.1 (10:1)" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Fonte</label>
+                <input class="form-control" name="Fonte" placeholder="Manual, B3, Brapi..." />
+            </div>
+        </div>
+        <div class="form-text text-secondary mt-2">
+            Fator &gt; 1 = desdobramento (ex.: 8 significa 1:8 — cada cota vira 8). Fator &lt; 1 = grupamento (ex.: 0,1 = 10:1).
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="evCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="evSalvar" disabled>Salvar evento</button>
+        </div>
+    </form>
+</div>
+
+@* Modal — editar evento *@
+<div id="editarEventoModal" data-titulo="Editar evento corporativo" data-icone="bi bi-pencil" data-largura="560" style="display:none">
+    <form method="post" asp-action="EditarEvento" id="formEditarEvento" class="p-3">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="edEvId" />
+        <div class="mb-2">
+            <label class="form-label">Ticker</label>
+            <input class="form-control" id="edEvTicker" readonly />
+            <input type="hidden" name="Ticker" id="edEvTickerHidden" />
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Tipo</label>
+                <select class="form-select" name="Tipo" id="edEvTipo">
+                    <option value="Desdobramento">Desdobramento</option>
+                    <option value="Grupamento">Grupamento</option>
+                    <option value="Bonificacao">Bonificacao</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Data-ex</label>
+                <input class="form-control" type="date" name="Data" id="edEvData" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Fator</label>
+                <input class="form-control" type="number" step="any" min="0.0001" name="Fator" id="edEvFator" required />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Fonte</label>
+                <input class="form-control" name="Fonte" id="edEvFonte" />
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="edEvCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar alteracoes</button>
+        </div>
+    </form>
+</div>
+
+@* Form oculto para exclusao *@
+<form method="post" asp-action="ExcluirEvento" id="formExcluirEvento" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" id="exEvId" />
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    // --- Novo evento: validacao do ticker ---
+    var ticker = document.getElementById('evTicker');
+    var validar = document.getElementById('evValidar');
+    var feedback = document.getElementById('evFeedback');
+    var salvar = document.getElementById('evSalvar');
+    var cancelar = document.getElementById('evCancelar');
+    var validado = '';
+
+    function bloquear() {
+        salvar.disabled = true;
+        if (ticker.value.trim().toUpperCase() !== validado) {
+            feedback.className = 'form-text';
+        }
+    }
+
+    async function validarTicker() {
+        var valor = ticker.value.trim().toUpperCase();
+        if (!valor) return;
+        feedback.className = 'form-text text-secondary';
+        feedback.textContent = 'Validando ' + valor + '...';
+        salvar.disabled = true;
+        try {
+            var resp = await fetch('@Url.Action("ValidarAtivo", "Financas")?ticker=' + encodeURIComponent(valor));
+            var data = await resp.json();
+            if (data.valido) {
+                validado = (data.ticker || valor).toUpperCase();
+                ticker.value = validado;
+                feedback.className = 'form-text text-success';
+                feedback.textContent = '✓ ' + (data.nome || validado) + ' · ' + data.classe;
+                salvar.disabled = false;
+            } else {
+                feedback.className = 'form-text text-danger';
+                feedback.textContent = '✕ ' + (data.mensagem || 'Ativo nao encontrado.');
+                salvar.disabled = true;
+            }
+        } catch (e) {
+            feedback.className = 'form-text text-danger';
+            feedback.textContent = 'Nao foi possivel validar. Tente novamente.';
+        }
+    }
+
+    if (validar) validar.addEventListener('click', validarTicker);
+    if (ticker) {
+        ticker.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); validarTicker(); } });
+        ticker.addEventListener('input', bloquear);
+    }
+    if (cancelar) cancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('novoEventoModal'); });
+
+    // --- Editar ---
+    document.querySelectorAll('.js-editar-evento').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('edEvId').value = btn.dataset.id;
+            document.getElementById('edEvTicker').value = btn.dataset.ticker;
+            document.getElementById('edEvTickerHidden').value = btn.dataset.ticker;
+            document.getElementById('edEvTipo').value = btn.dataset.tipo;
+            document.getElementById('edEvData').value = btn.dataset.data;
+            document.getElementById('edEvFator').value = btn.dataset.fator;
+            document.getElementById('edEvFonte').value = btn.dataset.fonte;
+            if (window.abrirModal) window.abrirModal('editarEventoModal');
+        });
+    });
+
+    var edCancelar = document.getElementById('edEvCancelar');
+    if (edCancelar) edCancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('editarEventoModal'); });
+
+    // --- Excluir ---
+    document.querySelectorAll('.js-excluir-evento').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm('Excluir o evento de ' + btn.dataset.ticker + '?')) return;
+            document.getElementById('exEvId').value = btn.dataset.id;
+            document.getElementById('formExcluirEvento').submit();
+        });
+    });
+})();
+</script>
+}

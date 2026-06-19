@@ -45,4 +45,11 @@ public interface IFinancasRepository
     void RemoverTransacao(TransacaoFinanceira transacao);
     Task<AtivoFinanceiro?> ObterAtivoPorChaveOuTickerAsync(string chaveOuTicker, CancellationToken cancellationToken = default);
     Task AdicionarAtivoAsync(AtivoFinanceiro ativo, CancellationToken cancellationToken = default);
+
+    // Eventos corporativos (split/grupamento/bonificacao) — CRUD manual.
+    Task<PagedResult<EventoCorporativo>> BuscarEventosCorporativosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
+    Task<EventoCorporativo?> ObterEventoCorporativoAsync(int id, CancellationToken cancellationToken = default);
+    Task AdicionarEventoCorporativoAsync(EventoCorporativo evento, CancellationToken cancellationToken = default);
+    void AtualizarEventoCorporativo(EventoCorporativo evento);
+    void RemoverEventoCorporativo(EventoCorporativo evento);
 }

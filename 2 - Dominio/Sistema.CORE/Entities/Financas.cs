@@ -85,7 +85,8 @@ public enum TipoDocumentoFinanceiro
     BinanceConvertOrders = 8,
     BinanceDeposits = 9,
     CsvBinance = 10,
-    InformeRendimentos = 11
+    InformeRendimentos = 11,
+    ExtratoConsolidadoB3 = 12
 }
 
 public enum StatusParseDocumentoFinanceiro
@@ -351,6 +352,32 @@ public class TransacaoFinanceira : AuditableEntity
     public string? ChaveNatural { get; set; }
 }
 
+// Staging do extrato consolidado da B3 (aba Negociações). É um AGREGADO mensal por ticker:
+// até 1 compra + 1 venda por ticker/mês (preço = preço médio do mês). Materializa em
+// TransacaoFinanceira só onde as notas (granular) NÃO cobrem o ticker×mês (precedência §3.1).
+public class NegociacaoMensalB3 : AuditableEntity
+{
+    public int Id { get; set; }
+    public int CargaFinanceiraId { get; set; }
+    public CargaFinanceira? CargaFinanceira { get; set; }
+    public int? SourceDocumentId { get; set; }
+    public DocumentoFinanceiro? SourceDocument { get; set; }
+    public int AssetId { get; set; }
+    public AtivoFinanceiro? Asset { get; set; }
+    // Ano-mês do extrato no formato yyyyMM (ex.: 202209). Vem do nome do arquivo.
+    public int AnoMes { get; set; }
+    public TipoOperacaoFinanceira OperationType { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal GrossAmount { get; set; }
+    public DateTime? PeriodoInicial { get; set; }
+    public DateTime? PeriodoFinal { get; set; }
+    public string Broker { get; set; } = string.Empty;
+    // Chave natural do agregado (fonte + ticker + ano-mês + sentido + corretora) — índice único filtrado.
+    public string? ChaveNatural { get; set; }
+    public string RawJson { get; set; } = "{}";
+}
+
 public class EstimativaPosicaoCarteira : AuditableEntity
 {
     public int Id { get; set; }
@@ -429,4 +456,35 @@ public class AlertaConfiabilidade : AuditableEntity
     public string Message { get; set; } = string.Empty;
     public string? Details { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public enum TipoEventoCorporativo
+{
+    Desdobramento = 1,
+    Grupamento = 2,
+    Bonificacao = 3
+}
+
+// Evento corporativo (split/grupamento/bonificação) de um ativo financeiro.
+// Fator > 1 = desdobramento (ex.: 8 = 1:8); Fator < 1 = grupamento (ex.: 0,1 = 1:10).
+// A ChaveNatural garante idempotência: o mesmo evento não entra duas vezes.
+public class EventoCorporativo : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public TipoEventoCorporativo Tipo { get; set; } = TipoEventoCorporativo.Desdobramento;
+    // Data-ex do evento (data a partir da qual as cotas já são pós-evento).
+    public DateTime Data { get; set; }
+    // Fator multiplicador: transações pré-Data têm Quantity *= Fator e UnitPrice /= Fator.
+    // Ex.: 8 = desdobramento 1:8; 0.1 = grupamento 10:1.
+    public decimal Fator { get; set; }
+    public string Fonte { get; set; } = string.Empty;
+    // Chave natural: idempotência do seed/import (ticker|data|fator).
+    public string? ChaveNatural { get; set; }
+
+    // Chave natural canônica do evento. Independe da fonte (seed, manual ou Brapi geram a MESMA
+    // chave para o mesmo evento) → o índice único deduplica entre fontes e evita aplicar o fator 2×.
+    public static string GerarChaveNatural(string ticker, DateTime data, decimal fator)
+        => $"{ticker.Trim().ToUpperInvariant()}|{data:yyyyMMdd}|{fator.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }
