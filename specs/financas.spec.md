@@ -35,7 +35,7 @@ API ao vivo (estilo Kinvo) exige convênio institucional com a B3 / Open Finance
 
 **Em aberto (reordenado jun/2026 após o achado dos "fantasmas"):**
 1. **B3 como fonte de verdade** (`importador-b3.spec.md`) — (a) fazer a B3 **entrar de fato** (pasta: o importador precisa varrer `arquivos/b3`), (b) **inverter a precedência** (B3 manda, Nubank complementa) + resync, (c) **reconciliação pela Posição** (F3) p/ cravar a quantidade oficial. **Conserta as posições erradas (vendidos fantasmas).**
-2. **#9 cripto — netting** (baldes Trade/Rendimentos) — Binance não abate o lado vendido; stablecoins/BRL/tokens viram posição fantasma. **Conserta os fantasmas de cripto.**
+2. **#9 cripto — netting** (`cripto.spec.md`; baldes Trade/Rendimentos) — Binance não abate o lado vendido; stablecoins/BRL/tokens viram posição fantasma. **Conserta os fantasmas de cripto** e é o elo que destrava o **IR de cripto** (permuta=alienação).
 3. **Rentabilidade F2** (série de `CriarEvolucaoPatrimonio` + CDI/Ibov/IPCA + UI).
 4. **Aceite do IR** contra os informes de `arquivos/ir/`.
 5. **Troca de ticker** (incorporação, ex.: TAEE3→TAEE4) + **alias IRDM11** (IRIDIUM/IRIM subconta).
