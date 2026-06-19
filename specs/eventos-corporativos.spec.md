@@ -42,7 +42,7 @@ Após a correção, as posições calculadas devem bater com a lista abaixo (tol
 Ao carregar transações para cálculo, para cada transação com `Date < Evento.Data` do mesmo ativo: `Quantity *= fator` e `UnitPrice /= fator` (mantém `GrossAmount`). Eventos múltiplos = produto dos fatores. **Só no caminho de cálculo** (`BuscarTodasTransacoesAsync`), nunca na lista/grid de transações.
 
 ## 6. Fases
-- **F1 — Núcleo:** entidade + mapping + migration + ajuste no carregador + seed dos eventos conhecidos + testes. → zera os negativos e corrige os mantidos.
+- **F1 — Núcleo: ✅ feito (jun/2026).** `EventoCorporativo` + enum + mapping + migration `AddEventoCorporativo` (não aplicada) + `DbSet` + seed idempotente; ajuste em `BuscarTodasTransacoesAsync` (produto dos fatores p/ `Date < Evento.Data`, por ativo, **independente da Fonte** — pega notas e `B3 Extrato`; `Quantity *= fator`, `UnitPrice /= fator`, `GrossAmount` preservado; só no caminho de cálculo). 4 testes, `dotnet test` verde (52/52). **Semeados só os confirmados:** BCFF11 1:8 (28/11/2023), GGRC11 1:10 (06/03/2024). **Pendentes de confirmação do fator/data (NÃO semeados):** CPTS11 ~1:2, KNSC11 ~1,66 (suspeito — fator não-inteiro), FYTO11 ~1,08, BBAS3 ~1,42, CNES11. Aceite real (§3) só valida com a migration aplicada + reimport rodando no app.
 - **F2 — Cadastro manual:** CRUD de eventos na UI (padrão do lançamento manual de transação).
 - **F3 — Auto-busca Brapi:** job recorrente que tenta buscar splits e faz upsert idempotente; alerta para cadastro manual quando a fonte não tiver o dado.
 
