@@ -1,0 +1,152 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model ApuracaoIrDto
+@{
+    ViewData["Title"] = "Imposto de Renda";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    int ano = ViewBag.Ano is int a ? a : Model.Ano;
+    var ganhosB3 = Model.GanhosMensais.Where(g => g.Natureza != "Cripto").ToList();
+    var ganhosCripto = Model.GanhosMensais.Where(g => g.Natureza == "Cripto").ToList();
+
+    Func<List<ApuracaoMensalIrDto>, Microsoft.AspNetCore.Mvc.Razor.HelperResult> GanhosTabela =
+        @<table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Mes</th><th>Natureza</th>
+                    <th class="text-end">Vendas</th><th class="text-end">Resultado</th>
+                    <th class="text-end">Base</th><th class="text-end">Aliq.</th>
+                    <th class="text-end">Imposto</th><th>Isento</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!item.Any())
+                {
+                    <tr><td colspan="8" class="text-muted text-center py-3">Sem vendas no ano.</td></tr>
+                }
+                @foreach (var g in item)
+                {
+                    <tr>
+                        <td>@g.Mes.ToString("00")</td>
+                        <td>@g.Natureza</td>
+                        <td class="text-end">@g.TotalVendas.ToString("C2", br)</td>
+                        <td class="text-end">@g.Resultado.ToString("C2", br)</td>
+                        <td class="text-end">@g.BaseCalculo.ToString("C2", br)</td>
+                        <td class="text-end">@(g.Aliquota == 0 ? "-" : g.Aliquota.ToString("P1", br))</td>
+                        <td class="text-end">@g.Imposto.ToString("C2", br)</td>
+                        <td>@(g.Isento ? "Isento" : "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>;
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Imposto de Renda",
+    Description = "Cola da declaracao: ganho de capital por mes (DARF), Bens e Direitos em 31/12 e proventos. Apoio - NAO substitui contador."
+})
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <form method="get" asp-action="IR" class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0">Ano-calendario</label>
+        <select name="ano" class="form-select form-select-sm" style="max-width:120px" onchange="this.form.submit()">
+            @for (var y = DateTime.UtcNow.Year - 1; y >= DateTime.UtcNow.Year - 6; y--)
+            {
+                <option value="@y" selected="@(y == ano)">@y</option>
+            }
+        </select>
+        <noscript><button class="btn btn-sm btn-outline-secondary" type="submit">Ver</button></noscript>
+    </form>
+    <a class="btn btn-success" asp-action="ExportarIR" asp-route-ano="@ano">
+        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+    </a>
+</div>
+
+<div class="alert alert-warning py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    Apoio/cola, <strong>nao substitui contador</strong>. Cripto: regra vigente em @ano (a MP 1.303/2025 que traria 17,5% fixo foi rejeitada).
+    Simplificacoes: nao separa day-trade; cripto assume exchange nacional.
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between">
+                <span>Ganho de capital - B3 (mensal / DARF)</span>
+                <strong>Imposto do ano: @Model.TotalImpostoDevido.ToString("C2", br)</strong>
+            </div>
+            <div class="card-body table-responsive p-0">
+                @GanhosTabela(ganhosB3)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Ganho de capital - Cripto (mensal)</div>
+            <div class="card-body table-responsive p-0">
+                @GanhosTabela(ganhosCripto)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Bens e Direitos (posicao em 31/12/@ano, ao custo)</div>
+            <div class="card-body table-responsive p-0">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Ticker</th><th>Classe</th><th class="text-end">Qtd</th><th class="text-end">Custo</th></tr></thead>
+                    <tbody>
+                    @if (Model.BensEDireitos.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted text-center py-3">Sem posicao em 31/12.</td></tr>
+                    }
+                    @foreach (var b in Model.BensEDireitos)
+                    {
+                        <tr>
+                            <td>@b.Ticker</td>
+                            <td>@b.Classe</td>
+                            <td class="text-end">@b.Quantidade.ToString("0.########", br)</td>
+                            <td class="text-end">@b.Custo.ToString("C2", br)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Rendimentos</div>
+            <div class="card-body">
+                <h6 class="text-muted">Isentos e nao tributaveis</h6>
+                <table class="table table-sm align-middle">
+                    <tbody>
+                    @if (Model.RendimentosIsentos.Count == 0)
+                    {
+                        <tr><td class="text-muted">Nenhum.</td></tr>
+                    }
+                    @foreach (var r in Model.RendimentosIsentos)
+                    {
+                        <tr><td>@r.Tipo</td><td class="text-end">@r.Valor.ToString("C2", br)</td></tr>
+                    }
+                    </tbody>
+                </table>
+                <h6 class="text-muted mt-2">Tributacao exclusiva (JCP)</h6>
+                <table class="table table-sm align-middle mb-0">
+                    <tbody>
+                    @if (Model.TributacaoExclusiva.Count == 0)
+                    {
+                        <tr><td class="text-muted">Nenhum.</td></tr>
+                    }
+                    @foreach (var r in Model.TributacaoExclusiva)
+                    {
+                        <tr><td>@r.Tipo</td><td class="text-end">@r.Valor.ToString("C2", br)</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

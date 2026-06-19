@@ -266,4 +266,19 @@ public class FinancasController(IFinancasAppService service) : Controller
             TempData["MensagemErro"] = resultado.Mensagem;
         return RedirectToAction(nameof(Eventos));
     }
+
+    [HttpGet("/Financas/IR")]
+    public async Task<IActionResult> IR(int? ano, CancellationToken cancellationToken)
+    {
+        var anoAlvo = ano ?? DateTime.UtcNow.Year - 1; // declaração cobre o ano-calendário anterior.
+        ViewBag.Ano = anoAlvo;
+        return View(await _service.ObterApuracaoIrAsync(anoAlvo, cancellationToken));
+    }
+
+    [HttpGet("/Financas/IR/Exportar")]
+    public async Task<IActionResult> ExportarIR(int ano, CancellationToken cancellationToken)
+    {
+        var bytes = await _service.ExportarApuracaoIrExcelAsync(ano, cancellationToken);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"IR-{ano}.xlsx");
+    }
 }
