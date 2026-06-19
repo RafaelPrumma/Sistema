@@ -391,6 +391,18 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
     }
 
+    // Apuração de IR (cola): usa o carregador central (já com ajuste de split) + os proventos.
+    public async Task<ApuracaoIrDto> ObterApuracaoIrAsync(int ano, CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+        var rendimentos = await _uow.Financas.BuscarRendimentosAsync(cancellationToken);
+        return CalculadoraIr.Apurar(ano, transacoes, rendimentos);
+    }
+
+    public async Task<byte[]> ExportarApuracaoIrExcelAsync(int ano, CancellationToken cancellationToken = default)
+        => ExcelApuracaoIr.Gerar(await ObterApuracaoIrAsync(ano, cancellationToken));
+
     private static EvolucaoPatrimonioDto CriarEvolucaoPatrimonio(
         IReadOnlyList<TransacaoFinanceira> transacoes,
         IReadOnlyList<PrecoHistoricoAtivoFinanceiro> historico,
