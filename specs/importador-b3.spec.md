@@ -61,6 +61,8 @@ Arquivos em `arquivos/b3/` (ver `arquivos/b3/README.md`). Contêm CPF e dados de
 `dotnet build` + `dotnet test` verde (teste do parser com os `.xlsx` reais e do dedup/precedência). Conferir uma posição mensal contra a aba de Posição correspondente.
 
 ## 10. Plano: reimport limpa com B3 como base (decidido jun/2026)
+> **Status: passos 1–3 ✅ feitos (jun/2026)** — importador varre `arquivos/b3` (config `Financas/B3FolderPath`), precedência **invertida** (B3 manda; nota só onde a B3 não cobre, via `DeveMaterializarNotaB3`), `MaterializacaoVersao` 7→8. Build + test verdes. **Passo 4 (reconciliação pela Posição) = pendente.** Aceite real só fecha rodando o app contra o banco.
+
 Motivo: as notas Nubank são incompletas (fantasmas) → B3 vira a fonte de verdade (§3.1). Passos:
 1. **Fazer a B3 entrar:** o importador hoje varre só `WatchedFolderPath` (`arquivos/financeiro`); os extratos estão em `arquivos/b3`. → ensinar o importador a varrer **também** `arquivos/b3` (ou pasta configurável `Financas/B3FolderPath`), classificando por nome (`relatorio-consolidado-mensal-*`).
 2. **Inverter a precedência** em `SincronizarTransacoesCanonicasAsync`: **B3 manda por ticker×mês onde houver `NegociacaoMensalB3`; a nota Nubank só materializa onde a B3 não cobre** (meses < set/2021, outras corretoras). (Hoje é o contrário.)
