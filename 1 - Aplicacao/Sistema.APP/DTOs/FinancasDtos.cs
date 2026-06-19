@@ -216,6 +216,22 @@ public record NovaTransacaoInput(
 
 public record ResultadoOperacao(bool Sucesso, string? Mensagem, int? Id = null);
 
+public record EventoCorporativoDto(
+    int Id,
+    string Ticker,
+    string AtivoNome,
+    string Tipo,
+    DateTime Data,
+    decimal Fator,
+    string Fonte);
+
+public record NovoEventoCorporativoInput(
+    string Ticker,
+    string Tipo,
+    DateTime Data,
+    decimal Fator,
+    string? Fonte = null);
+
 // Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
 // VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
 public record SerieEvolucaoDto(

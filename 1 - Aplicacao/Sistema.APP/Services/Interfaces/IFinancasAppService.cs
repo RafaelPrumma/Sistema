@@ -30,4 +30,10 @@ public interface IFinancasAppService
     Task<ResultadoOperacao> RegistrarTransacaoManualAsync(NovaTransacaoInput input, CancellationToken cancellationToken = default);
     Task<ResultadoOperacao> EditarTransacaoAsync(int id, NovaTransacaoInput input, CancellationToken cancellationToken = default);
     Task<ResultadoOperacao> ExcluirTransacaoAsync(int id, CancellationToken cancellationToken = default);
+
+    // Eventos corporativos — CRUD manual.
+    Task<PagedResult<EventoCorporativoDto>> BuscarEventosCorporativosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> RegistrarEventoCorporativoManualAsync(NovoEventoCorporativoInput input, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> EditarEventoCorporativoAsync(int id, NovoEventoCorporativoInput input, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> ExcluirEventoCorporativoAsync(int id, CancellationToken cancellationToken = default);
 }

@@ -223,4 +223,47 @@ public class FinancasController(IFinancasAppService service) : Controller
             TempData["MensagemErro"] = resultado.Mensagem;
         return RedirectToAction(nameof(Transacoes));
     }
+
+    [HttpGet]
+    public async Task<IActionResult> Eventos(string? termo, int page = 1, CancellationToken cancellationToken = default)
+    {
+        ViewBag.Termo = termo;
+        return View(await _service.BuscarEventosCorporativosAsync(page, 25, termo, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Eventos(NovoEventoCorporativoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.RegistrarEventoCorporativoManualAsync(input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(Eventos));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditarEvento(int id, NovoEventoCorporativoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.EditarEventoCorporativoAsync(id, input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(Eventos));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExcluirEvento(int id, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.ExcluirEventoCorporativoAsync(id, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(Eventos));
+    }
 }

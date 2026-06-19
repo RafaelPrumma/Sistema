@@ -324,6 +324,28 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
     public async Task AdicionarAtivoAsync(AtivoFinanceiro ativo, CancellationToken cancellationToken = default)
         => await _context.AtivosFinanceiros.AddAsync(ativo, cancellationToken);
 
+    public async Task<PagedResult<EventoCorporativo>> BuscarEventosCorporativosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var query = _context.EventosCorporativos.AsNoTracking().Include(x => x.AtivoFinanceiro).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(x =>
+                (x.AtivoFinanceiro != null && (x.AtivoFinanceiro.Ticker != null && x.AtivoFinanceiro.Ticker.Contains(termo)))
+                || x.Fonte.Contains(termo));
+        return await query.OrderByDescending(x => x.Data).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
+    }
+
+    public Task<EventoCorporativo?> ObterEventoCorporativoAsync(int id, CancellationToken cancellationToken = default)
+        => _context.EventosCorporativos.Include(x => x.AtivoFinanceiro).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task AdicionarEventoCorporativoAsync(EventoCorporativo evento, CancellationToken cancellationToken = default)
+        => await _context.EventosCorporativos.AddAsync(evento, cancellationToken);
+
+    public void AtualizarEventoCorporativo(EventoCorporativo evento)
+        => _context.EventosCorporativos.Update(evento);
+
+    public void RemoverEventoCorporativo(EventoCorporativo evento)
+        => _context.EventosCorporativos.Remove(evento);
+
     private async Task<int> ObterCargaIdAsync(CancellationToken cancellationToken)
     {
         var carga = await _context.CargasFinanceiras.AsNoTracking().OrderByDescending(x => x.ImportedAt).Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);
