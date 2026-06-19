@@ -13,12 +13,13 @@ public static class ExtratoB3Materializador
     public const string Fonte = "B3 Extrato";
 
     /// <summary>
-    /// Precedência §3.1: as notas (granular, com data/corretagem) mandam onde existem; o agregado
-    /// mensal da B3 só preenche ticker×mês AUSENTE nas notas. <paramref name="cobertosPorNotas"/>
-    /// é o conjunto de (assetId, ano, mês) que já tem transação vinda de nota.
+    /// Precedência INVERTIDA (§3.1, revista jun/2026): a B3 é a fonte de verdade e SEMPRE materializa
+    /// suas Negociações; as notas Nubank só materializam onde a B3 NÃO cobre aquele ticker×mês
+    /// (meses < set/2021, outras corretoras). <paramref name="cobertosPorB3"/> é o conjunto de
+    /// (assetId, ano, mês) que tem Negociação da B3 → a nota daquele ticker×mês é pulada (a B3 manda).
     /// </summary>
-    public static bool DeveMaterializarNegociacaoB3(int assetId, int ano, int mes, ISet<(int AssetId, int Ano, int Mes)> cobertosPorNotas)
-        => !cobertosPorNotas.Contains((assetId, ano, mes));
+    public static bool DeveMaterializarNotaB3(int assetId, int ano, int mes, ISet<(int AssetId, int Ano, int Mes)> cobertosPorB3)
+        => !cobertosPorB3.Contains((assetId, ano, mes));
 
     /// <summary>Chave natural do agregado mensal: fonte + ticker + ano-mês + sentido + corretora.</summary>
     public static string ChaveNegociacao(string assetKey, int anoMes, TipoOperacaoFinanceira tipo, string? broker)

@@ -41,13 +41,20 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         await _repairService.RepararAsync(cancellationToken);
         await GarantirCarteirasPadraoAsync(cancellationToken);
 
-        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(watchedFolder)
-            && Directory.Exists(watchedFolder)
-            && !await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == watchedFolder, cancellationToken))
+        // Importa as pastas monitoradas (financeiro + extratos B3) que ainda não foram varridas.
+        // Cada pasta é guardada pelo próprio SourceFolder → idempotente entre execuções.
+        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
+        var precisaImportar = false;
+        foreach (var pasta in pastas)
         {
-            await ImportarPastaMonitoradaAsync(cancellationToken);
+            if (!await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == pasta, cancellationToken))
+            {
+                precisaImportar = true;
+                break;
+            }
         }
+        if (precisaImportar)
+            await ImportarPastaMonitoradaAsync(cancellationToken);
 
         // Garante que a tabela única reflita a regra de materialização atual.
         // Barato quando já está na versão certa; faz o resync completo quando a regra muda.
@@ -56,11 +63,66 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
     {
-        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
-        if (string.IsNullOrWhiteSpace(watchedFolder) || !Directory.Exists(watchedFolder))
+        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
+        if (pastas.Count == 0)
             return;
 
-        var files = Directory.EnumerateFiles(watchedFolder)
+        var importou = false;
+        foreach (var pasta in pastas)
+            importou |= await ImportarPastaAsync(pasta, cancellationToken);
+
+        if (importou)
+        {
+            await GarantirCarteirasPadraoAsync(cancellationToken);
+            await SincronizarTransacoesCanonicasAsync(cancellationToken);
+        }
+    }
+
+    // Pastas varridas pelo importador: a monitorada (notas Nubank/Binance) e a dos extratos B3.
+    // A pasta B3 default = irmã "b3" da monitorada (ex.: arquivos/financeiro → arquivos/b3); pode ser
+    // sobrescrita por Financas/B3FolderPath. Dedup ainda é por SourceFolder/Sha256 (mesmo arquivo
+    // numa pasta já varrida é pulado), então listar a mesma pasta duas vezes é inofensivo — mas
+    // distinguimos os caminhos para não reprocessar a financeiro como se fosse B3.
+    private async Task<List<string>> ResolverPastasMonitoradasAsync(CancellationToken cancellationToken)
+    {
+        var pastas = new List<string>();
+
+        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(watchedFolder) && Directory.Exists(watchedFolder))
+            pastas.Add(watchedFolder);
+
+        var b3Folder = await ResolverPastaB3Async(watchedFolder, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(b3Folder)
+            && Directory.Exists(b3Folder)
+            && !pastas.Any(p => string.Equals(p, b3Folder, StringComparison.OrdinalIgnoreCase)))
+            pastas.Add(b3Folder);
+
+        return pastas;
+    }
+
+    // Resolve a pasta dos extratos consolidados B3. Ordem: config Financas/B3FolderPath →
+    // pasta "b3" irmã da monitorada → "arquivos/b3" relativa ao content root.
+    private async Task<string?> ResolverPastaB3Async(string? watchedFolder, CancellationToken cancellationToken)
+    {
+        var configurada = await _config.ObterTextoAsync("Financas", "B3FolderPath", null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(configurada))
+            return configurada;
+
+        if (!string.IsNullOrWhiteSpace(watchedFolder))
+        {
+            var parent = Path.GetDirectoryName(watchedFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (!string.IsNullOrWhiteSpace(parent))
+                return Path.Combine(parent, "b3");
+        }
+
+        return Path.Combine(_hostEnvironment.ContentRootPath, "arquivos", "b3");
+    }
+
+    // Varre uma pasta: classifica e processa os arquivos suportados, com idempotência por
+    // SourceFolder (o batch) e por Sha256 do documento. Devolve true se importou algo novo.
+    private async Task<bool> ImportarPastaAsync(string folder, CancellationToken cancellationToken)
+    {
+        var files = Directory.EnumerateFiles(folder)
             .Where(IsSupportedFile)
             .OrderBy(Path.GetFileName)
             .ToList();
@@ -71,8 +133,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             carga = new CargaFinanceira
             {
                 SchemaVersion = "folder-v1",
-                JsonSha256 = Sha256(Encoding.UTF8.GetBytes(watchedFolder)),
-                SourcePath = watchedFolder,
+                JsonSha256 = Sha256(Encoding.UTF8.GetBytes(folder)),
+                SourcePath = folder,
                 ImportedAt = DateTime.UtcNow,
                 Status = StatusDocumentoFinanceiro.Processado,
                 SummaryJson = "{}",
@@ -83,7 +145,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         var batch = new ImportacaoFinanceiraArquivo
         {
-            SourceFolder = watchedFolder,
+            SourceFolder = folder,
             StartedAt = DateTime.UtcNow,
             FilesDiscovered = files.Count,
             UsuarioInclusao = "financas-importador"
@@ -136,14 +198,13 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             batch.FilesImported++;
         }
 
-        await GarantirCarteirasPadraoAsync(cancellationToken);
         batch.FinishedAt = DateTime.UtcNow;
         batch.Status = batch.FilesImported == 0
             ? StatusImportacaoFinanceira.Concluida
             : batch.StructuredRowsImported == 0 ? StatusImportacaoFinanceira.ConcluidaComAlertas : StatusImportacaoFinanceira.Concluida;
 
         await _context.SaveChangesAsync(cancellationToken);
-        await SincronizarTransacoesCanonicasAsync(cancellationToken);
+        return batch.FilesImported > 0;
     }
 
     private async Task ProcessarZipMonitoradoAsync(string zipFile, CargaFinanceira carga, ImportacaoFinanceiraArquivo batch, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
@@ -214,7 +275,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 7;
+    private const int MaterializacaoVersao = 8;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -242,61 +303,19 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         var novas = new List<TransacaoFinanceira>();
 
-        var ops = await _context.OperacoesB3
-            .Where(x => x.IsCanonical && x.AssetId != null)
-            .ToListAsync(cancellationToken);
-        foreach (var op in ops)
-        {
-            var chave = $"OperacaoB3#{op.Id}";
-            if (!jaMaterializadas.Add(chave))
-                continue;
-
-            var quantidade = Math.Abs(op.Quantity);
-            // Notas B3 não têm horário por trade: a chave usa a data (sem hora).
-            var chaveNatural = op.TradeDate.HasValue
-                ? GerarChaveNatural("Nubank B3", op.AssetId!.Value, op.TradeDate.Value, op.OperationType, quantidade, op.UnitPrice)
-                : null;
-            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
-                continue;
-
-            novas.Add(new TransacaoFinanceira
-            {
-                Origem = OrigemTransacao.Importacao,
-                AssetId = op.AssetId!.Value,
-                Date = (op.TradeDate ?? op.DataInclusao).Date,
-                OperationType = op.OperationType,
-                Quantity = quantidade,
-                UnitPrice = op.UnitPrice,
-                GrossAmount = op.GrossAmount,
-                Fees = op.Fees,
-                Currency = "BRL",
-                Broker = string.IsNullOrWhiteSpace(op.Broker) ? "NU Invest" : op.Broker,
-                Fonte = "Nubank B3",
-                SourceDocumentId = op.SourceDocumentId,
-                CargaFinanceiraId = op.CargaFinanceiraId,
-                StagingTipo = "OperacaoB3",
-                StagingId = op.Id,
-                DuplicateGroupKey = chave,
-                ChaveNatural = chaveNatural,
-                IsCanonical = true,
-                ConfidenceLevel = op.ConfidenceLevel,
-                RawJson = "{}",
-                UsuarioInclusao = "financas-importador"
-            });
-        }
-
-        // Negociações do extrato consolidado da B3 (agregado mensal). Precedência §3.1: a nota
-        // (granular) manda onde existe; o agregado B3 só preenche ticker×mês AUSENTE nas notas.
-        // Cobertos = (assetId, ano, mês) com transação de NOTA (já no banco + as recém-criadas aqui).
-        var notasExistentes = await _context.TransacoesFinanceiras
-            .Where(x => x.Origem == OrigemTransacao.Importacao && x.Fonte == "Nubank B3")
+        // Precedência INVERTIDA (§3.1, revista jun/2026 — B3 é a fonte de verdade): as Negociações do
+        // extrato consolidado da B3 (agregado mensal, custódia oficial, completas no lado da venda)
+        // SEMPRE materializam. As notas Nubank (granulares, mas incompletas → posições fantasma) só
+        // materializam onde a B3 NÃO cobre aquele ticker×mês. Por isso a B3 é processada PRIMEIRO:
+        // ela define a cobertura que vai filtrar as notas.
+        // Cobertura = (assetId, ano, mês) com NegociacaoMensalB3 (já no banco + as recém-criadas aqui).
+        var b3Existentes = await _context.TransacoesFinanceiras
+            .Where(x => x.Origem == OrigemTransacao.Importacao && x.Fonte == FonteExtratoB3)
             .Select(x => new { x.AssetId, x.Date })
             .ToListAsync(cancellationToken);
-        var cobertosPorNotas = notasExistentes
+        var cobertosPorB3 = b3Existentes
             .Select(x => (x.AssetId, x.Date.Year, x.Date.Month))
             .ToHashSet();
-        foreach (var nota in novas.Where(x => x.Fonte == "Nubank B3"))
-            cobertosPorNotas.Add((nota.AssetId, nota.Date.Year, nota.Date.Month));
 
         var negociacoesB3 = await _context.NegociacoesMensaisB3.ToListAsync(cancellationToken);
         foreach (var neg in negociacoesB3)
@@ -305,19 +324,19 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             if (!jaMaterializadas.Add(chave))
                 continue;
 
-            var ano = neg.AnoMes / 100;
-            var mes = neg.AnoMes % 100;
-            if (!ExtratoB3Materializador.DeveMaterializarNegociacaoB3(neg.AssetId, ano, mes, cobertosPorNotas))
-                continue;
-
             var quantidade = Math.Abs(neg.Quantity);
             if (quantidade <= 0m)
                 continue;
 
+            var ano = neg.AnoMes / 100;
+            var mes = neg.AnoMes % 100;
             var data = (neg.PeriodoFinal ?? new DateTime(ano, mes, DateTime.DaysInMonth(ano, mes))).Date;
             var chaveNatural = GerarChaveNatural(FonteExtratoB3, neg.AssetId, data, neg.OperationType, quantidade, neg.UnitPrice);
             if (!chavesNaturais.Add(chaveNatural))
                 continue;
+
+            // A B3 sempre materializa: registra a cobertura do ticker×mês para barrar a nota.
+            cobertosPorB3.Add((neg.AssetId, ano, mes));
 
             novas.Add(new TransacaoFinanceira
             {
@@ -340,6 +359,55 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 ChaveNatural = chaveNatural,
                 IsCanonical = true,
                 ConfidenceLevel = NivelConfianca.Media,
+                RawJson = "{}",
+                UsuarioInclusao = "financas-importador"
+            });
+        }
+
+        // Notas Nubank (OperacaoB3): só materializam onde a B3 NÃO cobre aquele ticker×mês
+        // (meses < set/2021, outras corretoras). Onde há B3, a nota é pulada (a B3 manda).
+        var ops = await _context.OperacoesB3
+            .Where(x => x.IsCanonical && x.AssetId != null)
+            .ToListAsync(cancellationToken);
+        foreach (var op in ops)
+        {
+            var chave = $"OperacaoB3#{op.Id}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
+
+            var data = (op.TradeDate ?? op.DataInclusao).Date;
+            if (!ExtratoB3Materializador.DeveMaterializarNotaB3(op.AssetId!.Value, data.Year, data.Month, cobertosPorB3))
+                continue;
+
+            var quantidade = Math.Abs(op.Quantity);
+            // Notas B3 não têm horário por trade: a chave usa a data (sem hora).
+            var chaveNatural = op.TradeDate.HasValue
+                ? GerarChaveNatural("Nubank B3", op.AssetId!.Value, op.TradeDate.Value, op.OperationType, quantidade, op.UnitPrice)
+                : null;
+            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
+            {
+                Origem = OrigemTransacao.Importacao,
+                AssetId = op.AssetId!.Value,
+                Date = data,
+                OperationType = op.OperationType,
+                Quantity = quantidade,
+                UnitPrice = op.UnitPrice,
+                GrossAmount = op.GrossAmount,
+                Fees = op.Fees,
+                Currency = "BRL",
+                Broker = string.IsNullOrWhiteSpace(op.Broker) ? "NU Invest" : op.Broker,
+                Fonte = "Nubank B3",
+                SourceDocumentId = op.SourceDocumentId,
+                CargaFinanceiraId = op.CargaFinanceiraId,
+                StagingTipo = "OperacaoB3",
+                StagingId = op.Id,
+                DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
+                IsCanonical = true,
+                ConfidenceLevel = op.ConfidenceLevel,
                 RawJson = "{}",
                 UsuarioInclusao = "financas-importador"
             });

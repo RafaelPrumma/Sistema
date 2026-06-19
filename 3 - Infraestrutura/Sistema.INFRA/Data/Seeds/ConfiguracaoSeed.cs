@@ -165,6 +165,15 @@ public static class ConfiguracaoSeed
                 Tipo = ConfiguracaoTipo.Texto,
                 Descricao = "Pasta monitorada de onde os relatorios financeiros sao lidos na importacao.",
                 UsuarioInclusao = "seed"
+            },
+            new()
+            {
+                Agrupamento = "Financas",
+                Chave = "B3FolderPath",
+                Valor = "",
+                Tipo = ConfiguracaoTipo.Texto,
+                Descricao = "Pasta dos extratos consolidados mensais da B3 (relatorio-consolidado-mensal-*.xlsx). Vazio = pasta 'b3' irma da monitorada (ex.: arquivos/b3).",
+                UsuarioInclusao = "seed"
             }
         };
     }

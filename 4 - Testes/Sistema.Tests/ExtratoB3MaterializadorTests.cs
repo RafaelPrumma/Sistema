@@ -8,23 +8,25 @@ namespace Sistema.Tests;
 public class ExtratoB3MaterializadorTests
 {
     [Fact]
-    public void Precedencia_NotaPresenteNoTickerMes_NaoMaterializaB3()
+    public void PrecedenciaInvertida_B3PresenteNoTickerMes_NotaNaoMaterializa()
     {
-        // BBAS3 (assetId 1) em 2022-09 já tem transação vinda de nota → B3 não materializa.
-        var cobertos = new HashSet<(int AssetId, int Ano, int Mes)> { (1, 2022, 9) };
+        // B3 é a fonte de verdade: BBAS3 (assetId 1) em 2022-09 tem Negociação da B3 →
+        // a NOTA daquele ticker×mês é pulada (a B3 manda).
+        var cobertosPorB3 = new HashSet<(int AssetId, int Ano, int Mes)> { (1, 2022, 9) };
 
-        Assert.False(ExtratoB3Materializador.DeveMaterializarNegociacaoB3(1, 2022, 9, cobertos));
+        Assert.False(ExtratoB3Materializador.DeveMaterializarNotaB3(1, 2022, 9, cobertosPorB3));
     }
 
     [Fact]
-    public void Precedencia_TickerMesAusenteNasNotas_MaterializaB3()
+    public void PrecedenciaInvertida_B3AusenteNoTickerMes_NotaMaterializa()
     {
-        // Nota cobre BBAS3/2022-09; o agregado B3 de PETR4/2022-09 (assetId 2) e de
-        // BBAS3 em OUTRO mês (2022-10) não estão cobertos → B3 materializa.
-        var cobertos = new HashSet<(int AssetId, int Ano, int Mes)> { (1, 2022, 9) };
+        // A B3 cobre BBAS3/2022-09; onde a B3 NÃO cobre, a nota Nubank complementa:
+        // outro ticker no mesmo mês (PETR4/2022-09, assetId 2) e o MESMO ticker em outro mês
+        // (BBAS3/2022-10) → a nota materializa.
+        var cobertosPorB3 = new HashSet<(int AssetId, int Ano, int Mes)> { (1, 2022, 9) };
 
-        Assert.True(ExtratoB3Materializador.DeveMaterializarNegociacaoB3(2, 2022, 9, cobertos));
-        Assert.True(ExtratoB3Materializador.DeveMaterializarNegociacaoB3(1, 2022, 10, cobertos));
+        Assert.True(ExtratoB3Materializador.DeveMaterializarNotaB3(2, 2022, 9, cobertosPorB3));
+        Assert.True(ExtratoB3Materializador.DeveMaterializarNotaB3(1, 2022, 10, cobertosPorB3));
     }
 
     [Fact]
