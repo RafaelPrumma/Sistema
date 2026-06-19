@@ -16,24 +16,24 @@ Após a correção, as posições calculadas devem bater com a lista abaixo (tol
 | ITUB4 | 280 | 33,39 | 34,67 | — |
 | BBDC4 | 495 | 15,58 | 15,69 | — |
 | VALE3 | 105 | 63,27 | 66,61 | — |
-| BBAS3 | 430 | 18,42 | 26,23 | investigar (PM ~1,4×) |
+| BBAS3 | 430 | 18,42 | 26,23 | **1:2** ex 16/04/2024 ✅ semeado (qtd 70→140) |
 | PETR4 | 137 | 32,91 | 30,74 | — |
 | TAEE4 | 390 | 11,98 | 11,91 | — |
 | CXSE3 | 250 | 16,26 | 15,94 | — |
-| CPTS11 | 860 | 8,29 | 18,62 | **~1:2** (PM 2,25×) |
+| CPTS11 | 860 | 8,29 | 18,62 | **1:10** ex 26/09/2023 ✅ semeado (qtd 53→530) |
 | AFHI11 | 55 | 96,00 | 96,00 | — (já bate) |
 | RZAK11 | 64 | 88,65 | 88,02 | — (já bate) |
-| FYTO11 | 620 | 7,60 | 8,24 | investigar |
+| FYTO11 | 620 | 7,60 | 8,24 | sem split (só compras desde 03/2025) ✅ |
 | HGLG11 | 26 | 158,04 | 157,78 | — (já bate) |
 | RECR11 | 48 | 86,74 | 86,74 | — (já bate) |
-| KNSC11 | 420 | 8,95 | 14,83 | **split** (PM 1,66×) |
+| KNSC11 | 420 | 8,95 | 14,83 | **1:10** ex 06/11/2023 ✅ semeado (qtd 19→190) |
 | DEVA11 | 215 | 42,73 | 42,73 | — (já bate) |
 
 **Vendidos (devem zerar):** BCFF11 (split 1:8), GGRC11 (split 1:10), CNES11, BRCR11, VGHF11, RZAT11, e ações zeradas hoje negativas (KLBN3, ITSA3/4, CMIG3, KEPL3, TIMS3, AMER3, BBDC3, GOGL34, ROXO34…).
 
 **Cripto (fora desta fase de split, mas é o alvo geral):** BTC 0,0697; XRP 822,09; DOGE 3137,17; BNB 0,2695; + staking WBETH 1,4844 / BNSOL 26,6339.
 
-> O **ratio PM_banco / PM_real** é uma pista forte do fator (ex.: CPTS11 18,62/8,29≈2,25 → 1:2). Confirmar cada fator/data na B3 ou no informe do fundo.
+> ⚠️ **Método confiável = salto de quantidade na aba *Posição* da B3** (qtd que multiplica de um mês p/ o outro **sem compra correspondente** na aba *Negociações* = o fator exato). O ratio **PM_banco/PM_real ENGANA**: quando há compras pré e pós-split a média dilui a razão (ex.: CPTS11 deu 2,25 mas é **1:10**; KNSC11 deu 1,66 mas é **1:10**; BBAS3 deu 1,42 mas é **1:2**). Sempre cruzar com fato relevante/notícia p/ a data-ex exata.
 
 ## 4. Modelo de dados
 `EventoCorporativo` (tabela `FinanceiroEventoCorporativo`): `Id`, `AtivoFinanceiroId`, `Tipo` (enum `Desdobramento`/`Grupamento`/`Bonificacao`), `Data` (data-ex), `Fator` (decimal — 8 = 1:8; 0,1 = grupamento 1:10), `Fonte`, `ChaveNatural` (idempotência) + auditoria. Índice único filtrado em `ChaveNatural`.
