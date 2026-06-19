@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Sistema.INFRA.Data.Seeds;
 using Sistema.CORE.Entities;
 using Sistema.CORE.Enums;
@@ -26,6 +27,7 @@ public static class DbInitializer
         }
 
         SeedConfiguracoes(context);
+        SeedEventosCorporativos(context);
     }
 
     private static void RenomearFinancasLegadas(AppDbContext context)
@@ -113,5 +115,56 @@ public static class DbInitializer
             FuncionalidadeId = funcionalidade.Id,
             Permissoes = permissoes
         });
+    }
+
+    private static void SeedEventosCorporativos(AppDbContext context)
+    {
+        var definicoes = EventoCorporativoSeed.GetDefinicoes().ToList();
+        if (definicoes.Count == 0)
+            return;
+
+        // Verifica quais chaves naturais já existem (idempotência).
+        var chavesExistentes = context.EventosCorporativos
+            .IgnoreQueryFilters()
+            .Where(e => e.ChaveNatural != null)
+            .Select(e => e.ChaveNatural!)
+            .ToHashSet();
+
+        var tickers = definicoes.Select(d => d.Ticker).Distinct().ToList();
+        var ativos = context.AtivosFinanceiros
+            .IgnoreQueryFilters()
+            .Where(a => a.Ticker != null && tickers.Contains(a.Ticker!))
+            .ToList();
+
+        var ativosPorTicker = ativos
+            .GroupBy(a => a.Ticker!)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var novos = new List<EventoCorporativo>();
+        foreach (var (ticker, tipo, data, fator, fonte, chave) in definicoes)
+        {
+            if (chavesExistentes.Contains(chave))
+                continue;
+
+            if (!ativosPorTicker.TryGetValue(ticker, out var ativo))
+                continue; // Ativo ainda não existe no banco; será semeado na próxima importação.
+
+            novos.Add(new EventoCorporativo
+            {
+                AtivoFinanceiroId = ativo.Id,
+                Tipo = tipo,
+                Data = data,
+                Fator = fator,
+                Fonte = fonte,
+                ChaveNatural = chave,
+                UsuarioInclusao = "seed"
+            });
+        }
+
+        if (novos.Count == 0)
+            return;
+
+        context.EventosCorporativos.AddRange(novos);
+        context.SaveChanges();
     }
 }

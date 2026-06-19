@@ -334,3 +334,19 @@ public class AlertaConfiabilidadeMap : IEntityTypeConfiguration<AlertaConfiabili
         builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public class EventoCorporativoMap : IEntityTypeConfiguration<EventoCorporativo>
+{
+    public void Configure(EntityTypeBuilder<EventoCorporativo> builder)
+    {
+        builder.ToTable("FinanceiroEventoCorporativo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Fonte).HasMaxLength(80);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(200);
+        builder.Property(x => x.Fator).HasPrecision(18, 8);
+        // Índice único filtrado: idempotência do seed/import (chave não-nula e não-excluída).
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Data });
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

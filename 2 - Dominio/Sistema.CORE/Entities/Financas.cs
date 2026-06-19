@@ -457,3 +457,29 @@ public class AlertaConfiabilidade : AuditableEntity
     public string? Details { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+public enum TipoEventoCorporativo
+{
+    Desdobramento = 1,
+    Grupamento = 2,
+    Bonificacao = 3
+}
+
+// Evento corporativo (split/grupamento/bonificação) de um ativo financeiro.
+// Fator > 1 = desdobramento (ex.: 8 = 1:8); Fator < 1 = grupamento (ex.: 0,1 = 1:10).
+// A ChaveNatural garante idempotência: o mesmo evento não entra duas vezes.
+public class EventoCorporativo : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public TipoEventoCorporativo Tipo { get; set; } = TipoEventoCorporativo.Desdobramento;
+    // Data-ex do evento (data a partir da qual as cotas já são pós-evento).
+    public DateTime Data { get; set; }
+    // Fator multiplicador: transações pré-Data têm Quantity *= Fator e UnitPrice /= Fator.
+    // Ex.: 8 = desdobramento 1:8; 0.1 = grupamento 10:1.
+    public decimal Fator { get; set; }
+    public string Fonte { get; set; } = string.Empty;
+    // Chave natural: idempotência do seed/import (ticker|data|fator).
+    public string? ChaveNatural { get; set; }
+}

@@ -217,13 +217,47 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TransacaoFinanceira>> BuscarTodasTransacoesAsync(CancellationToken cancellationToken = default)
-        => await _context.TransacoesFinanceiras
+    {
+        var transacoes = await _context.TransacoesFinanceiras
             .AsNoTracking()
             .Include(x => x.Asset)
             .Where(x => x.IsCanonical && x.Asset != null)
             .OrderBy(x => x.Date)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+        var eventos = await _context.EventosCorporativos
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        if (eventos.Count == 0)
+            return transacoes;
+
+        // Agrupa eventos por ativo: para cada transação pré-Data, aplica o produto dos fatores.
+        var eventosPorAtivo = eventos
+            .GroupBy(e => e.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(e => e.Data).ToList());
+
+        foreach (var t in transacoes)
+        {
+            if (!eventosPorAtivo.TryGetValue(t.AssetId, out var evs))
+                continue;
+
+            // Produto dos fatores de todos os eventos posteriores à data da transação.
+            var fatorAcumulado = evs
+                .Where(e => t.Date < e.Data)
+                .Aggregate(1m, (acc, e) => acc * e.Fator);
+
+            if (fatorAcumulado == 1m)
+                continue;
+
+            t.Quantity *= fatorAcumulado;
+            t.UnitPrice /= fatorAcumulado;
+            // GrossAmount permanece inalterado (= Quantity_pré × UnitPrice_pré = Quantity_pós × UnitPrice_pós).
+        }
+
+        return transacoes;
+    }
 
     public async Task<PagedResult<TransacaoFinanceira>> BuscarTransacoesAsync(int page, int pageSize, string? termo, OrigemTransacao? origem, CancellationToken cancellationToken = default)
     {
