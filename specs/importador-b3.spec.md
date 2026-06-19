@@ -40,7 +40,7 @@ As notas de corretagem (PDF) não cobrem tudo: faltam **compras antigas** e, pri
 
 ## 5. Fases
 - **F1 — Parser + DocumentKind (sem materializar): ✅ feito (jun/2026).** `ExtratoConsolidadoB3Reader` (puro/testável: resolve `sharedStrings`, itera abas via workbook+rels), `DocumentKind = ExtratoConsolidadoB3`, dispatch no importador, persistência bruta em `ConteudosBrutosFinanceiros`, ano-mês derivado do nome no `RawMetadataJson`. 11 testes contra os arquivos reais (`dotnet test` verde). Nada materializado.
-- **F2 — Materializar movimento:** Negociações → transações e Proventos → proventos, com dedup e a **regra de precedência** vs notas/Brapi (§3.1, §3.2).
+- **F2 — Materializar movimento: ✅ feito (jun/2026).** Staging `NegociacaoMensalB3` (entidade+mapping+migration) povoado em `ProcessarExtratoB3Async`; materialização em `SincronizarTransacoesCanonicasAsync` com `Fonte="B3 Extrato"` e a **precedência §3.1** (cobertura por nota = banco + recém-criadas; B3 só preenche ticker×mês ausente). Proventos via `UpsertRendimento` (`Fonte="B3 Extrato"`) — rendimento de FII passa a entrar. `MaterializacaoVersao` 5→6. Lógica pura em `ExtratoB3Materializador` (12 testes). Cálculo/`BuscarTodasTransacoesAsync` intocados.
 - **F3 — Reconciliação/aceite:** usar as abas de Posição como snapshot para **conferir a posição calculada** mês a mês; relatório de divergência; alimenta a detecção de split.
 
 ## 6. Fora de escopo (inicial)
