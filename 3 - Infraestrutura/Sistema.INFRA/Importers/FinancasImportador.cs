@@ -59,6 +59,19 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         // Garante que a tabela única reflita a regra de materialização atual.
         // Barato quando já está na versão certa; faz o resync completo quando a regra muda.
         await RessincronizarPorVersaoAsync(cancellationToken);
+
+        // F3 — reconciliação pela Posição da B3 (DEPOIS da materialização/resync, pois usa as
+        // transações canônicas já reconstruídas). À PROVA DE FALHA: qualquer exceção aqui é logada e
+        // ENGOLIDA — a reconciliação é um refinamento opcional e NÃO pode derrubar o carregamento do
+        // dashboard (já tivemos 2 regressões de runtime por exceção no GarantirCargaInicial).
+        try
+        {
+            await ReconciliarPosicaoB3Async(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.ReconciliacaoB3Falhou(_logger, ex);
+        }
     }
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
@@ -1976,4 +1989,7 @@ internal static partial class FinancasImportadorLogMessages
 {
     [LoggerMessage(EventId = 20, Level = LogLevel.Information, Message = "Carga financeira importada. Fonte={Fonte}, Sha={Sha}")]
     public static partial void CargaFinanceiraImportada(ILogger logger, string fonte, string sha);
+
+    [LoggerMessage(EventId = 21, Level = LogLevel.Error, Message = "Reconciliação da posição B3 (F3) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void ReconciliacaoB3Falhou(ILogger logger, Exception exception);
 }
