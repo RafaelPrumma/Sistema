@@ -212,7 +212,29 @@ public class FinancasCarteiraTests
         Assert.All(context.RendimentosInvestimento.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
         Assert.Equal(12m, context.CotacoesAtivosFinanceiros.Single(x => x.AtivoFinanceiroId == 1 && x.DataExclusao == null).PriceBRL);
         Assert.Contains(context.PrecosHistoricosAtivosFinanceiros, x => x.AtivoFinanceiroId == 1 && x.Date == new DateTime(2026, 1, 2));
-        Assert.Equal("3", context.Configuracoes.Single(x => x.Chave == "ReparoAtivosVersao").Valor);
+        Assert.Equal("4", context.Configuracoes.Single(x => x.Chave == "ReparoAtivosVersao").Valor);
+    }
+
+    [Fact]
+    public async Task ReparoDeveReclassificarDocumentKindDesconhecido()
+    {
+        await using var context = CriarContexto();
+        context.DocumentosFinanceiros.AddRange(
+            new DocumentoFinanceiro { Id = 1, FileName = "Binance-Histórico-de-Transações-202606051619(UTC--3)_f8ea955c.xlsx", DocumentKind = TipoDocumentoFinanceiro.Desconhecido, UsuarioInclusao = "teste" },
+            new DocumentoFinanceiro { Id = 2, FileName = "movimentacaobinance.csv", DocumentKind = TipoDocumentoFinanceiro.Desconhecido, UsuarioInclusao = "teste" },
+            new DocumentoFinanceiro { Id = 3, FileName = "Binance-Histórico-de-Ordens-Spot-202606051616(UTC--3)_71523b31.xlsx", DocumentKind = TipoDocumentoFinanceiro.BinanceSpotOrders, UsuarioInclusao = "teste" });
+        await context.SaveChangesAsync();
+
+        var repair = new FinancasDataRepairService(context, NullLogger<FinancasDataRepairService>.Instance);
+        await repair.RepararAsync();
+
+        // O export .xlsx "Histórico de Transações" deixa de ser Desconhecido e vira ledger (BinanceTransactions)
+        // → o netting passa a enxergá-lo (causa-raiz do BTC subcontado).
+        Assert.Equal(TipoDocumentoFinanceiro.BinanceTransactions, context.DocumentosFinanceiros.Single(x => x.Id == 1).DocumentKind);
+        // CSV antigo também é classificado (CsvBinance) — fica como fallback do ledger.
+        Assert.Equal(TipoDocumentoFinanceiro.CsvBinance, context.DocumentosFinanceiros.Single(x => x.Id == 2).DocumentKind);
+        // Documento que já tinha kind definido não é alterado.
+        Assert.Equal(TipoDocumentoFinanceiro.BinanceSpotOrders, context.DocumentosFinanceiros.Single(x => x.Id == 3).DocumentKind);
     }
 
     private static FinancasAppService CriarService(IFinancasRepository repo)

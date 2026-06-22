@@ -288,7 +288,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 10;
+    private const int MaterializacaoVersao = 11;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -468,11 +468,20 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         HashSet<string> chavesNaturais,
         CancellationToken cancellationToken)
     {
-        // Só o ledger (Histórico de Transações .xlsx + CSV de mesmo formato) — é a fonte completa das
-        // pernas assinadas. Os demais documentos Binance (spot/convert/depósitos) ficam de fora.
+        // Só o ledger (Histórico de Transações) — é a fonte completa das pernas assinadas. Os demais
+        // documentos Binance (spot/convert/depósitos) ficam de fora.
+        // FONTE ÚNICA: o export oficial .xlsx ("Histórico de Transações" = BinanceTransactions) cobre TODO
+        // o histórico. O CsvBinance é um export parcial (subset de um período) que SOBREPÕE o .xlsx — usar
+        // os dois junto contamina o netting (a dedup por chave natural usa preço stateful e não casa entre
+        // formatos → o BTC parado no Earn ficava subcontado). Por isso: se há .xlsx, ele manda sozinho; o
+        // CSV só entra como fallback quando NÃO existe nenhum .xlsx de transações.
+        var temLedgerXlsx = await _context.DocumentosFinanceiros
+            .AnyAsync(d => d.DocumentKind == TipoDocumentoFinanceiro.BinanceTransactions, cancellationToken);
+        var kindLedger = temLedgerXlsx
+            ? TipoDocumentoFinanceiro.BinanceTransactions
+            : TipoDocumentoFinanceiro.CsvBinance;
         var docsLedger = await _context.DocumentosFinanceiros
-            .Where(d => d.DocumentKind == TipoDocumentoFinanceiro.BinanceTransactions
-                        || d.DocumentKind == TipoDocumentoFinanceiro.CsvBinance)
+            .Where(d => d.DocumentKind == kindLedger)
             .Select(d => d.Id)
             .ToListAsync(cancellationToken);
         var idsLedger = docsLedger.ToHashSet();
@@ -1584,7 +1593,9 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         }
     }
 
-    private static TipoDocumentoFinanceiro ClassificarDocumento(string file)
+    // internal: reaproveitado pelo FinancasDataRepairService para reclassificar documentos antigos
+    // gravados como Desconhecido por versões anteriores do importador (antes desta classificação existir).
+    internal static TipoDocumentoFinanceiro ClassificarDocumento(string file)
     {
         var name = Path.GetFileName(file).ToLowerInvariant();
         // Extrato consolidado mensal da Área do Investidor B3 (.xlsx com shared strings).
