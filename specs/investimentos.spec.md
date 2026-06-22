@@ -33,6 +33,18 @@ Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para 
 ### F-H · Alertas de preço/provento — #7
 Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
 
+### F-I · Carteiras hierárquicas (rework) — jun/2026
+Reorganizar os grupos com **subcarteiras** (hoje é flat: `FinanceiroCarteira` + `FinanceiroCarteiraAtivo`; precisa de hierarquia — `ParentId`/nível na `FinanceiroCarteira`).
+- **Topo:** `Bancário` · `FIIs` · `Criptomoedas` · `Comodities e energia` (**junta** petróleo + minério + energia — petróleo é commodity *e* energia).
+- **Subcarteiras:** FIIs → **Papel** / **Tijolo**; Comodities e energia → petróleo/minério/energia/…; Criptos → **BTC** / **Altcoins** / **Memecoins**.
+- **Classificação:** FII papel×tijolo (do `Tipo`/nome do fundo ou seed); cripto BTC/altcoin/memecoin (seed/heurística — memecoins: DOGE, SHIB…). A **auto-sugestão** de carteiras precisa popular topo+sub. UI do dashboard agrupa por carteira→subcarteira.
+
+### F-J · Carteiras com valor zerado (bug) — jun/2026
+Algumas carteiras aparecem com **valor zerado** no dashboard. Investigar: ativo sem cotação contribui 0 (relacionado ao F-D fallback), mapeamento ativo→carteira incompleto, ou carteira sem ativos com cotação. Corrigir a valoração (usar custo como fallback consistente, garantir que todo ativo da carteira valore).
+
+### F-K · Card de proventos no dashboard — jun/2026
+Falta o **card de proventos** no dashboard (resumo de proventos do período; os dados já existem — `RendimentoInvestimento` + a tela de Proventos). Adicionar como ilha lazy-loaded (padrão `Dashboard*`).
+
 ### Ideias novas (pesquisa)
 - **A · Yield on Cost / DY da carteira** — dividendo anual ÷ preço médio (renda futura).
 - **B · Risco × retorno** — volatilidade, Sharpe, max drawdown (Kinvo Premium tem).
