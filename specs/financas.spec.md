@@ -34,7 +34,7 @@ API ao vivo (estilo Kinvo) exige convênio institucional com a B3 / Open Finance
 **✅ Feito (jun/2026):** #2 eventos corporativos (F1+F2+F3, 5 splits semeados) · motor IR (F1 cálculo + F2 wiring/tela/Excel) · motor rentabilidade (F1 TWR/MWR) · importador B3 (F1 parser + F2 materialização). Tudo com testes; specs marcadas.
 
 **Em aberto (reordenado jun/2026 após o achado dos "fantasmas"):**
-1. **B3 como fonte de verdade** (`importador-b3.spec.md`) — (a) varrer `arquivos/b3` ✅, (b) **inverter a precedência** (B3 manda) + resync ✅, (c) **reconciliação pela Posição** (F3) p/ cravar a quantidade oficial ⏳. **(a)+(b) feitos (jun/2026)** — falta só (c) + validar no app.
+1. **B3 como fonte de verdade** (`importador-b3.spec.md`) — (a) varrer `arquivos/b3` ✅, (b) precedência invertida ✅, (c) **reconciliação pela Posição + ativo VARIAÇÃO** ✅ (à prova de falha; zera fantasmas vendidos, registra a diferença). + fracionário unificado e alias IRIM11→IRDM11. **Tudo feito (jun/2026)** — falta validar no app rodando.
 2. **#9 cripto — netting** (`cripto.spec.md`) — F1 netting ✅ (permuta abate origem, BRL=caixa, earn=posição); **F2 valoração BRL + F3 ponte IR** ⏳. É o elo que destrava o **IR de cripto** (permuta=alienação).
 3. **Rentabilidade F2** (série de `CriarEvolucaoPatrimonio` + CDI/Ibov/IPCA + UI).
 4. **Aceite do IR** contra os informes de `arquivos/ir/`.
