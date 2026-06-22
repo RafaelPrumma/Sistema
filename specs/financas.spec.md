@@ -41,6 +41,8 @@ API ao vivo (estilo Kinvo) exige convênio institucional com a B3 / Open Finance
 5. **Troca de ticker** (incorporação, ex.: TAEE3→TAEE4) + **alias IRDM11** (IRIDIUM/IRIM subconta).
 6. **Gastos** (pilar novo) · 7. #8 metas/rebal + #7 alertas + #4 linha de aportes · 8. ideias A–E.
 
+**Achados ao validar no app (jun/2026) — corrigidos:** import B3 quebrava em provento de ativo novo (FK AssetId=0); **mercado fracionário** (sufixo F, ITUB4F) duplicava ativos → `NormalizarTicker` + resolução do ativo-base no resync (versão 9). **Ainda abertos:** (a) tickers **só-fracionários** sem base (ITSA3F, ITUB3F) só zeram num reimport B3 (entra na reconciliação F3); (b) **ledger Binance cobre só 2025** → quantidades de cripto abaixo do real (faltam saldos de abertura 31/12/2024; ETH/SOL negativos) → precisa ledger completo ou seed de abertura (vai na `cripto.spec.md`); (c) **CMIG e outros vendidos não zeram** → reconciliação pela Posição (F3, item 1c).
+
 > O import da B3 subiu para #1 em jun/2026 (fonte oficial). Refinado depois: o problema não era só "dado faltante" — era **confiar na fonte errada** (notas Nubank incompletas). B3 vira a fonte de verdade; ver `importador-b3.spec.md` §3.1.
 
 ## Fontes de dados
