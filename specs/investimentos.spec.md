@@ -33,11 +33,30 @@ Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para 
 ### F-H · Alertas de preço/provento — #7
 Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
 
-### F-I · Carteiras hierárquicas (rework) — jun/2026
-Reorganizar os grupos com **subcarteiras** (hoje é flat: `FinanceiroCarteira` + `FinanceiroCarteiraAtivo`; precisa de hierarquia — `ParentId`/nível na `FinanceiroCarteira`).
-- **Topo:** `Bancário` · `FIIs` · `Criptomoedas` · `Comodities e energia` (**junta** petróleo + minério + energia — petróleo é commodity *e* energia).
-- **Subcarteiras:** FIIs → **Papel** / **Tijolo**; Comodities e energia → petróleo/minério/energia/…; Criptos → **BTC** / **Altcoins** / **Memecoins**.
-- **Classificação:** FII papel×tijolo (do `Tipo`/nome do fundo ou seed); cripto BTC/altcoin/memecoin (seed/heurística — memecoins: DOGE, SHIB…). A **auto-sugestão** de carteiras precisa popular topo+sub. UI do dashboard agrupa por carteira→subcarteira.
+### F-I · Carteiras hierárquicas (rework) — jun/2026 (DEFINIDO)
+Reorganizar os grupos com **subcarteiras** (hoje é flat: `FinanceiroCarteira` + `FinanceiroCarteiraAtivo`; precisa de hierarquia — `ParentId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
+
+- **Topo (4):** `Bancário e Seguridade` · `FIIs` · `Comodities e energia` · `Criptomoedas`.
+  - "Comodities e energia" **junta** petróleo + minério + energia (petróleo é commodity *e* energia).
+  - "Bancário e Seguridade" absorve seguradoras (CXSE3).
+- **Subcarteiras:** FIIs → **Papel** / **Tijolo**; Comodities e energia → **Petróleo** / **Mineração e Metais** / **Energia**; Criptos → **BTC** / **Altcoins** / **Memecoins**. "Bancário e Seguridade" fica flat (sem sub).
+
+**Mapa de classificação (custódia B3 2026-maio + cripto §10 cripto.spec) — semeado, editável na tela depois:**
+| Topo | Sub | Ativos |
+|---|---|---|
+| Bancário e Seguridade | (flat) | BBAS3, BBDC4, ITUB4, CXSE3 |
+| FIIs | Papel | AFHI11, AFHI12, CPTS11, DEVA11, FYTO11, KNSC11, RECR11, RECR12, RZAK11 |
+| FIIs | Tijolo | HGLG11 |
+| Comodities e energia | Petróleo | PETR4 |
+| Comodities e energia | Mineração e Metais | VALE3, GOLD11 |
+| Comodities e energia | Energia | TAEE4 |
+| Criptomoedas | BTC | BTC |
+| Criptomoedas | Altcoins | WBETH, BNSOL, XRP, BNB |
+| Criptomoedas | Memecoins | DOGE |
+
+- **Regra p/ ativos novos** (fallback até cadastro manual): FII com "RECEBÍVEIS/CRI/SECURITIES" no nome → Papel, senão Tijolo; cripto: BTC→BTC, lista de memecoins (DOGE, SHIB, PEPE, FLOKI, BONK, WIF…) → Memecoins, resto → Altcoins; ação/ETF sem mapa → sem subcarteira (só topo) + alerta para classificar.
+- **BDR/KEPL3 NÃO entram** — o usuário não detém (vendidos; net ≤ 0 → pisados em 0). Não criar carteira de BDR. Só ativos com **posição > 0** entram nos cards.
+- A **auto-sugestão** (`GarantirCarteirasPadraoAsync`) cria topo+sub idempotente e vincula os ativos detidos à subcarteira-folha. UI do dashboard agrupa carteira→subcarteira com agregação de valor para cima (pai = soma dos filhos).
 
 ### F-J · Carteiras com valor zerado (bug) — jun/2026
 Algumas carteiras aparecem com **valor zerado** no dashboard. Investigar: ativo sem cotação contribui 0 (relacionado ao F-D fallback), mapeamento ativo→carteira incompleto, ou carteira sem ativos com cotação. Corrigir a valoração (usar custo como fallback consistente, garantir que todo ativo da carteira valore).
