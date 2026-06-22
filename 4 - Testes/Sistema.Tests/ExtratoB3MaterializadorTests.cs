@@ -16,6 +16,8 @@ public class ExtratoB3MaterializadorTests
     [InlineData("ITUB4", "ITUB4")]   // base não muda
     [InlineData("HGLG11", "HGLG11")] // FII base não muda
     [InlineData("itub4f", "ITUB4")]  // normaliza caixa
+    [InlineData("IRIM11", "IRDM11")] // alias: mesmo fundo (Iridium)
+    [InlineData("IRIM11F", "IRDM11")] // fracionário + alias
     public void NormalizarTicker_RemoveSufixoFracionario(string entrada, string esperado)
         => Assert.Equal(esperado, ExtratoB3Materializador.NormalizarTicker(entrada));
 

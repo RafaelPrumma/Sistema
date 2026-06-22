@@ -275,7 +275,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 9;
+    private const int MaterializacaoVersao = 10;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte

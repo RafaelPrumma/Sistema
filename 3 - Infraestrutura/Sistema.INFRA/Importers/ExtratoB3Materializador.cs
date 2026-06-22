@@ -47,8 +47,17 @@ public static class ExtratoB3Materializador
     public static string NormalizarTicker(string? ticker)
     {
         var t = (ticker ?? string.Empty).Trim().ToUpperInvariant();
-        return System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Z]{4}\d{1,2}F$") ? t[..^1] : t;
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Z]{4}\d{1,2}F$"))
+            t = t[..^1]; // fracionário → base (ITUB4F → ITUB4)
+        return Aliases.TryGetValue(t, out var canonico) ? canonico : t;
     }
+
+    /// <summary>Aliases de ticker: tickers diferentes que são o MESMO ativo (troca de código/fundo).</summary>
+    private static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // Mesmo fundo (Iridium): a B3 usou "IRIM11", a Nubank "IRDM11" → a venda saía contada 2×.
+        ["IRIM11"] = "IRDM11",
+    };
 
     /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo).</summary>
     public static string MapTipoProvento(string? tipoEvento)
