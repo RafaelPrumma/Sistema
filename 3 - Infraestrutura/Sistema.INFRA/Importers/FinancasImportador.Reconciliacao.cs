@@ -14,7 +14,11 @@ namespace Sistema.INFRA.Importers;
 // (um único SaveChanges no fim) para não deixar estado meio-aplicado.
 public partial class FinancasImportador
 {
-    private static readonly string[] AbasPosicaoB3 = ["Posição - Ações", "Posição - Fundos"];
+    // Abas de Posição (custódia oficial) usadas como alvo da reconciliação. Inclui ETF e BDR: senão um
+    // ativo desses DETIDO (ex.: GOLD11 na aba ETF, BDRs na aba BDR) não acha alvo → cai em 0 e é zerado
+    // por engano, jogando o valor pro VARIAÇÃO. Renda Fixa/Tesouro ficam de fora (classes sem ticker/PM).
+    private static readonly string[] AbasPosicaoB3 =
+        ["Posição - Ações", "Posição - Fundos", "Posição - ETF", "Posição - BDR"];
 
     // Reconcilia a posição calculada com a Posição mais recente da B3, criando ajustes idempotentes
     // (Fonte="Reconciliação") + contrapartida no ativo virtual VARIAÇÃO. Idempotente: apaga os ajustes
