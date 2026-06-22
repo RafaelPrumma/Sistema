@@ -275,7 +275,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 8;
+    private const int MaterializacaoVersao = 9;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -317,6 +317,24 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             .Select(x => (x.AssetId, x.Date.Year, x.Date.Month))
             .ToHashSet();
 
+        // Mercado fracionário (ITUB4F) é o mesmo ativo do lote-padrão (ITUB4): materializa no ativo-base
+        // pra não duplicar/rachar a posição. O parse novo já normaliza; isto conserta o staging existente
+        // no resync (sem reimport). Se o base não existir, mantém o próprio ativo.
+        var ativosPorIdB3 = await _context.AtivosFinanceiros.ToDictionaryAsync(a => a.Id, cancellationToken);
+        var ativosPorKeyB3 = ativosPorIdB3.Values
+            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        int ResolverAtivoBaseB3(int assetId)
+        {
+            if (!ativosPorIdB3.TryGetValue(assetId, out var a))
+                return assetId;
+            var baseKey = ExtratoB3Materializador.NormalizarTicker(a.Ticker ?? a.AssetKey);
+            return !string.Equals(baseKey, a.AssetKey, StringComparison.OrdinalIgnoreCase)
+                   && ativosPorKeyB3.TryGetValue(baseKey, out var ativoBase)
+                ? ativoBase.Id
+                : assetId;
+        }
+
         var negociacoesB3 = await _context.NegociacoesMensaisB3.ToListAsync(cancellationToken);
         foreach (var neg in negociacoesB3)
         {
@@ -330,18 +348,19 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
             var ano = neg.AnoMes / 100;
             var mes = neg.AnoMes % 100;
+            var assetId = ResolverAtivoBaseB3(neg.AssetId); // fracionário → ativo-base (ITUB4F → ITUB4)
             var data = (neg.PeriodoFinal ?? new DateTime(ano, mes, DateTime.DaysInMonth(ano, mes))).Date;
-            var chaveNatural = GerarChaveNatural(FonteExtratoB3, neg.AssetId, data, neg.OperationType, quantidade, neg.UnitPrice);
+            var chaveNatural = GerarChaveNatural(FonteExtratoB3, assetId, data, neg.OperationType, quantidade, neg.UnitPrice);
             if (!chavesNaturais.Add(chaveNatural))
                 continue;
 
             // A B3 sempre materializa: registra a cobertura do ticker×mês para barrar a nota.
-            cobertosPorB3.Add((neg.AssetId, ano, mes));
+            cobertosPorB3.Add((assetId, ano, mes));
 
             novas.Add(new TransacaoFinanceira
             {
                 Origem = OrigemTransacao.Importacao,
-                AssetId = neg.AssetId,
+                AssetId = assetId,
                 Date = data,
                 OperationType = neg.OperationType,
                 Quantity = quantidade,

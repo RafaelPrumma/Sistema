@@ -35,8 +35,19 @@ public static class ExtratoB3Materializador
             return null;
 
         var idx = produto.IndexOf(" - ", StringComparison.Ordinal);
-        var ticker = (idx >= 0 ? produto[..idx] : produto).Trim();
+        var ticker = NormalizarTicker((idx >= 0 ? produto[..idx] : produto).Trim()); // fracionário → base
         return string.IsNullOrWhiteSpace(ticker) ? null : ticker;
+    }
+
+    /// <summary>
+    /// Mercado fracionário da B3 (ex.: ITUB4F, PETR4F, GOLD11F) é o MESMO ativo do lote-padrão
+    /// (ITUB4, PETR4, GOLD11): remove o sufixo "F". Padrão = 4 letras + 1–2 dígitos (+ "F" no fracionário).
+    /// Sem isso o extrato cria ativos duplicados (ITUB4 e ITUB4F) e racha a posição.
+    /// </summary>
+    public static string NormalizarTicker(string? ticker)
+    {
+        var t = (ticker ?? string.Empty).Trim().ToUpperInvariant();
+        return System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Z]{4}\d{1,2}F$") ? t[..^1] : t;
     }
 
     /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo).</summary>
@@ -106,7 +117,7 @@ public static class ExtratoB3Materializador
     /// </summary>
     public static IReadOnlyList<MovimentoNegociacaoB3> InterpretarNegociacao(IReadOnlyDictionary<string, string> row)
     {
-        var ticker = Campo(row, "Código de Negociação");
+        var ticker = NormalizarTicker(Campo(row, "Código de Negociação")); // ITUB4F → ITUB4 (fracionário)
         var movimentos = new List<MovimentoNegociacaoB3>(2);
         if (string.IsNullOrWhiteSpace(ticker))
             return movimentos;

@@ -7,6 +7,18 @@ namespace Sistema.Tests;
 // regra de precedência vs notas e o mapeamento das linhas de Negociações/Proventos.
 public class ExtratoB3MaterializadorTests
 {
+    // Mercado fracionário (sufixo "F") = mesmo ativo do lote-padrão → unifica no ticker base.
+    [Theory]
+    [InlineData("ITUB4F", "ITUB4")]
+    [InlineData("PETR4F", "PETR4")]
+    [InlineData("GOLD11F", "GOLD11")]
+    [InlineData("GOGL34F", "GOGL34")]
+    [InlineData("ITUB4", "ITUB4")]   // base não muda
+    [InlineData("HGLG11", "HGLG11")] // FII base não muda
+    [InlineData("itub4f", "ITUB4")]  // normaliza caixa
+    public void NormalizarTicker_RemoveSufixoFracionario(string entrada, string esperado)
+        => Assert.Equal(esperado, ExtratoB3Materializador.NormalizarTicker(entrada));
+
     [Fact]
     public void PrecedenciaInvertida_B3PresenteNoTickerMes_NotaNaoMaterializa()
     {
