@@ -110,7 +110,10 @@ public enum ProvedorCotacao
 {
     Manual = 0,
     Brapi = 1,
-    Binance = 2
+    Binance = 2,
+    // Preço de Fechamento da aba Posição do extrato consolidado B3 (custódia oficial). Usado como
+    // cotação de mercado dos ativos B3 quando não há token Brapi (ação/FII não cota de graça).
+    B3Custodia = 3
 }
 
 public enum StatusCotacao

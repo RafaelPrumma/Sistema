@@ -32,10 +32,13 @@ public partial class FinancasImportador
             .Where(x => x.Fonte == ReconciliadorPosicaoB3.Fonte)
             .ExecuteDeleteAsync(cancellationToken);
 
-        // 2) Alvo: quantidades da Posição MAIS RECENTE (abas Posição - Ações/Fundos).
-        var alvoPorTicker = await CarregarAlvosPosicaoB3Async(cancellationToken);
-        if (alvoPorTicker is null)
+        // 2) Linhas da Posição MAIS RECENTE (abas Posição - Ações/Fundos/ETF/BDR). Delas derivamos o
+        //    alvo de quantidade (reconciliação) E o Preço de Fechamento (cotação de custódia, abaixo).
+        var linhasPosicao = await CarregarLinhasPosicaoB3Async(cancellationToken);
+        if (linhasPosicao is null)
             return; // sem nenhuma Posição importada não há o que reconciliar.
+
+        var alvoPorTicker = ReconciliadorPosicaoB3.ExtrairAlvos(linhasPosicao);
 
         // 3) Calculado + PM corrente por ativo, das transações canônicas (já sem Reconciliação, pois
         //    apagamos acima). Cripto fora (não há Posição importada).
@@ -62,6 +65,7 @@ public partial class FinancasImportador
             .ToListAsync(cancellationToken);
 
         var assetKeyPorId = new Dictionary<int, string>();
+        var ativoPorTicker = new Dictionary<string, AtivoFinanceiro>(StringComparer.OrdinalIgnoreCase);
         var reconciliaveis = new List<AtivoReconciliavel>();
         foreach (var a in ativosB3)
         {
@@ -76,8 +80,14 @@ public partial class FinancasImportador
                 continue;
 
             assetKeyPorId[a.Id] = a.AssetKey;
+            ativoPorTicker[tickerNorm] = a;
             reconciliaveis.Add(new AtivoReconciliavel(a.Id, tickerNorm));
         }
+
+        // 4b) Cotação de custódia: alimenta uma CotacaoAtivoFinanceiro (B3Custódia) por ativo B3 detido
+        //     com o Preço de Fechamento da Posição → o "Resultado" do dashboard deixa de ser 0 para
+        //     ações/FII sem token Brapi. À PROVA DE FALHA: erro aqui não impede a reconciliação abaixo.
+        await AtualizarCotacoesCustodiaB3Async(linhasPosicao, ativoPorTicker, cancellationToken);
 
         // 5) Lógica pura: diff = alvo − calculado por ativo.
         var ajustes = ReconciliadorPosicaoB3.CalcularAjustes(
@@ -146,10 +156,71 @@ public partial class FinancasImportador
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    // Carrega os alvos da Posição MAIS RECENTE: acha o documento B3 com maior referencePeriod que tenha
-    // alguma aba de Posição, lê suas linhas de ConteudoBruto e extrai (ticker → quantidade) via lógica
-    // pura. Retorna null quando não há NENHUMA Posição importada.
-    private async Task<Dictionary<string, decimal>?> CarregarAlvosPosicaoB3Async(CancellationToken cancellationToken)
+    // Faz UPSERT idempotente de uma CotacaoAtivoFinanceiro (Provedor=B3Custodia) por ativo B3 detido,
+    // usando o Preço de Fechamento da Posição mais recente como PriceBRL (= Price). O índice único
+    // (AtivoFinanceiroId, Provedor) garante uma única linha de custódia por ativo: atualizamos a
+    // existente em vez de duplicar. NÃO mexe nas cotações Brapi/Binance (provedores distintos).
+    // À PROVA DE FALHA: try-catch que loga e segue — uma cotação não pode derrubar o dashboard.
+    private async Task AtualizarCotacoesCustodiaB3Async(
+        IReadOnlyList<IReadOnlyDictionary<string, string>> linhasPosicao,
+        IReadOnlyDictionary<string, AtivoFinanceiro> ativoPorTicker,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var precosPorTicker = ReconciliadorPosicaoB3.ExtrairPrecosFechamento(linhasPosicao);
+            if (precosPorTicker.Count == 0)
+                return;
+
+            var agora = DateTime.UtcNow;
+            var alterou = false;
+            foreach (var (ticker, preco) in precosPorTicker)
+            {
+                if (preco <= 0m || !ativoPorTicker.TryGetValue(ticker, out var ativo))
+                    continue;
+
+                var cotacao = await _context.CotacoesAtivosFinanceiros
+                    .FirstOrDefaultAsync(c => c.AtivoFinanceiroId == ativo.Id
+                                              && c.Provedor == ProvedorCotacao.B3Custodia, cancellationToken);
+                if (cotacao is null)
+                {
+                    cotacao = new CotacaoAtivoFinanceiro
+                    {
+                        AtivoFinanceiroId = ativo.Id,
+                        Provedor = ProvedorCotacao.B3Custodia,
+                        UsuarioInclusao = "financas-reconciliacao"
+                    };
+                    _context.CotacoesAtivosFinanceiros.Add(cotacao);
+                }
+
+                cotacao.Symbol = ticker;
+                cotacao.Currency = "BRL";
+                cotacao.Price = preco;
+                cotacao.PriceBRL = preco;
+                cotacao.Change = null;
+                cotacao.ChangePercent = null;
+                cotacao.MarketTime = null;
+                cotacao.RetrievedAt = agora;
+                cotacao.ExpiresAt = null;
+                cotacao.Status = StatusCotacao.Atual;
+                cotacao.ErrorMessage = null;
+                cotacao.RawJson = "{}";
+                alterou = true;
+            }
+
+            if (alterou)
+                await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.CotacaoCustodiaB3Falhou(_logger, ex);
+        }
+    }
+
+    // Carrega as LINHAS da Posição MAIS RECENTE: acha o documento B3 com maior referencePeriod que tenha
+    // alguma aba de Posição e lê suas linhas (header→valor) de ConteudoBruto. Delas o chamador extrai os
+    // alvos de quantidade E os preços de fechamento. Retorna null quando não há NENHUMA Posição importada.
+    private async Task<List<IReadOnlyDictionary<string, string>>?> CarregarLinhasPosicaoB3Async(CancellationToken cancellationToken)
     {
         // Documentos B3 com período derivado (RawMetadataJson.referencePeriod = "yyyy-MM").
         var docs = await _context.DocumentosFinanceiros
@@ -185,7 +256,7 @@ public partial class FinancasImportador
             if (linhas.Count == 0)
                 continue;
 
-            return ReconciliadorPosicaoB3.ExtrairAlvos(linhas);
+            return linhas;
         }
 
         return null;

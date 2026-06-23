@@ -39,7 +39,6 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         }
 
         await _repairService.RepararAsync(cancellationToken);
-        await GarantirCarteirasPadraoAsync(cancellationToken);
 
         // Importa as pastas monitoradas (financeiro + extratos B3) que ainda não foram varridas.
         // Cada pasta é guardada pelo próprio SourceFolder → idempotente entre execuções.
@@ -72,6 +71,12 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         {
             FinancasImportadorLogMessages.ReconciliacaoB3Falhou(_logger, ex);
         }
+
+        // Auto-sugestão de carteiras por ÚLTIMO: usa a posição FINAL (pós-resync e pós-reconciliação).
+        // Se rodasse antes, ativos cujo saldo muda no resync/reconciliação (GOLD11/ETF zerado e recriado
+        // pela reconciliação; cripto refeito pelo resync) não seriam vinculados no 1º load. Idempotente
+        // e à prova de falha (try-catch interno em GarantirCarteirasPadraoAsync).
+        await GarantirCarteirasPadraoAsync(cancellationToken);
     }
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
@@ -2077,4 +2082,7 @@ internal static partial class FinancasImportadorLogMessages
 
     [LoggerMessage(EventId = 22, Level = LogLevel.Error, Message = "Auto-sugestão de carteiras (F-I) falhou; ignorada para não derrubar o dashboard.")]
     public static partial void AutoCarteirasFalhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 23, Level = LogLevel.Warning, Message = "Cotação de custódia B3 (Preço de Fechamento) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void CotacaoCustodiaB3Falhou(ILogger logger, Exception exception);
 }

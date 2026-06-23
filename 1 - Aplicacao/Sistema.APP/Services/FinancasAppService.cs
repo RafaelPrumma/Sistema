@@ -1159,9 +1159,12 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
     private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAcumulada> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
     {
+        // Prefere uma cotação utilizável (PriceBRL > 0) e SÓ DEPOIS a mais recente. Sem isso, uma
+        // cotação de erro mais nova (Brapi SemToken/Falhou com PriceBRL <= 0) mascararia a cotação de
+        // custódia B3 (Preço de Fechamento), zerando de novo o "Resultado" das ações/FII.
         var cotacaoPorAtivo = cotacoes
             .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.PriceBRL > 0m).ThenByDescending(c => c.RetrievedAt).First());
 
         return posicoes
             .Select(pos =>

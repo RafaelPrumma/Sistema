@@ -61,6 +61,60 @@ public class ReconciliadorPosicaoB3Tests
     }
 
     [Fact]
+    public void ExtrairPrecosFechamento_LeTickerEPreco_DaPosicao()
+    {
+        // O xlsx da B3 grava número com "." (invariant), como ParseDecimal espera: NCHB11 9.87, BBAS3 23.45.
+        var linhas = new[]
+        {
+            LinhaPosicaoComPreco("NCHB11", "30", "9.87"),
+            LinhaPosicaoComPreco("BBAS3", "102", "23.45"),
+        };
+
+        var precos = ReconciliadorPosicaoB3.ExtrairPrecosFechamento(linhas);
+
+        Assert.Equal(9.87m, precos["NCHB11"]);
+        Assert.Equal(23.45m, precos["BBAS3"]);
+        Assert.Equal(2, precos.Count);
+    }
+
+    [Fact]
+    public void ExtrairPrecosFechamento_NormalizaTickerENaoSomaPrecos()
+    {
+        // Fracionário (ITUB4F) e lote-padrão (ITUB4) são o MESMO papel com o MESMO preço: não somar.
+        // Alias IRIM11 → IRDM11. O primeiro preço positivo do ticker normalizado prevalece.
+        var linhas = new[]
+        {
+            LinhaPosicaoComPreco("ITUB4", "100", "31.10"),
+            LinhaPosicaoComPreco("ITUB4F", "7", "31.10"),
+            LinhaPosicaoComPreco("IRIM11", "5", "88.40"),
+        };
+
+        var precos = ReconciliadorPosicaoB3.ExtrairPrecosFechamento(linhas);
+
+        Assert.Equal(31.10m, precos["ITUB4"]);
+        Assert.Equal(88.40m, precos["IRDM11"]);
+        Assert.False(precos.ContainsKey("ITUB4F"));
+        Assert.False(precos.ContainsKey("IRIM11"));
+    }
+
+    [Fact]
+    public void ExtrairPrecosFechamento_IgnoraLinhaSemTickerOuPrecoZero()
+    {
+        var linhas = new[]
+        {
+            LinhaPosicaoComPreco("", "10", "12.00"),     // sem ticker
+            LinhaPosicaoComPreco("MXRF11", "100", "0"),  // preço zero (sem fechamento utilizável)
+            LinhaPosicaoComPreco("HGLG11", "12", "158.30"),
+        };
+
+        var precos = ReconciliadorPosicaoB3.ExtrairPrecosFechamento(linhas);
+
+        var unico = Assert.Single(precos);
+        Assert.Equal("HGLG11", unico.Key);
+        Assert.Equal(158.30m, unico.Value);
+    }
+
+    [Fact]
     public void CalcularAjustes_FantasmaForaDaCustodia_ZeraComVenda()
     {
         // NCHB11: o cálculo tem +30 (compra sem a venda), mas NÃO está na Posição → alvo 0.
@@ -192,5 +246,14 @@ public class ReconciliadorPosicaoB3Tests
         {
             ["Código de Negociação"] = ticker,
             ["Quantidade"] = quantidade,
+        };
+
+    // Linha de Posição com o Preço de Fechamento (custódia) — fonte da cotação B3Custódia.
+    private static Dictionary<string, string> LinhaPosicaoComPreco(string ticker, string quantidade, string precoFechamento)
+        => new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Código de Negociação"] = ticker,
+            ["Quantidade"] = quantidade,
+            ["Preço de Fechamento"] = precoFechamento,
         };
 }

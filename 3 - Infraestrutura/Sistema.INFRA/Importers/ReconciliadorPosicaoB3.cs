@@ -55,6 +55,33 @@ public static class ReconciliadorPosicaoB3
     }
 
     /// <summary>
+    /// Lê o <b>Preço de Fechamento</b> (preço de mercado de fim de mês da custódia) por ticker da
+    /// Posição mais recente. Mesmas linhas que <see cref="ExtrairAlvos"/>: o ticker é normalizado
+    /// (fracionário + alias) e linhas sem ticker/preço positivo são ignoradas. O fracionário e o
+    /// lote-padrão do mesmo papel têm o mesmo preço de fechamento, então o primeiro positivo basta —
+    /// não somamos preços. Serve para alimentar uma <c>CotacaoAtivoFinanceiro</c> (B3Custódia) e fazer
+    /// o "Resultado" do dashboard deixar de ser 0 para ações/FII sem token Brapi.
+    /// </summary>
+    public static Dictionary<string, decimal> ExtrairPrecosFechamento(IEnumerable<IReadOnlyDictionary<string, string>> linhasPosicao)
+    {
+        var precos = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in linhasPosicao)
+        {
+            var ticker = ExtratoB3Materializador.NormalizarTicker(Campo(row, "Código de Negociação"));
+            if (string.IsNullOrWhiteSpace(ticker) || precos.ContainsKey(ticker))
+                continue;
+
+            var preco = ExtratoB3Materializador.ParseDecimal(Campo(row, "Preço de Fechamento"));
+            if (preco <= 0m)
+                continue;
+
+            precos[ticker] = preco;
+        }
+
+        return precos;
+    }
+
+    /// <summary>
     /// Calcula os ajustes de reconciliação. Para cada ativo B3 (não-cripto) presente no cálculo OU na
     /// Posição, compara a quantidade <paramref name="calculadoPorAtivo"/> (soma canônica, JÁ sem os
     /// ajustes de Reconciliação) com o alvo da Posição (<paramref name="alvoPorTicker"/>; ausente → 0).
