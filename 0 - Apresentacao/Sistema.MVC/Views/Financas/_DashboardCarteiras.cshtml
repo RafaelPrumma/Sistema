@@ -3,8 +3,6 @@
 @model FinancasCarteirasDto
 @{
     var br = CultureInfo.GetCultureInfo("pt-BR");
-    string Money(decimal value) => value.ToString("C", br);
-    string Percent(decimal value) => value.ToString("N2", br) + "%";
 }
 
 @functions {

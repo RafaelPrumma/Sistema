@@ -535,7 +535,7 @@ public class FinancasMarketDataService(
     }
 
     // true = existe na B3; false = a lista respondeu e não contém; null = não foi possível consultar.
-    private async Task<bool?> ExisteNaListaBrapiAsync(string symbol, HttpClient client, CancellationToken cancellationToken)
+    private static async Task<bool?> ExisteNaListaBrapiAsync(string symbol, HttpClient client, CancellationToken cancellationToken)
     {
         try
         {
