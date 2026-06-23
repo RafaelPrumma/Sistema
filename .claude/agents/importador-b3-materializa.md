@@ -1,6 +1,6 @@
 ---
 name: importador-b3-materializa
-description: Implementa a Fase 2 do importador do extrato consolidado da B3 — materializa a aba Negociações em TransacaoFinanceira (via staging mensal) e a aba Proventos Recebidos em RendimentoInvestimento, aplicando as precedências confirmadas (notas mandam onde existem; B3 proventos primários, Brapi/IR fallback) + testes. Use após a F1 estar pronta. Executa a F2 de specs/importador-b3.spec.md.
+description: "[HISTÓRICO — F2 concluída] Materializou a aba Negociações em TransacaoFinanceira (staging mensal) e Proventos Recebidos em RendimentoInvestimento. ⚠️ A precedência foi DEPOIS INVERTIDA: a B3 manda por ticker×mês e o Nubank só complementa onde a B3 não cobre (ver agente b3-fonte-de-verdade). Proventos B3 primários, Brapi/IR fallback. NÃO reusar a regra antiga 'notas mandam'."
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---

@@ -148,7 +148,10 @@ public record CotacaoAtivoDto(
     decimal? VariacaoDiaPercentual,
     DateTime? AtualizadoEm,
     string Status,
-    string Confianca);
+    string Confianca,
+    // F-L: de onde veio o preço que valorou a posição — "Cotação" (Brapi/Binance ao vivo),
+    // "B3Custódia" (fechamento da aba Posição) ou "Custo" (fallback ao preço médio, sem cotação).
+    string FontePreco = "Custo");
 
 public record CarteiraAtivoResumoDto(
     int AtivoId,
@@ -174,7 +177,10 @@ public record CarteiraFinanceiraResumoDto(
     decimal VariacaoDiaPercentual,
     decimal PercentualPatrimonio,
     int Ativos,
-    IReadOnlyList<CarteiraAtivoResumoDto> Itens);
+    IReadOnlyList<CarteiraAtivoResumoDto> Itens,
+    // F-I: subcarteiras (folhas) de uma carteira-topo. O valor/custo/resultado do pai agrega os filhos
+    // (soma para cima). Carteira-folha ou flat tem a lista vazia.
+    IReadOnlyList<CarteiraFinanceiraResumoDto> Subcarteiras);
 
 public record PeriodoPerformanceDto(string Codigo, string Label, decimal VariacaoPercentual, decimal VariacaoValor);
 
@@ -304,12 +310,80 @@ public record FinancasPatrimonioDto(
     EvolucaoPatrimonioDto Evolucao);
 
 public record FinancasCarteirasDto(
-    IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras);
+    IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras,
+    // F-O: cripto ainda não tem saldo de abertura/snapshot real da Binance (ver cripto.spec.md F2).
+    // Quando há posição cripto, sinalizamos "parcialmente reconciliado" — honestidade > número cego.
+    bool CriptoParcialmenteReconciliada = false);
 
 public record FinancasImportacaoDto(
     IReadOnlyList<FinanceiroKpiDto> Kpis,
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,
     DateTime? CotacoesAtualizadasEm);
+
+public record ProventoTopPagadorDto(
+    string Ticker,
+    string Nome,
+    decimal Valor);
+
+// F-N: quanto do provento recebido (12M) veio de cada fonte (B3 Extrato, Brapi, Binance Earn, IR).
+// É informação de confiança: FII vem da B3 porque o informe de IR só cobre ações.
+public record ProventoFonteDto(
+    string Fonte,
+    decimal Valor,
+    decimal Percentual,
+    int Quantidade);
+
+// F-K: resumo de proventos para a ilha lazy-loaded do dashboard.
+// Reaproveita os mesmos cálculos da tela de Proventos (resumo do período + série mensal).
+// F-N: PorFonte separa o recebido (12M) por origem do dado.
+public record FinancasProventosDashboardDto(
+    ProventosResumoDto Resumo,
+    IReadOnlyList<ProventoMensalDto> Mensais,
+    IReadOnlyList<ProventoTopPagadorDto> TopPagadores,
+    IReadOnlyList<ProventoFonteDto> PorFonte);
+
+// F-L: painel de saúde/transparência. Posição calculada (das transações) confrontada com a custódia
+// oficial da B3 (Preço de Fechamento da aba Posição), com a fonte do preço que valorou cada ativo.
+public record PosicaoCalculadaDto(
+    string Ticker,
+    string Classe,
+    decimal Quantidade,
+    decimal PrecoMedio,
+    decimal ValorMercado,
+    string FontePreco,
+    decimal? PrecoB3,        // Preço de Fechamento B3Custódia (null = sem snapshot da B3 p/ o ativo)
+    decimal? DiferencaB3,    // valorMercado − (qtd × precoB3); null quando não há preço B3
+    string Status);
+
+// F-L (a): composição do valor de mercado por fonte do preço — cotação ao vivo × fechamento B3 × custo.
+public record ComposicaoValorDto(
+    decimal ComCotacao,      // valorado por cotação ao vivo (Brapi/Binance)
+    decimal ComFechamentoB3, // valorado pelo fechamento B3Custódia
+    decimal ComCusto,        // fallback ao custo (sem cotação utilizável)
+    decimal Total);
+
+public record FinancasPosicoesDashboardDto(
+    ComposicaoValorDto Composicao,
+    IReadOnlyList<PosicaoCalculadaDto> Posicoes);
+
+// F-M: card de reconciliação B3. Torna o ReconciliadorPosicaoB3 explícito para o usuário confiar
+// no número: alvo da custódia vs calculado por transações, nº de ajustes e o valor que foi parar no
+// ativo virtual VARIACAO (a diferença não explicada pelos relatórios).
+public record ReconciliacaoAtivoDto(
+    string Ticker,
+    string Nome,
+    decimal Alvo,
+    decimal Calculado,
+    decimal Diferenca,
+    decimal ValorAjuste);
+
+public record FinancasReconciliacaoDto(
+    bool TemDados,
+    int NumeroAjustes,
+    decimal ValorTotalVariacao,
+    decimal AlvoTotalCustodia,
+    decimal CalculadoTotal,
+    IReadOnlyList<ReconciliacaoAtivoDto> PrincipaisAtivos);
 
 public class FinancasDashboardDto
 {

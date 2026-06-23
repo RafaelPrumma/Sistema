@@ -3,8 +3,113 @@
 @model FinancasCarteirasDto
 @{
     var br = CultureInfo.GetCultureInfo("pt-BR");
-    string Money(decimal value) => value.ToString("C", br);
-    string Percent(decimal value) => value.ToString("N2", br) + "%";
+}
+
+@functions {
+    // Renderiza uma carteira (topo, subcarteira ou flat) e desce recursivamente nas subcarteiras.
+    // nivel controla o recuo visual; topo = 0.
+    void RenderCarteira(CarteiraFinanceiraResumoDto carteira, int nivel)
+    {
+        var br = CultureInfo.GetCultureInfo("pt-BR");
+        string Money(decimal value) => value.ToString("C", br);
+        string Percent(decimal value) => value.ToString("N2", br) + "%";
+
+        var resultadoClass = carteira.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+        var diaClass = carteira.VariacaoDiaPercentual >= 0 ? "text-success" : "text-danger";
+        var collapseId = $"carteira-{carteira.Id}";
+        var temFilhos = carteira.Subcarteiras.Count > 0 || carteira.Itens.Count > 0;
+        var pesoNome = nivel == 0 ? "fw-semibold" : "";
+        var indentRem = nivel * 1.1;
+
+        <tr class="@(nivel == 0 ? "border-top" : "")">
+            <td>
+                <div style="padding-left:@(indentRem.ToString(CultureInfo.InvariantCulture))rem">
+                    @if (temFilhos)
+                    {
+                        <button class="btn btn-link p-0 text-decoration-none @pesoNome" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false">
+                            <i class="bi bi-chevron-down me-1"></i>@carteira.Nome
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="@pesoNome">@carteira.Nome</span>
+                    }
+                    @if (nivel == 0)
+                    {
+                        <div class="small text-secondary">@carteira.Tipo</div>
+                    }
+                </div>
+            </td>
+            <td class="text-end">@Percent(carteira.PercentualPatrimonio)</td>
+            <td class="text-end @diaClass">@Percent(carteira.VariacaoDiaPercentual)</td>
+            <td class="text-end">@Money(carteira.ValorMercado)</td>
+            <td class="text-end @resultadoClass">
+                @Money(carteira.ResultadoNaoRealizado)
+                <div class="small">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>
+            </td>
+            <td class="text-end">@carteira.Ativos.ToString("N0", br)</td>
+        </tr>
+        @if (temFilhos)
+        {
+            <tr class="collapse" id="@collapseId">
+                <td colspan="6" class="bg-body-tertiary">
+                    @* Subcarteiras (folhas) primeiro — agregam para cima no pai. *@
+                    @if (carteira.Subcarteiras.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <tbody>
+                                @foreach (var sub in carteira.Subcarteiras)
+                                {
+                                    RenderCarteira(sub, nivel + 1);
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    @* Ativos ligados diretamente a esta carteira. *@
+                    @if (carteira.Itens.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Ativo</th>
+                                        <th class="text-end">% carteira</th>
+                                        <th class="text-end">Qtde</th>
+                                        <th class="text-end">Dia</th>
+                                        <th class="text-end">Valor</th>
+                                        <th class="text-end">Resultado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach (var ativo in carteira.Itens)
+                                {
+                                    var ativoResultadoClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
+                                    var ativoDiaClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@ativo.Ativo</div>
+                                            <div class="small text-secondary">@ativo.Classe &middot; @ativo.Symbol &middot; @ativo.Status</div>
+                                        </td>
+                                        <td class="text-end">@Percent(ativo.PercentualCarteira)</td>
+                                        <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
+                                        <td class="text-end @ativoDiaClass">@(ativo.VariacaoDiaPercentual.HasValue ? Percent(ativo.VariacaoDiaPercentual.Value) : "-")</td>
+                                        <td class="text-end">@Money(ativo.ValorMercado)</td>
+                                        <td class="text-end @ativoResultadoClass">
+                                            @Money(ativo.ResultadoNaoRealizado)
+                                            <div class="small">@Percent(ativo.ResultadoNaoRealizadoPercentual)</div>
+                                        </td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </td>
+            </tr>
+        }
+    }
 }
 
 <div data-aos="fade-up" data-aos-duration="220">
@@ -16,6 +121,19 @@
                     <i class="bi bi-list-ul me-1"></i>Ver transações
                 </a>
             </div>
+            @* F-O: a Binance não fornece snapshot de custódia (como a aba Posição da B3), então a posição
+               cripto ainda vem só do netting do ledger e pode estar incompleta (ver cripto.spec.md F2). *@
+            @if (Model.CriptoParcialmenteReconciliada)
+            {
+                <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 small mb-3" role="status">
+                    <i class="bi bi-exclamation-triangle mt-1"></i>
+                    <div>
+                        <strong>Cripto parcialmente reconciliada.</strong>
+                        Ainda não há saldo de abertura/snapshot real da Binance — a posição de cripto é
+                        calculada pelo netting do extrato e pode divergir da corretora (ex.: saldo em Earn).
+                    </div>
+                </div>
+            }
             <div class="table-responsive">
                 <table class="table table-sm align-middle finance-assets">
                     <thead>
@@ -31,64 +149,7 @@
                     <tbody>
                     @foreach (var carteira in Model.Carteiras)
                     {
-                        var resultadoClass = carteira.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
-                        var diaClass = carteira.VariacaoDiaPercentual >= 0 ? "text-success" : "text-danger";
-                        var collapseId = $"carteira-{carteira.Id}";
-                        <tr>
-                            <td>
-                                <button class="btn btn-link p-0 text-decoration-none fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false">
-                                    <i class="bi bi-chevron-down me-1"></i>@carteira.Nome
-                                </button>
-                                <div class="small text-secondary">@carteira.Tipo</div>
-                            </td>
-                            <td class="text-end">@Percent(carteira.PercentualPatrimonio)</td>
-                            <td class="text-end @diaClass">@Percent(carteira.VariacaoDiaPercentual)</td>
-                            <td class="text-end">@Money(carteira.ValorMercado)</td>
-                            <td class="text-end @resultadoClass">
-                                @Money(carteira.ResultadoNaoRealizado)
-                                <div class="small">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>
-                            </td>
-                            <td class="text-end">@carteira.Ativos.ToString("N0", br)</td>
-                        </tr>
-                        <tr class="collapse" id="@collapseId">
-                            <td colspan="6" class="bg-body-tertiary">
-                                <div class="table-responsive">
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Ativo</th>
-                                                <th class="text-end">% carteira</th>
-                                                <th class="text-end">Qtde</th>
-                                                <th class="text-end">Dia</th>
-                                                <th class="text-end">Valor</th>
-                                                <th class="text-end">Resultado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                        @foreach (var ativo in carteira.Itens)
-                                        {
-                                            var ativoResultadoClass = ativo.ResultadoNaoRealizado >= 0 ? "text-success" : "text-danger";
-                                            var ativoDiaClass = (ativo.VariacaoDiaPercentual ?? 0) >= 0 ? "text-success" : "text-danger";
-                                            <tr>
-                                                <td>
-                                                    <div class="fw-semibold">@ativo.Ativo</div>
-                                                    <div class="small text-secondary">@ativo.Classe &middot; @ativo.Symbol &middot; @ativo.Status</div>
-                                                </td>
-                                                <td class="text-end">@Percent(ativo.PercentualCarteira)</td>
-                                                <td class="text-end">@ativo.Quantidade.ToString("N4", br)</td>
-                                                <td class="text-end @ativoDiaClass">@(ativo.VariacaoDiaPercentual.HasValue ? Percent(ativo.VariacaoDiaPercentual.Value) : "-")</td>
-                                                <td class="text-end">@Money(ativo.ValorMercado)</td>
-                                                <td class="text-end @ativoResultadoClass">
-                                                    @Money(ativo.ResultadoNaoRealizado)
-                                                    <div class="small">@Percent(ativo.ResultadoNaoRealizadoPercentual)</div>
-                                                </td>
-                                            </tr>
-                                        }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </td>
-                        </tr>
+                        RenderCarteira(carteira, 0);
                     }
                     @if (Model.Carteiras.Count == 0)
                     {

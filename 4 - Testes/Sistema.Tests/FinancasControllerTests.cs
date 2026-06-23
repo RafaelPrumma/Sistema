@@ -45,14 +45,16 @@ public class FinancasControllerTests
             [],
             new ImportacaoFinanceiraResumoDto(null, 0, 0, 0, null),
             null);
-        IReadOnlyList<PosicaoFinanceiraDto> posicoes = [];
+        var posicoes = new FinancasPosicoesDashboardDto(new ComposicaoValorDto(0, 0, 0, 0), []);
         IReadOnlyList<AlertaConfiabilidadeDto> alertas = [];
+        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], [], []);
 
         service.Setup(x => x.ObterPatrimonioDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(patrimonio);
         service.Setup(x => x.ObterCarteirasDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(carteiras);
         service.Setup(x => x.ObterImportacaoDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(importacao);
         service.Setup(x => x.ObterPosicoesDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(posicoes);
         service.Setup(x => x.ObterAlertasDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(alertas);
+        service.Setup(x => x.ObterProventosDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
         var controller = new FinancasController(service.Object);
 
         var patrimonioResult = Assert.IsType<JsonResult>(await controller.DashboardPatrimonio(CancellationToken.None));
@@ -64,6 +66,8 @@ public class FinancasControllerTests
         var posicoesModel = posicoesResult.Model;
         var alertasResult = Assert.IsType<PartialViewResult>(await controller.DashboardAlertas(CancellationToken.None));
         var alertasModel = alertasResult.Model;
+        var proventosResult = Assert.IsType<PartialViewResult>(await controller.DashboardProventos(CancellationToken.None));
+        var proventosModel = proventosResult.Model;
 
         Assert.Same(patrimonio, patrimonioResult.Value);
         Assert.Equal("_DashboardCarteiras", carteirasResult.ViewName);
@@ -74,5 +78,37 @@ public class FinancasControllerTests
         Assert.Same(posicoes, posicoesModel);
         Assert.Equal("_DashboardAlertas", alertasResult.ViewName);
         Assert.Same(alertas, alertasModel);
+        Assert.Equal("_DashboardProventos", proventosResult.ViewName);
+        Assert.Same(proventos, proventosModel);
+    }
+
+    [Fact]
+    public async Task DashboardReconciliacaoDeveRetornarParcialDaIlha()
+    {
+        var service = new Mock<IFinancasAppService>();
+        var reconciliacao = new FinancasReconciliacaoDto(false, 0, 0, 0, 0, []);
+        service.Setup(x => x.ObterReconciliacaoDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(reconciliacao);
+        var controller = new FinancasController(service.Object);
+
+        var result = Assert.IsType<PartialViewResult>(await controller.DashboardReconciliacao(CancellationToken.None));
+
+        Assert.Equal("_DashboardReconciliacao", result.ViewName);
+        Assert.Same(reconciliacao, result.Model);
+        service.Verify(x => x.ObterReconciliacaoDashboardAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DashboardProventosDeveRetornarParcialDaIlha()
+    {
+        var service = new Mock<IFinancasAppService>();
+        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], [], []);
+        service.Setup(x => x.ObterProventosDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
+        var controller = new FinancasController(service.Object);
+
+        var result = Assert.IsType<PartialViewResult>(await controller.DashboardProventos(CancellationToken.None));
+
+        Assert.Equal("_DashboardProventos", result.ViewName);
+        Assert.Same(proventos, result.Model);
+        service.Verify(x => x.ObterProventosDashboardAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

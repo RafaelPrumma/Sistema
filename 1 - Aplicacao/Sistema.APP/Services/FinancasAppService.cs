@@ -53,7 +53,12 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
         var valorMercadoTotal = ativos.Sum(x => x.ValorMercado);
 
-        return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal));
+        // F-O: cripto não tem snapshot/saldo real importado (a Binance não tem aba "Posição" como a B3),
+        // então a posição cripto ainda depende do netting do ledger (cripto.spec.md F2 em aberto).
+        // Sinaliza "parcialmente reconciliado" sempre que houver posição cripto detida.
+        var criptoParcial = posicoes.Any(p => p.Asset.IsCrypto);
+
+        return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal), criptoParcial);
     }
 
     public async Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default)
@@ -74,20 +79,251 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault());
     }
 
-    public async Task<IReadOnlyList<PosicaoFinanceiraDto>> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default)
+    // F-L — "Posições calculadas vs custódia". À prova de falha (roda no load): erro → DTO vazio.
+    // (a) composição do valor por fonte do preço; (c) posição calculada × fechamento B3 + diferença.
+    public async Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default)
     {
-        var posicoes = await _uow.Financas.BuscarPosicoesAsync(true, cancellationToken);
-        return posicoes
-            .Where(EhPosicaoEstimativaAbertaVisivel)
-            .Take(12)
-            .Select(MapPosicao)
-            .ToList();
+        try
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+            var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+
+            // Preço de Fechamento da custódia B3 (Provedor=B3Custodia) por ativo — base do "diferença vs B3".
+            var precoB3PorAtivo = cotacoes
+                .Where(c => c.Provedor == ProvedorCotacao.B3Custodia && c.PriceBRL > 0m)
+                .GroupBy(c => c.AtivoFinanceiroId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+
+            // (a) Composição do valor de mercado por fonte do preço usado.
+            decimal comCotacao = 0m, comFechamentoB3 = 0m, comCusto = 0m;
+            foreach (var a in ativos)
+            {
+                if (a.FontePreco == "Custo")
+                    comCusto += a.ValorMercado;
+                else if (a.FontePreco == "Fechamento B3")
+                    comFechamentoB3 += a.ValorMercado;
+                else
+                    comCotacao += a.ValorMercado;
+            }
+            var composicao = new ComposicaoValorDto(
+                Math.Round(comCotacao, 2),
+                Math.Round(comFechamentoB3, 2),
+                Math.Round(comCusto, 2),
+                Math.Round(comCotacao + comFechamentoB3 + comCusto, 2));
+
+            // (c) Posições calculadas vs custódia, com fonte do preço e diferença vs B3.
+            var lista = ativos
+                .Select(a =>
+                {
+                    decimal? precoB3 = precoB3PorAtivo.TryGetValue(a.AtivoId, out var p) ? p : null;
+                    decimal? diferenca = precoB3.HasValue ? Math.Round(a.ValorMercado - a.Quantidade * precoB3.Value, 2) : null;
+                    return new PosicaoCalculadaDto(
+                        a.Ativo,
+                        a.Classe,
+                        a.Quantidade,
+                        Math.Round(a.PrecoMedio, 4),
+                        Math.Round(a.ValorMercado, 2),
+                        a.FontePreco,
+                        precoB3,
+                        diferenca,
+                        a.Status);
+                })
+                .OrderByDescending(x => x.ValorMercado)
+                .Take(15)
+                .ToList();
+
+            return new FinancasPosicoesDashboardDto(composicao, lista);
+        }
+        catch
+        {
+            return new FinancasPosicoesDashboardDto(new ComposicaoValorDto(0m, 0m, 0m, 0m), []);
+        }
     }
 
     public async Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default)
     {
         var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);
         return alertas.Take(8).Select(MapAlerta).ToList();
+    }
+
+    // F-K: ilha lazy-loaded do dashboard com o resumo de proventos.
+    // À prova de falha: a ilha é carregada junto com o dashboard, então um erro aqui não pode
+    // derrubar o load — devolvemos um DTO zerado em vez de estourar.
+    public async Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var hoje = DateTime.UtcNow.Date;
+            var todos = await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hoje.AddYears(5), cancellationToken);
+            var recebidos = todos.Where(x => x.PaymentDate <= hoje).ToList();
+
+            var resumo = new ProventosResumoDto(
+                Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year && x.PaymentDate!.Value.Month == hoje.Month).Sum(ValorLiquido), 2),
+                Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year).Sum(ValorLiquido), 2),
+                Math.Round(recebidos.Sum(ValorLiquido), 2),
+                Math.Round(todos.Where(x => x.PaymentDate > hoje).Sum(ValorLiquido), 2),
+                todos.Count);
+
+            var mensais = CriarProventosMensais(todos, hoje);
+
+            // Recebidos dos últimos 12 meses, reusado por Top pagadores e PorFonte (F-N).
+            var inicio12m = hoje.AddMonths(-12);
+            var recebidos12m = recebidos
+                .Where(x => x.PaymentDate!.Value.Date >= inicio12m)
+                .ToList();
+
+            // Top pagadores dos últimos 12 meses (líquido recebido por ativo).
+            var topPagadores = recebidos12m
+                .GroupBy(x => x.AssetId)
+                .Select(g =>
+                {
+                    var asset = g.First().Asset;
+                    return new ProventoTopPagadorDto(
+                        asset?.Ticker ?? asset?.AssetKey ?? "—",
+                        asset?.Name ?? string.Empty,
+                        Math.Round(g.Sum(ValorLiquido), 2));
+                })
+                .Where(x => x.Valor > 0m)
+                .OrderByDescending(x => x.Valor)
+                .Take(5)
+                .ToList();
+
+            var porFonte = CriarProventosPorFonte(recebidos12m);
+
+            return new FinancasProventosDashboardDto(resumo, mensais, topPagadores, porFonte);
+        }
+        catch
+        {
+            return ProventosDashboardVazio();
+        }
+    }
+
+    // F-N — quebra do recebido (12M) por FONTE do dado (B3 Extrato, Brapi, Binance Earn, Informe IR).
+    // A Fonte do RendimentoInvestimento pode vir combinada com "+" (ex.: "B3 Extrato+Brapi"); nesse
+    // caso a primeira fonte "manda" para o rótulo (a B3 é primária quando presente). É informação de
+    // confiança: FII vem da B3 porque o informe de IR só cobre ações.
+    private static IReadOnlyList<ProventoFonteDto> CriarProventosPorFonte(IReadOnlyList<RendimentoInvestimento> recebidos)
+    {
+        var grupos = recebidos
+            .GroupBy(RotuloFonteProvento)
+            .Select(g => new { Fonte = g.Key, Valor = Math.Round(g.Sum(ValorLiquido), 2), Quantidade = g.Count() })
+            .Where(x => x.Valor > 0m)
+            .ToList();
+
+        var total = grupos.Sum(x => x.Valor);
+        return grupos
+            .OrderByDescending(x => x.Valor)
+            .Select(x => new ProventoFonteDto(
+                x.Fonte,
+                x.Valor,
+                total == 0m ? 0m : Math.Round(x.Valor / total * 100m, 1),
+                x.Quantidade))
+            .ToList();
+    }
+
+    // Normaliza a Fonte crua do provento para um rótulo amigável e estável. A primeira fonte da
+    // string combinada ("B3 Extrato+Brapi") define o rótulo; "InformeIR2025" → "Informe IR".
+    private static string RotuloFonteProvento(RendimentoInvestimento r)
+    {
+        var bruta = string.IsNullOrWhiteSpace(r.Fonte) ? r.Source : r.Fonte;
+        if (string.IsNullOrWhiteSpace(bruta))
+            return "Outras fontes";
+
+        var primeira = bruta.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? bruta.Trim();
+
+        if (primeira.StartsWith("InformeIR", StringComparison.OrdinalIgnoreCase) || primeira.Contains("Informe", StringComparison.OrdinalIgnoreCase))
+            return "Informe IR";
+        if (primeira.Contains("B3", StringComparison.OrdinalIgnoreCase))
+            return "B3 Extrato";
+        if (primeira.Contains("Brapi", StringComparison.OrdinalIgnoreCase))
+            return "Brapi";
+        if (primeira.Contains("Binance", StringComparison.OrdinalIgnoreCase))
+            return "Binance Earn";
+        return primeira;
+    }
+
+    private static FinancasProventosDashboardDto ProventosDashboardVazio()
+        => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], [], []);
+
+    // Contrato com o ReconciliadorPosicaoB3 (camada INFRA, fora do alcance do APP): as transações de
+    // ajuste têm Fonte="Reconciliação" e a contrapartida cai no ativo virtual AssetKey="VARIACAO".
+    // Mantidos como literais aqui porque sobrevivem ao resync (são o "contrato" da feature).
+    private const string FonteReconciliacao = "Reconciliação";
+    private const string AssetKeyVariacao = "VARIACAO";
+
+    // F-M — torna a reconciliação da Posição B3 explícita. Lê as transações Fonte="Reconciliação"
+    // (à prova de falha: erro aqui não pode derrubar o dashboard). O ativo-side leva a posição ao alvo
+    // da custódia; a contrapartida no ativo VARIACAO absorve o valor da diferença não explicada.
+    public async Task<FinancasReconciliacaoDto> ObterReconciliacaoDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            var ajustes = transacoes
+                .Where(t => t.Fonte == FonteReconciliacao && t.Asset is not null)
+                .ToList();
+            if (ajustes.Count == 0)
+                return ReconciliacaoVazia();
+
+            // Valor líquido parado no ativo VARIACAO = soma assinada (Compra +, Venda −) das suas linhas.
+            var variacao = ajustes.Where(t => t.Asset!.AssetKey == AssetKeyVariacao).ToList();
+            var valorTotalVariacao = Math.Round(variacao.Sum(t => DeltaQuantidade(t)), 2);
+
+            // Ajustes do ativo real (exclui a contrapartida VARIACAO). Alvo/Calculado vêm do RawJson
+            // gravado pelo reconciliador; fallback: deriva do próprio ajuste se o JSON faltar.
+            var ativosAjustados = ajustes
+                .Where(t => t.Asset!.AssetKey != AssetKeyVariacao)
+                .Select(t =>
+                {
+                    var (alvo, calculado) = LerAlvoCalculado(t.RawJson);
+                    var diferenca = alvo - calculado;
+                    return new ReconciliacaoAtivoDto(
+                        t.Asset!.Ticker ?? t.Asset.AssetKey ?? "—",
+                        t.Asset.Name ?? string.Empty,
+                        Math.Round(alvo, 8),
+                        Math.Round(calculado, 8),
+                        Math.Round(diferenca, 8),
+                        Math.Round(t.Quantity * t.UnitPrice, 2));
+                })
+                .OrderByDescending(x => Math.Abs(x.ValorAjuste))
+                .ToList();
+
+            return new FinancasReconciliacaoDto(
+                TemDados: true,
+                NumeroAjustes: ativosAjustados.Count,
+                ValorTotalVariacao: valorTotalVariacao,
+                AlvoTotalCustodia: Math.Round(ativosAjustados.Sum(x => x.Alvo), 8),
+                CalculadoTotal: Math.Round(ativosAjustados.Sum(x => x.Calculado), 8),
+                PrincipaisAtivos: ativosAjustados.Take(8).ToList());
+        }
+        catch
+        {
+            return ReconciliacaoVazia();
+        }
+    }
+
+    private static FinancasReconciliacaoDto ReconciliacaoVazia()
+        => new(false, 0, 0m, 0m, 0m, []);
+
+    // Extrai Alvo/Calculado do RawJson { Alvo, Calculado, PrecoMedio } gravado pelo reconciliador.
+    private static (decimal Alvo, decimal Calculado) LerAlvoCalculado(string? rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+            return (0m, 0m);
+        try
+        {
+            using var doc = JsonDocument.Parse(rawJson);
+            var root = doc.RootElement;
+            decimal Ler(string nome) => root.TryGetProperty(nome, out var v) && v.TryGetDecimal(out var d) ? d : 0m;
+            return (Ler("Alvo"), Ler("Calculado"));
+        }
+        catch
+        {
+            return (0m, 0m);
+        }
     }
 
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
@@ -1108,11 +1344,24 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return estado;
     }
 
+    // F-L: rótulo amigável da fonte do preço (provedor da cotação utilizada).
+    private static string RotuloFontePreco(ProvedorCotacao provedor) => provedor switch
+    {
+        ProvedorCotacao.Brapi => "Cotação (Brapi)",
+        ProvedorCotacao.Binance => "Cotação (Binance)",
+        ProvedorCotacao.B3Custodia => "Fechamento B3",
+        ProvedorCotacao.Manual => "Cotação (manual)",
+        _ => "Cotação"
+    };
+
     private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAcumulada> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
     {
+        // Prefere uma cotação utilizável (PriceBRL > 0) e SÓ DEPOIS a mais recente. Sem isso, uma
+        // cotação de erro mais nova (Brapi SemToken/Falhou com PriceBRL <= 0) mascararia a cotação de
+        // custódia B3 (Preço de Fechamento), zerando de novo o "Resultado" das ações/FII.
         var cotacaoPorAtivo = cotacoes
             .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.PriceBRL > 0m).ThenByDescending(c => c.RetrievedAt).First());
 
         return posicoes
             .Select(pos =>
@@ -1122,9 +1371,18 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
                 var precoAtual = cotacao is { PriceBRL: > 0m } ? cotacao.PriceBRL : (decimal?)null;
                 var custo = pos.Custo;
+                // F-D/F-J: sem cotação utilizável (ação B3 sem token Brapi, cripto sem preço) o valor de
+                // mercado cai no CUSTO (preço médio) — piso consistente, nunca 0 para ativo detido. Sem
+                // isso a carteira inteira aparecia zerada. Não inventa cotação: custo é só piso.
                 var valorMercado = precoAtual.HasValue ? pos.Quantidade * precoAtual.Value : custo;
                 var resultado = valorMercado - custo;
                 var percentual = custo == 0m ? 0m : resultado / custo * 100m;
+                // Status só reflete cotação viva quando o preço foi de fato usado; senão sinaliza
+                // "SemCotacao" (cobre também a cotação obsoleta/erro com PriceBRL <= 0).
+                var status = precoAtual.HasValue ? (cotacao?.Status.ToString() ?? "SemCotacao") : "SemCotacao";
+                // F-L: fonte do preço que valorou a posição. Custo quando caiu no fallback; senão o
+                // provedor da cotação usada (Brapi/Binance ao vivo vs B3Custódia = fechamento da Posição).
+                var fontePreco = !precoAtual.HasValue ? "Custo" : RotuloFontePreco(cotacao!.Provedor);
 
                 return new CotacaoAtivoDto(
                     asset.Id,
@@ -1138,10 +1396,11 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     custo,
                     resultado,
                     percentual,
-                    cotacao?.ChangePercent,
+                    precoAtual.HasValue ? cotacao?.ChangePercent : null,
                     cotacao?.RetrievedAt,
-                    cotacao?.Status.ToString() ?? "SemCotacao",
-                    "Calculada");
+                    status,
+                    "Calculada",
+                    fontePreco);
             })
             .OrderByDescending(x => x.ValorMercado)
             .ToList();
@@ -1185,49 +1444,76 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .ToList();
     }
 
+    // F-I — monta o resumo de carteiras como árvore (topo → subcarteiras). O valor/custo/resultado do
+    // topo AGREGA os ativos diretos + todas as folhas (soma para cima); a variação do dia é ponderada
+    // pelo valor de mercado. Carteiras vazias (sem ativo detido em si nem nas filhas) somem.
     private static IReadOnlyList<CarteiraFinanceiraResumoDto> CriarResumoCarteiras(IReadOnlyList<CarteiraFinanceira> carteiras, IReadOnlyList<CotacaoAtivoDto> ativos, decimal valorPatrimonio)
     {
         var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
-        return carteiras
-            .Select(carteira =>
-            {
-                var itens = carteira.Ativos
-                    .Where(x => x.AtivoFinanceiroId > 0 && ativosPorId.ContainsKey(x.AtivoFinanceiroId))
-                    .Select(x => ativosPorId[x.AtivoFinanceiroId])
-                    .ToList();
-                var valor = itens.Sum(x => x.ValorMercado);
-                var custo = itens.Sum(x => x.CustoEstimado);
-                var resultado = valor - custo;
-                var variacaoDiaValor = itens.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m));
-                var itensResumo = itens
-                    .OrderByDescending(x => x.ValorMercado)
-                    .Select(x => new CarteiraAtivoResumoDto(
-                        x.AtivoId,
-                        x.Ativo,
-                        x.Classe,
-                        x.Symbol,
-                        x.Quantidade,
-                        Math.Round(x.ValorMercado, 2),
-                        valor == 0m ? 0m : Math.Round(x.ValorMercado / valor * 100m, 2),
-                        x.VariacaoDiaPercentual,
-                        Math.Round(x.ResultadoNaoRealizado, 2),
-                        Math.Round(x.ResultadoNaoRealizadoPercentual, 2),
-                        x.Status))
-                    .ToList();
+        var filhasPorPai = carteiras
+            .Where(c => c.ParentId.HasValue)
+            .GroupBy(c => c.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Ordem).ThenBy(c => c.Nome).ToList());
 
-                return new CarteiraFinanceiraResumoDto(
-                    carteira.Id,
-                    carteira.Nome,
-                    carteira.Tipo,
-                    valor,
-                    custo,
-                    resultado,
-                    custo == 0 ? 0 : resultado / custo * 100m,
-                    valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
-                    valorPatrimonio == 0m ? 0m : valor / valorPatrimonio * 100m,
-                    itens.Count,
-                    itensResumo);
-            })
+        // Constrói o resumo de UMA carteira: seus ativos diretos + (recursivo) suas subcarteiras.
+        // A agregação para cima soma valor/custo/variação dos próprios itens com os das filhas.
+        CarteiraFinanceiraResumoDto Montar(CarteiraFinanceira carteira)
+        {
+            var subResumos = filhasPorPai.TryGetValue(carteira.Id, out var filhas)
+                ? filhas.Select(Montar).Where(s => s.ValorMercado != 0m || s.Ativos > 0).ToList()
+                : [];
+
+            var itensDiretos = carteira.Ativos
+                .Where(x => x.AtivoFinanceiroId > 0 && ativosPorId.ContainsKey(x.AtivoFinanceiroId))
+                .Select(x => ativosPorId[x.AtivoFinanceiroId])
+                .ToList();
+
+            // Valor/custo/variação agregados = diretos + soma das filhas (já agregadas).
+            var valor = itensDiretos.Sum(x => x.ValorMercado) + subResumos.Sum(s => s.ValorMercado);
+            var custo = itensDiretos.Sum(x => x.CustoEstimado) + subResumos.Sum(s => s.CustoEstimado);
+            var resultado = valor - custo;
+            var variacaoDiaValor = itensDiretos.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m))
+                + subResumos.Sum(s => s.ValorMercado * (s.VariacaoDiaPercentual / 100m));
+            var qtdAtivos = itensDiretos.Count + subResumos.Sum(s => s.Ativos);
+
+            var itensResumo = itensDiretos
+                .OrderByDescending(x => x.ValorMercado)
+                .Select(x => new CarteiraAtivoResumoDto(
+                    x.AtivoId,
+                    x.Ativo,
+                    x.Classe,
+                    x.Symbol,
+                    x.Quantidade,
+                    Math.Round(x.ValorMercado, 2),
+                    valor == 0m ? 0m : Math.Round(x.ValorMercado / valor * 100m, 2),
+                    x.VariacaoDiaPercentual,
+                    Math.Round(x.ResultadoNaoRealizado, 2),
+                    Math.Round(x.ResultadoNaoRealizadoPercentual, 2),
+                    x.Status))
+                .ToList();
+
+            return new CarteiraFinanceiraResumoDto(
+                carteira.Id,
+                carteira.Nome,
+                carteira.Tipo,
+                valor,
+                custo,
+                resultado,
+                custo == 0 ? 0 : resultado / custo * 100m,
+                valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
+                valorPatrimonio == 0m ? 0m : valor / valorPatrimonio * 100m,
+                qtdAtivos,
+                itensResumo,
+                subResumos);
+        }
+
+        // Só os topos (ParentId nulo) entram no nível raiz; as filhas vêm aninhadas. Carteiras antigas
+        // flat (sem ParentId, sem filhas) também são "topos" e continuam aparecendo.
+        return carteiras
+            .Where(c => !c.ParentId.HasValue)
+            .OrderBy(c => c.Ordem)
+            .ThenBy(c => c.Nome)
+            .Select(Montar)
             .Where(x => x.Ativos > 0)
             .OrderByDescending(x => x.ValorMercado)
             .ToList();

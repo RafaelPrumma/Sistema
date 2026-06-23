@@ -29,6 +29,21 @@
 
     let activePanelId = null;
 
+    const findCurrentRoutePanelId = () => {
+      const $activeSubLink = $menu.find('.menu-panel--sub .menu-sublink.active').first();
+
+      if ($activeSubLink.length) {
+        return $activeSubLink.closest('.menu-panel--sub').attr('id') || null;
+      }
+
+      const fallbackPanelId = $menu.find('.menu-panel--root .menu-toggle.active')
+        .first()
+        .closest('.menu-item')
+        .data('panel');
+
+      return fallbackPanelId || null;
+    };
+
     const rememberExpandedState = (expanded) => {
       const value = expanded ? 'true' : 'false';
       $menu.data('menu-expanded', value);
@@ -60,6 +75,14 @@
       activePanelId = null;
     };
 
+    const showCurrentRoutePanel = () => {
+      const panelId = findCurrentRoutePanelId();
+
+      if (panelId) {
+        showPanel(panelId);
+      }
+    };
+
     const setDesktopExpanded = (expanded) => {
       document.body.classList.toggle(config.collapsedClass, !expanded);
       $hamburger.attr('aria-expanded', expanded ? 'true' : 'false');
@@ -71,14 +94,24 @@
     const setMobileOpen = (open) => {
       document.body.classList.toggle(config.mobileOpenClass, open);
       $hamburger.attr('aria-expanded', open ? 'true' : 'false');
-      if (!open) showRoot();
+
+      if (open) {
+        showCurrentRoutePanel();
+      } else {
+        showRoot();
+      }
     };
 
     const sync = (desktopExpanded) => {
       if (desktop.matches) {
         $checkbox.prop('disabled', false);
-        setDesktopExpanded(Boolean(desktopExpanded));
-        setMobileOpen(false);
+        const expanded = Boolean(desktopExpanded);
+        setDesktopExpanded(expanded);
+        document.body.classList.remove(config.mobileOpenClass);
+
+        if (expanded) {
+          showCurrentRoutePanel();
+        }
       } else {
         $checkbox.prop('disabled', true);
         setMobileOpen(false);
@@ -160,6 +193,7 @@
     };
 
     bindEvents();
+    showCurrentRoutePanel();
 
     return {
       sync,

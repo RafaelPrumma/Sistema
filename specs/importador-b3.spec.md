@@ -59,3 +59,19 @@ Arquivos em `arquivos/b3/` (ver `arquivos/b3/README.md`). Contêm CPF e dados de
 
 ## 9. Verificação
 `dotnet build` + `dotnet test` verde (teste do parser com os `.xlsx` reais e do dedup/precedência). Conferir uma posição mensal contra a aba de Posição correspondente.
+
+## 10. Plano: reimport limpa com B3 como base (decidido jun/2026)
+> **Status: passos 1–4 ✅ feitos (jun/2026)** — importador varre `arquivos/b3` (config `Financas/B3FolderPath`), precedência **invertida** (B3 manda, via `DeveMaterializarNotaB3`), fracionário unificado (`NormalizarTicker` + `ResolverAtivoBaseB3`), alias IRIM11→IRDM11, e **reconciliação pela Posição + ativo VARIAÇÃO** (passo 4, à prova de falha). `MaterializacaoVersao` em 10. Build + test verdes (113). Aceite real fecha rodando o app (resync no startup + reconciliação).
+
+Motivo: as notas Nubank são incompletas (fantasmas) → B3 vira a fonte de verdade (§3.1). Passos:
+1. **Fazer a B3 entrar:** o importador hoje varre só `WatchedFolderPath` (`arquivos/financeiro`); os extratos estão em `arquivos/b3`. → ensinar o importador a varrer **também** `arquivos/b3` (ou pasta configurável `Financas/B3FolderPath`), classificando por nome (`relatorio-consolidado-mensal-*`).
+2. **Inverter a precedência** em `SincronizarTransacoesCanonicasAsync`: **B3 manda por ticker×mês onde houver `NegociacaoMensalB3`; a nota Nubank só materializa onde a B3 não cobre** (meses < set/2021, outras corretoras). (Hoje é o contrário.)
+3. **Bump `MaterializacaoVersao`** → o resync apaga as transações de importação e reconstrói do staging com a regra nova (**não precisa apagar tabela à mão**). Staging (OperacaoB3/NegociacaoMensalB3/TransacaoCripto) é preservado.
+4. **Reconciliar pela Posição** (F3 — com ativo VARIAÇÃO): a aba **Posição** (mais recente) é a verdade de quantidade. Mecanismo:
+   - **Fonte da verdade:** por ativo B3 (não-cripto), a quantidade na **Posição mais recente** (das abas `Posição - Ações`/`Fundos`, já em `ConteudoBruto`; período no `RawMetadataJson.referencePeriod` do documento). Ativo que **não aparece** na Posição mais recente → alvo **0** (vendido).
+   - **Ajuste:** `diff = alvo − calculado`. Se |diff| > ε, cria transação de **ajuste** (`Fonte="Reconciliação"`) que leva a posição ao alvo (Venda se diff<0, Compra se diff>0; preço = PM corrente → realizado ≈ 0) + **contrapartida no ativo virtual `VARIACAO`** (`Ajuste de Reconciliação`, `ClasseAtivo.Outro`) com o valor da diferença → carteira mostra a posição real **e** a discrepância fica visível/auditável (não some dinheiro). Zera NCHB11/EQIN11/CMIG3/IRDM11 que não estão na custódia.
+   - **Idempotente:** a cada execução apaga as transações `Fonte="Reconciliação"` e recalcula; **não toca** em importação/manuais reais.
+   - **À PROVA DE FALHA (obrigatório):** roda após a materialização, em `try-catch` — se falhar, loga e **NÃO derruba** o dashboard (já tivemos 2 regressões de runtime).
+   - Cripto fica fora (não há Posição importada; depende dos saldos reais do usuário).
+5. **Validar** contra a Posição B3 2025-07 (7 ações + 9 FIIs). Casos fora de escopo desta fase: **troca de ticker** (TAEE3→TAEE4) e **alias IRDM11** (IRIDIUM/IRIM). Cripto é trilha à parte (#9 netting Binance).
+> Aceite real só fecha rodando o app contra o SQL Server do usuário (não mexer no banco sem OK).

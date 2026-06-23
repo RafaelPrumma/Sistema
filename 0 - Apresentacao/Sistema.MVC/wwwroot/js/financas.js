@@ -16,8 +16,12 @@
     carteiras: document.getElementById('financeCarteirasIsland'),
     importacao: document.getElementById('financeImportacaoIsland'),
     posicoes: document.getElementById('financePosicoesIsland'),
-    alertas: document.getElementById('financeAlertasIsland')
+    alertas: document.getElementById('financeAlertasIsland'),
+    proventos: document.getElementById('financeProventosIsland'),
+    reconciliacao: document.getElementById('financeReconciliacaoIsland')
   };
+
+  let proventosChart = null;
 
   const PERIODOS = [
     { cod: '1D', label: '1D', dias: 1 },
@@ -81,6 +85,47 @@
       if (error.name !== 'AbortError') setError(island, error);
       throw error;
     }
+  }
+
+  // Proventos: carrega a parcial e, como scripts em innerHTML não executam,
+  // monta o gráfico ApexCharts aqui a partir dos dados embutidos em data-*.
+  async function loadProventos(island, url) {
+    await loadPartial(island, url);
+    const el = island.querySelector('#financeProventosChart');
+    if (!el || !window.ApexCharts) return;
+
+    let labels = [];
+    let recebido = [];
+    let aReceber = [];
+    try {
+      labels = JSON.parse(el.dataset.labels || '[]');
+      recebido = JSON.parse(el.dataset.recebido || '[]');
+      aReceber = JSON.parse(el.dataset.areceber || '[]');
+    } catch (error) {
+      console.error('Falha ao ler série de proventos.', error);
+      return;
+    }
+
+    // Ilha vem com 24 meses; o card mostra os últimos 12.
+    const ini = Math.max(0, labels.length - 12);
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    proventosChart = new ApexCharts(el, {
+      chart: { type: 'bar', height: 260, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, background: 'transparent', animations: { enabled: !prefersReducedMotion } },
+      theme: { mode: dark ? 'dark' : 'light' },
+      series: [
+        { name: 'Recebido', data: recebido.slice(ini) },
+        { name: 'A receber', data: aReceber.slice(ini) }
+      ],
+      colors: [corPositiva(), cssVar('--bs-info', '#0dcaf0')],
+      plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(148,163,184,.18)' },
+      xaxis: { categories: labels.slice(ini), axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      legend: { position: 'top', horizontalAlign: 'left' },
+      tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
+    });
+    proventosChart.render();
   }
 
   function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
@@ -314,15 +359,18 @@
     await Promise.allSettled([
       loadPatrimonio(),
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
+      loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
-      loadPartial(islands.alertas, dashboard.dataset.alertasUrl)
+      loadPartial(islands.alertas, dashboard.dataset.alertasUrl),
+      loadProventos(islands.proventos, dashboard.dataset.proventosUrl)
     ]);
   }
 
   window.addEventListener('pagehide', () => {
     controller.abort();
     chart?.destroy();
+    proventosChart?.destroy();
   }, { once: true });
 
   initialize();

@@ -1,0 +1,102 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasProventosDashboardDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    var r = Model.Resumo;
+    // Série mensal serializada para o gráfico ApexCharts (montado no financas.js após inserção da ilha).
+    var labels = Model.Mensais.Select(m => m.Rotulo);
+    var recebido = Model.Mensais.Select(m => m.Recebido);
+    var aReceber = Model.Mensais.Select(m => m.AReceber);
+}
+
+<div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0"><i class="bi bi-cash-coin me-1"></i>Proventos</h6>
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Proventos">Ver todos</a>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-2 p-2 h-100">
+                    <div class="small text-secondary">Recebido no mês</div>
+                    <div class="fs-5 fw-semibold">@r.RecebidoMes.ToString("C2", br)</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-2 p-2 h-100">
+                    <div class="small text-secondary">Recebido no ano</div>
+                    <div class="fs-5 fw-semibold">@r.RecebidoAno.ToString("C2", br)</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-2 p-2 h-100">
+                    <div class="small text-secondary">Total recebido</div>
+                    <div class="fs-5 fw-semibold">@r.RecebidoTotal.ToString("C2", br)</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-2 p-2 h-100">
+                    <div class="small text-secondary">A receber (anunciado)</div>
+                    <div class="fs-5 fw-semibold">@r.AReceber.ToString("C2", br)</div>
+                </div>
+            </div>
+        </div>
+
+        @* F-N: de onde vem o provento recebido (12M). Confiança: FII vem da B3 porque o informe IR só cobre ações. *@
+        @if (Model.PorFonte.Count > 0)
+        {
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span class="small text-secondary me-1"><i class="bi bi-shield-check me-1"></i>Por fonte (12M):</span>
+                @foreach (var f in Model.PorFonte)
+                {
+                    var cor = f.Fonte switch
+                    {
+                        "B3 Extrato" => "text-bg-primary",
+                        "Brapi" => "text-bg-success",
+                        "Binance Earn" => "text-bg-warning",
+                        "Informe IR" => "text-bg-info",
+                        _ => "text-bg-secondary"
+                    };
+                    <span class="badge @cor d-inline-flex align-items-center gap-1"
+                          title="@f.Quantidade.ToString("N0", br) lançamento(s) — @f.Percentual.ToString("0.#", br)% do recebido em 12M">
+                        @f.Fonte: @f.Valor.ToString("C2", br)
+                        <span class="opacity-75">(@f.Percentual.ToString("0.#", br)%)</span>
+                    </span>
+                }
+            </div>
+        }
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-8">
+                <div class="small text-secondary mb-1">Proventos por mês (12M)</div>
+                <div id="financeProventosChart"
+                     class="finance-proventos-chart"
+                     style="min-height:260px;"
+                     data-labels='@Html.Raw(Json.Serialize(labels))'
+                     data-recebido='@Html.Raw(Json.Serialize(recebido))'
+                     data-areceber='@Html.Raw(Json.Serialize(aReceber))'></div>
+            </div>
+            <div class="col-12 col-xl-4">
+                <div class="small text-secondary mb-1">Maiores pagadores (12M)</div>
+                <div class="list-group list-group-flush">
+                @if (Model.TopPagadores.Count == 0)
+                {
+                    <div class="text-secondary small py-3">Sem proventos recebidos nos últimos 12 meses.</div>
+                }
+                @foreach (var p in Model.TopPagadores)
+                {
+                    <div class="list-group-item px-0 d-flex justify-content-between gap-2">
+                        <div class="text-truncate">
+                            <div class="fw-semibold">@p.Ticker</div>
+                            <div class="small text-secondary text-truncate">@p.Nome</div>
+                        </div>
+                        <div class="fw-semibold text-success">@p.Valor.ToString("C2", br)</div>
+                    </div>
+                }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

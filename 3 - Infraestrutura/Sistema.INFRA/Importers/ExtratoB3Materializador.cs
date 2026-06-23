@@ -13,12 +13,13 @@ public static class ExtratoB3Materializador
     public const string Fonte = "B3 Extrato";
 
     /// <summary>
-    /// Precedência §3.1: as notas (granular, com data/corretagem) mandam onde existem; o agregado
-    /// mensal da B3 só preenche ticker×mês AUSENTE nas notas. <paramref name="cobertosPorNotas"/>
-    /// é o conjunto de (assetId, ano, mês) que já tem transação vinda de nota.
+    /// Precedência INVERTIDA (§3.1, revista jun/2026): a B3 é a fonte de verdade e SEMPRE materializa
+    /// suas Negociações; as notas Nubank só materializam onde a B3 NÃO cobre aquele ticker×mês
+    /// (meses < set/2021, outras corretoras). <paramref name="cobertosPorB3"/> é o conjunto de
+    /// (assetId, ano, mês) que tem Negociação da B3 → a nota daquele ticker×mês é pulada (a B3 manda).
     /// </summary>
-    public static bool DeveMaterializarNegociacaoB3(int assetId, int ano, int mes, ISet<(int AssetId, int Ano, int Mes)> cobertosPorNotas)
-        => !cobertosPorNotas.Contains((assetId, ano, mes));
+    public static bool DeveMaterializarNotaB3(int assetId, int ano, int mes, ISet<(int AssetId, int Ano, int Mes)> cobertosPorB3)
+        => !cobertosPorB3.Contains((assetId, ano, mes));
 
     /// <summary>Chave natural do agregado mensal: fonte + ticker + ano-mês + sentido + corretora.</summary>
     public static string ChaveNegociacao(string assetKey, int anoMes, TipoOperacaoFinanceira tipo, string? broker)
@@ -34,9 +35,29 @@ public static class ExtratoB3Materializador
             return null;
 
         var idx = produto.IndexOf(" - ", StringComparison.Ordinal);
-        var ticker = (idx >= 0 ? produto[..idx] : produto).Trim();
+        var ticker = NormalizarTicker((idx >= 0 ? produto[..idx] : produto).Trim()); // fracionário → base
         return string.IsNullOrWhiteSpace(ticker) ? null : ticker;
     }
+
+    /// <summary>
+    /// Mercado fracionário da B3 (ex.: ITUB4F, PETR4F, GOLD11F) é o MESMO ativo do lote-padrão
+    /// (ITUB4, PETR4, GOLD11): remove o sufixo "F". Padrão = 4 letras + 1–2 dígitos (+ "F" no fracionário).
+    /// Sem isso o extrato cria ativos duplicados (ITUB4 e ITUB4F) e racha a posição.
+    /// </summary>
+    public static string NormalizarTicker(string? ticker)
+    {
+        var t = (ticker ?? string.Empty).Trim().ToUpperInvariant();
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^[A-Z]{4}\d{1,2}F$"))
+            t = t[..^1]; // fracionário → base (ITUB4F → ITUB4)
+        return Aliases.TryGetValue(t, out var canonico) ? canonico : t;
+    }
+
+    /// <summary>Aliases de ticker: tickers diferentes que são o MESMO ativo (troca de código/fundo).</summary>
+    private static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // Mesmo fundo (Iridium): a B3 usou "IRIM11", a Nubank "IRDM11" → a venda saía contada 2×.
+        ["IRIM11"] = "IRDM11",
+    };
 
     /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo).</summary>
     public static string MapTipoProvento(string? tipoEvento)
@@ -105,7 +126,7 @@ public static class ExtratoB3Materializador
     /// </summary>
     public static IReadOnlyList<MovimentoNegociacaoB3> InterpretarNegociacao(IReadOnlyDictionary<string, string> row)
     {
-        var ticker = Campo(row, "Código de Negociação");
+        var ticker = NormalizarTicker(Campo(row, "Código de Negociação")); // ITUB4F → ITUB4 (fracionário)
         var movimentos = new List<MovimentoNegociacaoB3>(2);
         if (string.IsNullOrWhiteSpace(ticker))
             return movimentos;

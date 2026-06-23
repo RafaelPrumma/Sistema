@@ -110,7 +110,10 @@ public enum ProvedorCotacao
 {
     Manual = 0,
     Brapi = 1,
-    Binance = 2
+    Binance = 2,
+    // Preço de Fechamento da aba Posição do extrato consolidado B3 (custódia oficial). Usado como
+    // cotação de mercado dos ativos B3 quando não há token Brapi (ação/FII não cota de graça).
+    B3Custodia = 3
 }
 
 public enum StatusCotacao
@@ -211,6 +214,13 @@ public class CarteiraFinanceira : AuditableEntity
     public bool IsSistema { get; set; }
     public bool Ativo { get; set; } = true;
     public int Ordem { get; set; }
+
+    // Hierarquia (F-I): carteira-topo tem ParentId nulo; subcarteira aponta para a topo.
+    // Self-FK nullable, OnDelete restrict (ver CarteiraFinanceiraMap).
+    public int? ParentId { get; set; }
+    public CarteiraFinanceira? Parent { get; set; }
+    public ICollection<CarteiraFinanceira> Filhas { get; set; } = new List<CarteiraFinanceira>();
+
     public ICollection<CarteiraAtivoFinanceiro> Ativos { get; set; } = new List<CarteiraAtivoFinanceiro>();
 }
 

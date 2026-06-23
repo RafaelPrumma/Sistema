@@ -9,7 +9,7 @@ namespace Sistema.INFRA.Importers;
 
 public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDataRepairService> logger)
 {
-    private const int RepairVersion = 3;
+    private const int RepairVersion = 4;
     private const string Agrupamento = "Financas";
     private const string ChaveVersao = "ReparoAtivosVersao";
     private const string UsuarioSistema = "financas-repair";
@@ -27,6 +27,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
 
         var alteracoes = await RepararAtivosAsync(cancellationToken);
         await RepararChavesProventosAsync(cancellationToken);
+        await RepararDocumentKindAsync(cancellationToken);
         await RegistrarVersaoAsync(config, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -116,6 +117,44 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
                 vencedor.Fonte = MesclarFonte(vencedor.Fonte, item.Fonte);
                 _context.RendimentosInvestimento.Remove(item);
             }
+        }
+    }
+
+    // Reclassifica DocumentKind dos documentos gravados como Desconhecido por versões antigas do
+    // importador (que ainda não tinham ClassificarDocumento). Causa-raiz corrigida: o export oficial .xlsx
+    // "Histórico de Transações" da Binance ficava como Desconhecido; o netting filtra por
+    // BinanceTransactions e o IGNORAVA → só o CSV parcial entrava e a cripto (BTC no Earn) vinha
+    // subcontada. Idempotente (só toca em Desconhecido) e à PROVA DE FALHA (não pode derrubar o load).
+    private async Task RepararDocumentKindAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var docs = await _context.DocumentosFinanceiros
+                .IgnoreQueryFilters()
+                .Where(d => d.DocumentKind == TipoDocumentoFinanceiro.Desconhecido)
+                .ToListAsync(cancellationToken);
+
+            var reclassificados = 0;
+            foreach (var doc in docs)
+            {
+                if (string.IsNullOrWhiteSpace(doc.FileName))
+                    continue;
+
+                var kind = FinancasImportador.ClassificarDocumento(doc.FileName);
+                if (kind == TipoDocumentoFinanceiro.Desconhecido)
+                    continue;
+
+                doc.DocumentKind = kind;
+                doc.UsuarioAlteracao = UsuarioSistema;
+                reclassificados++;
+            }
+
+            if (reclassificados > 0)
+                FinancasRepairLogMessages.DocumentKindReclassificado(_logger, reclassificados);
+        }
+        catch (Exception ex)
+        {
+            FinancasRepairLogMessages.ReparoDocumentKindFalhou(_logger, ex);
         }
     }
 
@@ -421,4 +460,10 @@ internal static partial class FinancasRepairLogMessages
 {
     [LoggerMessage(EventId = 53, Level = LogLevel.Information, Message = "Reparo financeiro aplicado: {AtivosNormalizados} ativos normalizados, {AtivosMesclados} ativos mesclados, {DependenciasReapontadas} dependencias reapontadas.")]
     public static partial void ReparoAplicado(ILogger logger, int ativosNormalizados, int ativosMesclados, int dependenciasReapontadas);
+
+    [LoggerMessage(EventId = 54, Level = LogLevel.Information, Message = "Reparo de DocumentKind: {Reclassificados} documentos reclassificados de Desconhecido.")]
+    public static partial void DocumentKindReclassificado(ILogger logger, int reclassificados);
+
+    [LoggerMessage(EventId = 55, Level = LogLevel.Warning, Message = "Falha no reparo de DocumentKind (ignorada para nao derrubar o load).")]
+    public static partial void ReparoDocumentKindFalhou(ILogger logger, Exception exception);
 }

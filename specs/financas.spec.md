@@ -34,12 +34,14 @@ API ao vivo (estilo Kinvo) exige convênio institucional com a B3 / Open Finance
 **✅ Feito (jun/2026):** #2 eventos corporativos (F1+F2+F3, 5 splits semeados) · motor IR (F1 cálculo + F2 wiring/tela/Excel) · motor rentabilidade (F1 TWR/MWR) · importador B3 (F1 parser + F2 materialização). Tudo com testes; specs marcadas.
 
 **Em aberto (reordenado jun/2026 após o achado dos "fantasmas"):**
-1. **B3 como fonte de verdade** (`importador-b3.spec.md`) — (a) fazer a B3 **entrar de fato** (pasta: o importador precisa varrer `arquivos/b3`), (b) **inverter a precedência** (B3 manda, Nubank complementa) + resync, (c) **reconciliação pela Posição** (F3) p/ cravar a quantidade oficial. **Conserta as posições erradas (vendidos fantasmas).**
-2. **#9 cripto — netting** (baldes Trade/Rendimentos) — Binance não abate o lado vendido; stablecoins/BRL/tokens viram posição fantasma. **Conserta os fantasmas de cripto.**
+1. **B3 como fonte de verdade** (`importador-b3.spec.md`) — (a) varrer `arquivos/b3` ✅, (b) precedência invertida ✅, (c) **reconciliação pela Posição + ativo VARIAÇÃO** ✅ (à prova de falha; zera fantasmas vendidos, registra a diferença). + fracionário unificado e alias IRIM11→IRDM11. **Tudo feito (jun/2026)** — falta validar no app rodando.
+2. **#9 cripto — netting** (`cripto.spec.md`) — F1 netting ✅ (permuta abate origem, BRL=caixa, earn=posição); **F2 valoração BRL + F3 ponte IR** ⏳. É o elo que destrava o **IR de cripto** (permuta=alienação).
 3. **Rentabilidade F2** (série de `CriarEvolucaoPatrimonio` + CDI/Ibov/IPCA + UI).
 4. **Aceite do IR** contra os informes de `arquivos/ir/`.
 5. **Troca de ticker** (incorporação, ex.: TAEE3→TAEE4) + **alias IRDM11** (IRIDIUM/IRIM subconta).
 6. **Gastos** (pilar novo) · 7. #8 metas/rebal + #7 alertas + #4 linha de aportes · 8. ideias A–E.
+
+**Achados ao validar no app (jun/2026) — corrigidos:** import B3 quebrava em provento de ativo novo (FK AssetId=0); **mercado fracionário** (sufixo F, ITUB4F) duplicava ativos → `NormalizarTicker` + resolução do ativo-base no resync (versão 9). **Ainda abertos:** (a) tickers **só-fracionários** sem base (ITSA3F, ITUB3F) só zeram num reimport B3 (entra na reconciliação F3); (b) **ledger Binance cobre só 2025** → quantidades de cripto abaixo do real (faltam saldos de abertura 31/12/2024; ETH/SOL negativos) → precisa ledger completo ou seed de abertura (vai na `cripto.spec.md`); (c) **CMIG e outros vendidos não zeram** → reconciliação pela Posição (F3, item 1c).
 
 > O import da B3 subiu para #1 em jun/2026 (fonte oficial). Refinado depois: o problema não era só "dado faltante" — era **confiar na fonte errada** (notas Nubank incompletas). B3 vira a fonte de verdade; ver `importador-b3.spec.md` §3.1.
 

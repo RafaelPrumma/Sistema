@@ -1,0 +1,22 @@
+root = true
+
+# Configuração de analisadores (.NET) para manter o build sem warnings de ruído.
+# Regras genuinamente acionáveis são corrigidas no código; aqui ficam só os casos
+# em que a regra não se aplica ao contexto (testes / código gerado / dica de perf).
+
+[*.cs]
+# CA1859: preferir tipo concreto a interface por performance — é dica de micro-otimização,
+# não um problema de correção. Mantém como sugestão (aparece no IDE, não falha/avisa no build).
+dotnet_diagnostic.CA1859.severity = suggestion
+
+# Os nomes de método de teste seguem a convenção Metodo_Cenario_Esperado (underscore
+# intencional, padrão de legibilidade de testes). CA1707 não se aplica aqui.
+[*Tests.cs]
+dotnet_diagnostic.CA1707.severity = none
+# CA1861 (arrays constantes em argumentos): micro-perf irrelevante em código de teste.
+dotnet_diagnostic.CA1861.severity = none
+
+# Migrations e ModelSnapshot do EF Core são código gerado pela tool — não faz sentido
+# aplicar regras de estilo (ex.: CA1861 sobre arrays constantes em argumentos).
+[**/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none

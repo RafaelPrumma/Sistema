@@ -35,6 +35,9 @@
                 </div>
             </div>
 
+            @* F-L (b) TODO: detalhar arquivos por fonte/status (B3/Nubank/Binance/IR: processados/parciais/
+               falhos, período, duplicados ignorados, linhas lidas). Requer novas queries de agregação por
+               DocumentKind/ParseStatus no repositório — deixado como próximo passo. *@
             <div class="row g-3">
             @foreach (var kpi in Model.Kpis)
             {

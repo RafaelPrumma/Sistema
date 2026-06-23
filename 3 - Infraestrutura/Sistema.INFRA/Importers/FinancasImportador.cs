@@ -39,28 +39,108 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         }
 
         await _repairService.RepararAsync(cancellationToken);
-        await GarantirCarteirasPadraoAsync(cancellationToken);
 
-        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(watchedFolder)
-            && Directory.Exists(watchedFolder)
-            && !await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == watchedFolder, cancellationToken))
+        // Importa as pastas monitoradas (financeiro + extratos B3) que ainda não foram varridas.
+        // Cada pasta é guardada pelo próprio SourceFolder → idempotente entre execuções.
+        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
+        var precisaImportar = false;
+        foreach (var pasta in pastas)
         {
-            await ImportarPastaMonitoradaAsync(cancellationToken);
+            if (!await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == pasta, cancellationToken))
+            {
+                precisaImportar = true;
+                break;
+            }
         }
+        if (precisaImportar)
+            await ImportarPastaMonitoradaAsync(cancellationToken);
 
         // Garante que a tabela única reflita a regra de materialização atual.
         // Barato quando já está na versão certa; faz o resync completo quando a regra muda.
         await RessincronizarPorVersaoAsync(cancellationToken);
+
+        // F3 — reconciliação pela Posição da B3 (DEPOIS da materialização/resync, pois usa as
+        // transações canônicas já reconstruídas). À PROVA DE FALHA: qualquer exceção aqui é logada e
+        // ENGOLIDA — a reconciliação é um refinamento opcional e NÃO pode derrubar o carregamento do
+        // dashboard (já tivemos 2 regressões de runtime por exceção no GarantirCargaInicial).
+        try
+        {
+            await ReconciliarPosicaoB3Async(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.ReconciliacaoB3Falhou(_logger, ex);
+        }
+
+        // Auto-sugestão de carteiras por ÚLTIMO: usa a posição FINAL (pós-resync e pós-reconciliação).
+        // Se rodasse antes, ativos cujo saldo muda no resync/reconciliação (GOLD11/ETF zerado e recriado
+        // pela reconciliação; cripto refeito pelo resync) não seriam vinculados no 1º load. Idempotente
+        // e à prova de falha (try-catch interno em GarantirCarteirasPadraoAsync).
+        await GarantirCarteirasPadraoAsync(cancellationToken);
     }
 
     public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
     {
-        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
-        if (string.IsNullOrWhiteSpace(watchedFolder) || !Directory.Exists(watchedFolder))
+        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
+        if (pastas.Count == 0)
             return;
 
-        var files = Directory.EnumerateFiles(watchedFolder)
+        var importou = false;
+        foreach (var pasta in pastas)
+            importou |= await ImportarPastaAsync(pasta, cancellationToken);
+
+        if (importou)
+        {
+            await GarantirCarteirasPadraoAsync(cancellationToken);
+            await SincronizarTransacoesCanonicasAsync(cancellationToken);
+        }
+    }
+
+    // Pastas varridas pelo importador: a monitorada (notas Nubank/Binance) e a dos extratos B3.
+    // A pasta B3 default = irmã "b3" da monitorada (ex.: arquivos/financeiro → arquivos/b3); pode ser
+    // sobrescrita por Financas/B3FolderPath. Dedup ainda é por SourceFolder/Sha256 (mesmo arquivo
+    // numa pasta já varrida é pulado), então listar a mesma pasta duas vezes é inofensivo — mas
+    // distinguimos os caminhos para não reprocessar a financeiro como se fosse B3.
+    private async Task<List<string>> ResolverPastasMonitoradasAsync(CancellationToken cancellationToken)
+    {
+        var pastas = new List<string>();
+
+        var watchedFolder = await _config.ObterTextoAsync("Financas", "WatchedFolderPath", null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(watchedFolder) && Directory.Exists(watchedFolder))
+            pastas.Add(watchedFolder);
+
+        var b3Folder = await ResolverPastaB3Async(watchedFolder, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(b3Folder)
+            && Directory.Exists(b3Folder)
+            && !pastas.Any(p => string.Equals(p, b3Folder, StringComparison.OrdinalIgnoreCase)))
+            pastas.Add(b3Folder);
+
+        return pastas;
+    }
+
+    // Resolve a pasta dos extratos consolidados B3. Ordem: config Financas/B3FolderPath →
+    // pasta "b3" irmã da monitorada → "arquivos/b3" relativa ao content root.
+    private async Task<string?> ResolverPastaB3Async(string? watchedFolder, CancellationToken cancellationToken)
+    {
+        var configurada = await _config.ObterTextoAsync("Financas", "B3FolderPath", null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(configurada))
+            return configurada;
+
+        if (!string.IsNullOrWhiteSpace(watchedFolder))
+        {
+            var parent = Path.GetDirectoryName(watchedFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (!string.IsNullOrWhiteSpace(parent))
+                return Path.Combine(parent, "b3");
+        }
+
+        return Path.Combine(_hostEnvironment.ContentRootPath, "arquivos", "b3");
+    }
+
+    // Varre uma pasta: classifica e processa os arquivos suportados, com idempotência por
+    // SourceFolder (o batch) e por Sha256 do documento. Devolve true se importou algo novo.
+    private async Task<bool> ImportarPastaAsync(string folder, CancellationToken cancellationToken)
+    {
+        var files = Directory.EnumerateFiles(folder)
             .Where(IsSupportedFile)
             .OrderBy(Path.GetFileName)
             .ToList();
@@ -71,8 +151,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             carga = new CargaFinanceira
             {
                 SchemaVersion = "folder-v1",
-                JsonSha256 = Sha256(Encoding.UTF8.GetBytes(watchedFolder)),
-                SourcePath = watchedFolder,
+                JsonSha256 = Sha256(Encoding.UTF8.GetBytes(folder)),
+                SourcePath = folder,
                 ImportedAt = DateTime.UtcNow,
                 Status = StatusDocumentoFinanceiro.Processado,
                 SummaryJson = "{}",
@@ -83,7 +163,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         var batch = new ImportacaoFinanceiraArquivo
         {
-            SourceFolder = watchedFolder,
+            SourceFolder = folder,
             StartedAt = DateTime.UtcNow,
             FilesDiscovered = files.Count,
             UsuarioInclusao = "financas-importador"
@@ -136,14 +216,13 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             batch.FilesImported++;
         }
 
-        await GarantirCarteirasPadraoAsync(cancellationToken);
         batch.FinishedAt = DateTime.UtcNow;
         batch.Status = batch.FilesImported == 0
             ? StatusImportacaoFinanceira.Concluida
             : batch.StructuredRowsImported == 0 ? StatusImportacaoFinanceira.ConcluidaComAlertas : StatusImportacaoFinanceira.Concluida;
 
         await _context.SaveChangesAsync(cancellationToken);
-        await SincronizarTransacoesCanonicasAsync(cancellationToken);
+        return batch.FilesImported > 0;
     }
 
     private async Task ProcessarZipMonitoradoAsync(string zipFile, CargaFinanceira carga, ImportacaoFinanceiraArquivo batch, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
@@ -214,13 +293,14 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 6;
+    private const int MaterializacaoVersao = 11;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
-    // B3: todas as notas canônicas (têm preço). Cripto: apenas negócios reais com preço
-    // (spot trades e converts) — o restante do ledger da Binance (Simple Earn, staking, juros,
-    // airdrops, taxas e o detalhamento sem preço dos trades) fica no staging para auditoria,
-    // mas não polui a carteira. Idempotente por "{StagingTipo}#{StagingId}".
+    // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
+    // completa (cada operação = pernas assinadas pelo campo Alterar) e passa por MaterializarCriptoNetting:
+    // permuta abate a origem, earn/staking/airdrop entram como Rendimento (custo 0) e BRL/fiat ficam fora
+    // da posição. Spot/Convert/Depósitos ficam no staging para auditoria mas não são materializados (o
+    // ledger já cobre o efeito econômico). Idempotente por "{StagingTipo}#{StagingId}".
     private async Task SincronizarTransacoesCanonicasAsync(CancellationToken cancellationToken)
     {
         var jaMaterializadas = new HashSet<string>(
@@ -241,61 +321,37 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         var novas = new List<TransacaoFinanceira>();
 
-        var ops = await _context.OperacoesB3
-            .Where(x => x.IsCanonical && x.AssetId != null)
-            .ToListAsync(cancellationToken);
-        foreach (var op in ops)
-        {
-            var chave = $"OperacaoB3#{op.Id}";
-            if (!jaMaterializadas.Add(chave))
-                continue;
-
-            var quantidade = Math.Abs(op.Quantity);
-            // Notas B3 não têm horário por trade: a chave usa a data (sem hora).
-            var chaveNatural = op.TradeDate.HasValue
-                ? GerarChaveNatural("Nubank B3", op.AssetId!.Value, op.TradeDate.Value, op.OperationType, quantidade, op.UnitPrice)
-                : null;
-            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
-                continue;
-
-            novas.Add(new TransacaoFinanceira
-            {
-                Origem = OrigemTransacao.Importacao,
-                AssetId = op.AssetId!.Value,
-                Date = (op.TradeDate ?? op.DataInclusao).Date,
-                OperationType = op.OperationType,
-                Quantity = quantidade,
-                UnitPrice = op.UnitPrice,
-                GrossAmount = op.GrossAmount,
-                Fees = op.Fees,
-                Currency = "BRL",
-                Broker = string.IsNullOrWhiteSpace(op.Broker) ? "NU Invest" : op.Broker,
-                Fonte = "Nubank B3",
-                SourceDocumentId = op.SourceDocumentId,
-                CargaFinanceiraId = op.CargaFinanceiraId,
-                StagingTipo = "OperacaoB3",
-                StagingId = op.Id,
-                DuplicateGroupKey = chave,
-                ChaveNatural = chaveNatural,
-                IsCanonical = true,
-                ConfidenceLevel = op.ConfidenceLevel,
-                RawJson = "{}",
-                UsuarioInclusao = "financas-importador"
-            });
-        }
-
-        // Negociações do extrato consolidado da B3 (agregado mensal). Precedência §3.1: a nota
-        // (granular) manda onde existe; o agregado B3 só preenche ticker×mês AUSENTE nas notas.
-        // Cobertos = (assetId, ano, mês) com transação de NOTA (já no banco + as recém-criadas aqui).
-        var notasExistentes = await _context.TransacoesFinanceiras
-            .Where(x => x.Origem == OrigemTransacao.Importacao && x.Fonte == "Nubank B3")
+        // Precedência INVERTIDA (§3.1, revista jun/2026 — B3 é a fonte de verdade): as Negociações do
+        // extrato consolidado da B3 (agregado mensal, custódia oficial, completas no lado da venda)
+        // SEMPRE materializam. As notas Nubank (granulares, mas incompletas → posições fantasma) só
+        // materializam onde a B3 NÃO cobre aquele ticker×mês. Por isso a B3 é processada PRIMEIRO:
+        // ela define a cobertura que vai filtrar as notas.
+        // Cobertura = (assetId, ano, mês) com NegociacaoMensalB3 (já no banco + as recém-criadas aqui).
+        var b3Existentes = await _context.TransacoesFinanceiras
+            .Where(x => x.Origem == OrigemTransacao.Importacao && x.Fonte == FonteExtratoB3)
             .Select(x => new { x.AssetId, x.Date })
             .ToListAsync(cancellationToken);
-        var cobertosPorNotas = notasExistentes
+        var cobertosPorB3 = b3Existentes
             .Select(x => (x.AssetId, x.Date.Year, x.Date.Month))
             .ToHashSet();
-        foreach (var nota in novas.Where(x => x.Fonte == "Nubank B3"))
-            cobertosPorNotas.Add((nota.AssetId, nota.Date.Year, nota.Date.Month));
+
+        // Mercado fracionário (ITUB4F) é o mesmo ativo do lote-padrão (ITUB4): materializa no ativo-base
+        // pra não duplicar/rachar a posição. O parse novo já normaliza; isto conserta o staging existente
+        // no resync (sem reimport). Se o base não existir, mantém o próprio ativo.
+        var ativosPorIdB3 = await _context.AtivosFinanceiros.ToDictionaryAsync(a => a.Id, cancellationToken);
+        var ativosPorKeyB3 = ativosPorIdB3.Values
+            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        int ResolverAtivoBaseB3(int assetId)
+        {
+            if (!ativosPorIdB3.TryGetValue(assetId, out var a))
+                return assetId;
+            var baseKey = ExtratoB3Materializador.NormalizarTicker(a.Ticker ?? a.AssetKey);
+            return !string.Equals(baseKey, a.AssetKey, StringComparison.OrdinalIgnoreCase)
+                   && ativosPorKeyB3.TryGetValue(baseKey, out var ativoBase)
+                ? ativoBase.Id
+                : assetId;
+        }
 
         var negociacoesB3 = await _context.NegociacoesMensaisB3.ToListAsync(cancellationToken);
         foreach (var neg in negociacoesB3)
@@ -304,24 +360,25 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             if (!jaMaterializadas.Add(chave))
                 continue;
 
-            var ano = neg.AnoMes / 100;
-            var mes = neg.AnoMes % 100;
-            if (!ExtratoB3Materializador.DeveMaterializarNegociacaoB3(neg.AssetId, ano, mes, cobertosPorNotas))
-                continue;
-
             var quantidade = Math.Abs(neg.Quantity);
             if (quantidade <= 0m)
                 continue;
 
+            var ano = neg.AnoMes / 100;
+            var mes = neg.AnoMes % 100;
+            var assetId = ResolverAtivoBaseB3(neg.AssetId); // fracionário → ativo-base (ITUB4F → ITUB4)
             var data = (neg.PeriodoFinal ?? new DateTime(ano, mes, DateTime.DaysInMonth(ano, mes))).Date;
-            var chaveNatural = GerarChaveNatural(FonteExtratoB3, neg.AssetId, data, neg.OperationType, quantidade, neg.UnitPrice);
+            var chaveNatural = GerarChaveNatural(FonteExtratoB3, assetId, data, neg.OperationType, quantidade, neg.UnitPrice);
             if (!chavesNaturais.Add(chaveNatural))
                 continue;
+
+            // A B3 sempre materializa: registra a cobertura do ticker×mês para barrar a nota.
+            cobertosPorB3.Add((assetId, ano, mes));
 
             novas.Add(new TransacaoFinanceira
             {
                 Origem = OrigemTransacao.Importacao,
-                AssetId = neg.AssetId,
+                AssetId = assetId,
                 Date = data,
                 OperationType = neg.OperationType,
                 Quantity = quantidade,
@@ -344,72 +401,185 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             });
         }
 
-        var cryptos = await _context.TransacoesCripto
-            .Where(x => x.Price != null && x.Price > 0m)
+        // Notas Nubank (OperacaoB3): só materializam onde a B3 NÃO cobre aquele ticker×mês
+        // (meses < set/2021, outras corretoras). Onde há B3, a nota é pulada (a B3 manda).
+        var ops = await _context.OperacoesB3
+            .Where(x => x.IsCanonical && x.AssetId != null)
             .ToListAsync(cancellationToken);
-        if (cryptos.Count > 0)
+        foreach (var op in ops)
         {
-            var assetIdPorChave = (await _context.AtivosFinanceiros
-                    .Where(a => a.IsCrypto)
-                    .ToListAsync(cancellationToken))
-                .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+            var chave = $"OperacaoB3#{op.Id}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
 
-            foreach (var tx in cryptos)
+            var data = (op.TradeDate ?? op.DataInclusao).Date;
+            if (!ExtratoB3Materializador.DeveMaterializarNotaB3(op.AssetId!.Value, data.Year, data.Month, cobertosPorB3))
+                continue;
+
+            var quantidade = Math.Abs(op.Quantity);
+            // Notas B3 não têm horário por trade: a chave usa a data (sem hora).
+            var chaveNatural = op.TradeDate.HasValue
+                ? GerarChaveNatural("Nubank B3", op.AssetId!.Value, op.TradeDate.Value, op.OperationType, quantidade, op.UnitPrice)
+                : null;
+            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
             {
-                var chave = $"TransacaoCripto#{tx.Id}";
-                if (!jaMaterializadas.Add(chave))
-                    continue;
-                if (string.IsNullOrWhiteSpace(tx.AssetSymbol) || !assetIdPorChave.TryGetValue(tx.AssetSymbol, out var assetId))
-                    continue;
-
-                var quantidade = Math.Abs(tx.Amount);
-                if (quantidade <= 0m)
-                    continue;
-
-                var preco = tx.Price!.Value;
-                var tipo = tx.OperationType is TipoOperacaoFinanceira.Venda or TipoOperacaoFinanceira.Saque
-                    ? TipoOperacaoFinanceira.Venda
-                    : TipoOperacaoFinanceira.Compra;
-
-                // Cripto da Binance tem o horário exato (até o segundo): a chave usa data+hora.
-                var chaveNatural = tx.TransactionDate.HasValue
-                    ? GerarChaveNatural("Binance", assetId, tx.TransactionDate.Value, tipo, quantidade, preco)
-                    : null;
-                if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
-                    continue;
-
-                novas.Add(new TransacaoFinanceira
-                {
-                    Origem = OrigemTransacao.Importacao,
-                    AssetId = assetId,
-                    Date = tx.TransactionDate ?? tx.DataInclusao,
-                    OperationType = tipo,
-                    Quantity = quantidade,
-                    UnitPrice = preco,
-                    GrossAmount = tx.Total ?? quantidade * preco,
-                    Fees = tx.FeeAmount ?? 0m,
-                    Currency = "BRL",
-                    Broker = string.IsNullOrWhiteSpace(tx.Exchange) ? "Binance" : tx.Exchange,
-                    Fonte = "Binance",
-                    SourceDocumentId = tx.SourceDocumentId,
-                    CargaFinanceiraId = tx.CargaFinanceiraId,
-                    StagingTipo = "TransacaoCripto",
-                    StagingId = tx.Id,
-                    DuplicateGroupKey = chave,
-                    ChaveNatural = chaveNatural,
-                    IsCanonical = true,
-                    ConfidenceLevel = NivelConfianca.Media,
-                    RawJson = "{}",
-                    UsuarioInclusao = "financas-importador"
-                });
-            }
+                Origem = OrigemTransacao.Importacao,
+                AssetId = op.AssetId!.Value,
+                Date = data,
+                OperationType = op.OperationType,
+                Quantity = quantidade,
+                UnitPrice = op.UnitPrice,
+                GrossAmount = op.GrossAmount,
+                Fees = op.Fees,
+                Currency = "BRL",
+                Broker = string.IsNullOrWhiteSpace(op.Broker) ? "NU Invest" : op.Broker,
+                Fonte = "Nubank B3",
+                SourceDocumentId = op.SourceDocumentId,
+                CargaFinanceiraId = op.CargaFinanceiraId,
+                StagingTipo = "OperacaoB3",
+                StagingId = op.Id,
+                DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
+                IsCanonical = true,
+                ConfidenceLevel = op.ConfidenceLevel,
+                RawJson = "{}",
+                UsuarioInclusao = "financas-importador"
+            });
         }
+
+        await MaterializarCriptoNettingAsync(novas, jaMaterializadas, chavesNaturais, cancellationToken);
 
         if (novas.Count > 0)
         {
             await _context.TransacoesFinanceiras.AddRangeAsync(novas, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // F1 (cripto) — netting da Binance: materializa a posição correta por QUANTIDADE a partir do ledger
+    // ("Histórico de Transações"/CSV), que cobre TUDO como pernas assinadas (Alterar) com o mesmo
+    // timestamp. A lógica de classificação/netting (pura) está em CriptoNetting; aqui fica só o que é
+    // stateful: resolver o preço da perna pelo PM corrente do ativo (→ realizado ≈ 0 na F1; valoração
+    // BRL é F2) e gravar em TransacaoFinanceira. As pernas de permuta/earn que a regra antiga ignorava
+    // (sem Price) agora entram → a origem das trocas é abatida (somem fantasmas/negativos) e BRL/fiat
+    // sai da posição. Spot/Convert/Depósitos continuam no staging para auditoria, mas NÃO são
+    // materializados (o ledger já cobre o efeito econômico deles — evita dobrar).
+    private async Task MaterializarCriptoNettingAsync(
+        List<TransacaoFinanceira> novas,
+        HashSet<string> jaMaterializadas,
+        HashSet<string> chavesNaturais,
+        CancellationToken cancellationToken)
+    {
+        // Só o ledger (Histórico de Transações) — é a fonte completa das pernas assinadas. Os demais
+        // documentos Binance (spot/convert/depósitos) ficam de fora.
+        // FONTE ÚNICA: o export oficial .xlsx ("Histórico de Transações" = BinanceTransactions) cobre TODO
+        // o histórico. O CsvBinance é um export parcial (subset de um período) que SOBREPÕE o .xlsx — usar
+        // os dois junto contamina o netting (a dedup por chave natural usa preço stateful e não casa entre
+        // formatos → o BTC parado no Earn ficava subcontado). Por isso: se há .xlsx, ele manda sozinho; o
+        // CSV só entra como fallback quando NÃO existe nenhum .xlsx de transações.
+        var temLedgerXlsx = await _context.DocumentosFinanceiros
+            .AnyAsync(d => d.DocumentKind == TipoDocumentoFinanceiro.BinanceTransactions, cancellationToken);
+        var kindLedger = temLedgerXlsx
+            ? TipoDocumentoFinanceiro.BinanceTransactions
+            : TipoDocumentoFinanceiro.CsvBinance;
+        var docsLedger = await _context.DocumentosFinanceiros
+            .Where(d => d.DocumentKind == kindLedger)
+            .Select(d => d.Id)
+            .ToListAsync(cancellationToken);
+        var idsLedger = docsLedger.ToHashSet();
+
+        var staging = await _context.TransacoesCripto
+            .Where(x => x.SourceDocumentId != null)
+            .OrderBy(x => x.TransactionDate)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+        staging = staging.Where(x => idsLedger.Contains(x.SourceDocumentId!.Value)).ToList();
+        if (staging.Count == 0)
+            return;
+
+        var assetIdPorChave = (await _context.AtivosFinanceiros
+                .Where(a => a.IsCrypto)
+                .ToListAsync(cancellationToken))
+            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+        // Lógica pura: classifica e neta as pernas. Mantém a ordem (timestamp, id) para o PM corrente.
+        var brutos = staging.Select(tx => new MovimentoCriptoBruto(
+            tx.AssetSymbol, tx.TransactionDate, tx.RawType, tx.Amount, tx.Id));
+        var canonicos = CriptoNetting.Netar(brutos);
+
+        // PM corrente por ativo (estoque + custo), reconstruído na ordem cronológica para precificar a
+        // perna de saída ao PM do ativo (realizado ≈ 0). Custo aqui é placeholder da F1 (1 por unidade
+        // nas compras de troca; 0 no earn) — a valoração real em BRL é F2.
+        var estoque = new Dictionary<int, (decimal Qtd, decimal Custo)>();
+
+        foreach (var mov in canonicos)
+        {
+            var chave = $"TransacaoCripto#{mov.SourceStagingId}";
+            if (!jaMaterializadas.Add(chave))
+                continue;
+            if (!assetIdPorChave.TryGetValue(mov.AssetSymbol, out var assetId))
+                continue;
+
+            estoque.TryGetValue(assetId, out var pos);
+            var pm = pos.Qtd > 0m ? pos.Custo / pos.Qtd : 0m;
+
+            // Preço da perna: earn = 0; saída = PM corrente (→ realizado ≈ 0); entrada de troca = PM
+            // corrente do destino se já houver estoque, senão 1 (placeholder; valoração é F2).
+            decimal preco;
+            if (mov.PrecoZero)
+                preco = 0m;
+            else if (mov.OperationType == TipoOperacaoFinanceira.Venda)
+                preco = pm;
+            else
+                preco = pm > 0m ? pm : 1m;
+
+            // Atualiza o estoque para o próximo PM.
+            if (mov.OperationType is TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Rendimento)
+            {
+                estoque[assetId] = (pos.Qtd + mov.Quantity, pos.Custo + mov.Quantity * preco);
+            }
+            else // Venda: abate ao PM corrente.
+            {
+                var reduz = Math.Min(mov.Quantity, pos.Qtd);
+                var novaQtd = pos.Qtd - mov.Quantity;
+                var novoCusto = pos.Custo - reduz * pm;
+                if (novaQtd <= 0.000000000001m)
+                    (novaQtd, novoCusto) = (0m, 0m);
+                estoque[assetId] = (novaQtd, novoCusto);
+            }
+
+            var chaveNatural = mov.Timestamp.HasValue
+                ? GerarChaveNatural(CriptoNetting.Fonte, assetId, mov.Timestamp.Value, mov.OperationType, mov.Quantity, preco)
+                : null;
+            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+                continue;
+
+            novas.Add(new TransacaoFinanceira
+            {
+                Origem = OrigemTransacao.Importacao,
+                AssetId = assetId,
+                Date = mov.Timestamp ?? DateTime.UtcNow,
+                OperationType = mov.OperationType,
+                Quantity = mov.Quantity,
+                UnitPrice = preco,
+                GrossAmount = mov.Quantity * preco,
+                Fees = 0m,
+                Currency = "BRL",
+                Broker = "Binance",
+                Fonte = CriptoNetting.Fonte,
+                StagingTipo = "TransacaoCripto",
+                StagingId = mov.SourceStagingId,
+                DuplicateGroupKey = chave,
+                ChaveNatural = chaveNatural,
+                IsCanonical = true,
+                ConfidenceLevel = NivelConfianca.Media,
+                RawJson = "{}",
+                UsuarioInclusao = "financas-importador"
+            });
         }
     }
 
@@ -1321,96 +1491,167 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             lookup.TryAdd(documento.FileName, documento);
     }
 
+    // Usuário que assina as carteiras/vínculos auto-sugeridos. Distingue o que é "de sistema" (a
+    // árvore F-I) do que o usuário cria/edita à mão na tela (que NÃO mexemos).
+    private const string UsuarioAutoCarteira = "financas-importador";
+
+    // Auto-sugestão das carteiras hierárquicas (F-I — specs/investimentos.spec.md). Roda no load do
+    // dashboard, então é IDEMPOTENTE (por Slug) e À PROVA DE FALHA (qualquer exceção é logada e
+    // engolida — não pode derrubar o carregamento). Garante a árvore-alvo do ClassificadorCarteira
+    // (4 topos + subcarteiras), vincula cada ativo DETIDO (posição > 0) à carteira-folha classificada
+    // e desativa carteiras de sistema órfãs de versões antigas (preserva histórico, não apaga).
     private async Task GarantirCarteirasPadraoAsync(CancellationToken cancellationToken)
     {
-        var specs = new (string Nome, string Slug, string Tipo, int Ordem)[]
+        try
         {
-            ("Bancário", "bancario", "Setor", 10),
-            ("Petróleo", "petroleo", "Setor", 20),
-            ("Elétrico", "eletrico", "Setor", 30),
-            ("Commodities", "commodities", "Setor", 40),
-            ("FIIs de papel", "fiis-papel", "Classe", 50),
-            ("FIIs de tijolo", "fiis-tijolo", "Classe", 60),
-            ("Cripto principais", "cripto-principais", "Tese", 70),
-            ("Altcoins", "altcoins", "Tese", 80),
-            ("Memecoins", "memecoins", "Tese", 90),
-            ("Taxas Binance", "taxas-binance", "Uso", 100)
-        };
+            await GarantirCarteirasPadraoInternoAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.AutoCarteirasFalhou(_logger, ex);
+        }
+    }
 
+    private async Task GarantirCarteirasPadraoInternoAsync(CancellationToken cancellationToken)
+    {
         var carteiras = await _context.CarteirasFinanceiras.ToListAsync(cancellationToken);
-        foreach (var spec in specs)
-        {
-            if (carteiras.Any(x => x.Slug == spec.Slug))
-                continue;
 
-            var carteira = new CarteiraFinanceira
+        // 1) Garante topos e subcarteiras da árvore-alvo, idempotente por Slug. Atualiza Nome/Ordem/
+        //    ParentId/Ativo das que já existem (reusa; nunca duplica). Mapeia Slug → carteira.
+        var porSlug = carteiras
+            .GroupBy(c => c.Slug, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var slugsArvore = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        CarteiraFinanceira GarantirCarteira(string nome, string slug, int ordem, int? parentId, string tipo)
+        {
+            slugsArvore.Add(slug);
+            if (porSlug.TryGetValue(slug, out var existente))
             {
-                Nome = spec.Nome,
-                Slug = spec.Slug,
-                Tipo = spec.Tipo,
-                Ordem = spec.Ordem,
+                existente.Nome = nome;
+                existente.Ordem = ordem;
+                existente.ParentId = parentId;
+                existente.Tipo = tipo;
+                existente.IsSistema = true;
+                existente.Ativo = true;
+                return existente;
+            }
+
+            var nova = new CarteiraFinanceira
+            {
+                Nome = nome,
+                Slug = slug,
+                Tipo = tipo,
+                Ordem = ordem,
+                ParentId = parentId,
                 IsSistema = true,
-                UsuarioInclusao = "financas-importador"
+                Ativo = true,
+                UsuarioInclusao = UsuarioAutoCarteira
             };
-            _context.CarteirasFinanceiras.Add(carteira);
-            carteiras.Add(carteira);
+            _context.CarteirasFinanceiras.Add(nova);
+            porSlug[slug] = nova;
+            carteiras.Add(nova);
+            return nova;
+        }
+
+        foreach (var topo in ClassificadorCarteira.Arvore)
+        {
+            var carteiraTopo = GarantirCarteira(topo.Nome, topo.Slug, topo.Ordem, null, "Topo");
+            // Topo precisa ter Id antes de virar ParentId das filhas.
+            await _context.SaveChangesAsync(cancellationToken);
+            foreach (var sub in topo.Subs)
+                GarantirCarteira(sub.Nome, sub.Slug, sub.Ordem, carteiraTopo.Id, "Subcarteira");
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var ativos = await _context.AtivosFinanceiros.ToListAsync(cancellationToken);
+        // 2) Desativa carteiras de SISTEMA de versões antigas que não fazem parte da nova árvore
+        //    (preserva histórico — não apaga; não toca em CarteiraAtivoFinanceiro existente).
+        //    Carteiras criadas/editadas à mão pelo usuário (IsSistema = false) ficam intactas.
+        foreach (var carteira in carteiras.Where(c => c.IsSistema && c.Ativo && !slugsArvore.Contains(c.Slug)))
+            carteira.Ativo = false;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // 3) Posição canônica (qtd) por ativo — mesma regra do dashboard (CalcularPosicaoCanonica +
+        //    eventos corporativos). Só ativos com posição > 0 entram nos cards (spec F-I).
+        var transacoes = await _context.TransacoesFinanceiras
+            .AsNoTracking()
+            .Where(x => x.IsCanonical)
+            .Include(x => x.Asset)
+            .Where(x => x.Asset != null)
+            .OrderBy(x => x.Date)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+        AplicarEventosCorporativos(transacoes, await _context.EventosCorporativos.AsNoTracking().ToListAsync(cancellationToken));
+        var (quantidadePorAtivo, _) = CalcularPosicaoCanonica(transacoes);
+
+        var detidos = quantidadePorAtivo
+            .Where(kv => kv.Value > QuantidadeAbertaCarteira)
+            .Select(kv => kv.Key)
+            .ToHashSet();
+        if (detidos.Count == 0)
+            return;
+
+        var ativos = (await _context.AtivosFinanceiros.ToListAsync(cancellationToken))
+            .ToDictionary(a => a.Id);
         var links = await _context.CarteirasAtivosFinanceiros.ToListAsync(cancellationToken);
-        foreach (var ativo in ativos)
+
+        // Slugs-folha da árvore (qualquer carteira da árvore que NÃO é topo de outra). A remoção do passo
+        // 4 só atinge vínculos auto-sugeridos (carteiras da árvore) — vínculos manuais ficam intactos.
+        var idsCarteirasArvore = porSlug.Values
+            .Where(c => slugsArvore.Contains(c.Slug))
+            .Select(c => c.Id)
+            .ToHashSet();
+
+        // 4) Para cada ativo detido: classifica e garante UM vínculo na carteira-folha (ou topo se a
+        //    classificação não tem folha). Remove vínculos do mesmo ativo a OUTRAS carteiras da árvore
+        //    (não duplica o ativo em vários cards). Não cria vínculo para ativo não classificável.
+        foreach (var assetId in detidos)
         {
-            if (links.Any(x => x.AtivoFinanceiroId == ativo.Id))
+            if (!ativos.TryGetValue(assetId, out var ativo))
                 continue;
 
-            foreach (var slug in ResolverCarteirasAtivo(ativo))
+            var classificacao = ClassificadorCarteira.Classificar(ativo);
+            if (classificacao is null)
+                continue; // ação/ETF fora do mapa → fica sem carteira (não inventa grupo).
+
+            var slugDestino = classificacao.SlugFolha ?? classificacao.SlugTopo;
+            if (!porSlug.TryGetValue(slugDestino, out var carteiraDestino))
+                continue;
+
+            // Remove vínculos auto-sugeridos do ativo a outras carteiras da árvore (evita duplicar o
+            // card). Vínculos a carteiras manuais (fora da árvore) não são tocados.
+            var duplicados = links
+                .Where(l => l.AtivoFinanceiroId == assetId
+                    && l.CarteiraFinanceiraId != carteiraDestino.Id
+                    && idsCarteirasArvore.Contains(l.CarteiraFinanceiraId))
+                .ToList();
+            foreach (var dup in duplicados)
             {
-                var carteira = carteiras.FirstOrDefault(x => x.Slug == slug);
-                if (carteira is null || links.Any(x => x.CarteiraFinanceiraId == carteira.Id && x.AtivoFinanceiroId == ativo.Id))
-                    continue;
-
-                var link = new CarteiraAtivoFinanceiro
-                {
-                    CarteiraFinanceiraId = carteira.Id,
-                    AtivoFinanceiroId = ativo.Id,
-                    UsuarioInclusao = "financas-importador"
-                };
-                _context.CarteirasAtivosFinanceiros.Add(link);
-                links.Add(link);
+                _context.CarteirasAtivosFinanceiros.Remove(dup);
+                links.Remove(dup);
             }
+
+            if (links.Any(l => l.CarteiraFinanceiraId == carteiraDestino.Id && l.AtivoFinanceiroId == assetId))
+                continue;
+
+            var link = new CarteiraAtivoFinanceiro
+            {
+                CarteiraFinanceiraId = carteiraDestino.Id,
+                AtivoFinanceiroId = assetId,
+                UsuarioInclusao = UsuarioAutoCarteira
+            };
+            _context.CarteirasAtivosFinanceiros.Add(link);
+            links.Add(link);
         }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private static IReadOnlyList<string> ResolverCarteirasAtivo(AtivoFinanceiro ativo)
-    {
-        var key = $"{ativo.AssetKey} {ativo.Ticker} {ativo.Name}".ToUpperInvariant();
-        if (ativo.IsCrypto || ativo.AssetClass == ClasseAtivo.Cripto)
-        {
-            if (key.Contains("DOGE")) return ["memecoins"];
-            if (key.Contains("BNB")) return ["taxas-binance", "altcoins"];
-            if (key.Contains("BTC") || key.Contains("ETH") || key.Contains("SOL")) return ["cripto-principais"];
-            return ["altcoins"];
-        }
-
-        if (key.Contains("ITUB") || key.Contains("ITSA") || key.Contains("BBAS") || key.Contains("BBDC") || key.Contains("SANB"))
-            return ["bancario"];
-        if (key.Contains("PETR") || key.Contains("PRIO"))
-            return ["petroleo"];
-        if (key.Contains("TAEE") || key.Contains("EGIE") || key.Contains("ELET") || key.Contains("CMIG") || key.Contains("CPLE") || key.Contains("CPFE"))
-            return ["eletrico"];
-        if (key.Contains("VALE") || key.Contains("GGBR") || key.Contains("GOAU") || key.Contains("CSNA") || key.Contains("USIM"))
-            return ["commodities"];
-        if (ativo.AssetClass == ClasseAtivo.FII)
-        {
-            if (key.Contains("DEVA") || key.Contains("FYTO") || key.Contains("MXRF") || key.Contains("KNCR") || key.Contains("KNIP") || key.Contains("VGIR") || key.Contains("CPTS"))
-                return ["fiis-papel"];
-            return ["fiis-tijolo"];
-        }
-
-        return [];
-    }
+    // Posição mínima para um ativo entrar nos cards de carteira (espelha QuantidadeAbertaMinima do app).
+    private const decimal QuantidadeAbertaCarteira = 0.000000001m;
 
     private static bool IsSupportedFile(string file)
         => Path.GetExtension(file).ToLowerInvariant() is ".pdf" or ".xlsx" or ".csv" or ".zip";
@@ -1428,7 +1669,9 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         }
     }
 
-    private static TipoDocumentoFinanceiro ClassificarDocumento(string file)
+    // internal: reaproveitado pelo FinancasDataRepairService para reclassificar documentos antigos
+    // gravados como Desconhecido por versões anteriores do importador (antes desta classificação existir).
+    internal static TipoDocumentoFinanceiro ClassificarDocumento(string file)
     {
         var name = Path.GetFileName(file).ToLowerInvariant();
         // Extrato consolidado mensal da Área do Investidor B3 (.xlsx com shared strings).
@@ -1833,4 +2076,13 @@ internal static partial class FinancasImportadorLogMessages
 {
     [LoggerMessage(EventId = 20, Level = LogLevel.Information, Message = "Carga financeira importada. Fonte={Fonte}, Sha={Sha}")]
     public static partial void CargaFinanceiraImportada(ILogger logger, string fonte, string sha);
+
+    [LoggerMessage(EventId = 21, Level = LogLevel.Error, Message = "Reconciliação da posição B3 (F3) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void ReconciliacaoB3Falhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 22, Level = LogLevel.Error, Message = "Auto-sugestão de carteiras (F-I) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void AutoCarteirasFalhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 23, Level = LogLevel.Warning, Message = "Cotação de custódia B3 (Preço de Fechamento) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void CotacaoCustodiaB3Falhou(ILogger logger, Exception exception);
 }

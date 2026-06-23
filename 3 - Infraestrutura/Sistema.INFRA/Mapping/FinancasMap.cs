@@ -95,6 +95,13 @@ public class CarteiraFinanceiraMap : IEntityTypeConfiguration<CarteiraFinanceira
         builder.Property(x => x.Descricao).HasMaxLength(500);
         builder.Property(x => x.Tipo).IsRequired().HasMaxLength(40);
         builder.HasIndex(x => x.Slug).IsUnique();
+        builder.HasIndex(x => x.ParentId);
+        // Hierarquia (F-I): self-reference nullable. Restrict/NoAction p/ não cascatear o delete da topo
+        // sobre as subcarteiras (SQL Server proíbe ciclos de cascade em self-FK de qualquer forma).
+        builder.HasOne(x => x.Parent)
+            .WithMany(x => x.Filhas)
+            .HasForeignKey(x => x.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
