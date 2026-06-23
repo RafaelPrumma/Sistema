@@ -12,8 +12,9 @@ public class ClassificadorCarteiraTests
     // --- 1) Mapa explícito por ticker (custódia B3 + cripto §10) -------------------------------------
 
     [Theory]
-    [InlineData("BBAS3", ClassificadorCarteira.SlugBancario, null)]
-    [InlineData("CXSE3", ClassificadorCarteira.SlugBancario, null)] // seguradora absorvida pelo bancário
+    [InlineData("BBAS3", ClassificadorCarteira.SlugBancario, ClassificadorCarteira.SlugBancos)]
+    [InlineData("BBDC4", ClassificadorCarteira.SlugBancario, ClassificadorCarteira.SlugBancos)]
+    [InlineData("CXSE3", ClassificadorCarteira.SlugBancario, ClassificadorCarteira.SlugSeguridade)] // seguradora → Seguridade
     [InlineData("CPTS11", ClassificadorCarteira.SlugFiis, ClassificadorCarteira.SlugFiisPapel)]
     [InlineData("HGLG11", ClassificadorCarteira.SlugFiis, ClassificadorCarteira.SlugFiisTijolo)]
     [InlineData("PETR4", ClassificadorCarteira.SlugComodities, ClassificadorCarteira.SlugComoditiesPetroleo)]
@@ -39,7 +40,7 @@ public class ClassificadorCarteiraTests
 
         Assert.NotNull(classificacao);
         Assert.Equal(ClassificadorCarteira.SlugBancario, classificacao!.SlugTopo);
-        Assert.Null(classificacao.SlugFolha);
+        Assert.Equal(ClassificadorCarteira.SlugBancos, classificacao.SlugFolha);
     }
 
     // --- 2) Fallback cripto (ticker fora do mapa) ---------------------------------------------------

@@ -27,6 +27,8 @@ public static class ClassificadorCarteira
     public const string SlugCripto = "criptomoedas";
 
     // Slugs estáveis das subcarteiras (folhas). Prefixados pelo slug do pai p/ unicidade global.
+    public const string SlugBancos = "bancario-seguridade-bancos";
+    public const string SlugSeguridade = "bancario-seguridade-seguros";
     public const string SlugFiisPapel = "fiis-papel";
     public const string SlugFiisTijolo = "fiis-tijolo";
     public const string SlugComoditiesPetroleo = "comodities-energia-petroleo";
@@ -53,11 +55,11 @@ public static class ClassificadorCarteira
     // Mapa explícito ticker → caminho na árvore (custódia B3 2026-maio + cripto §10). Editável na tela depois.
     private static readonly Dictionary<string, Classificacao> MapaPorTicker = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Bancário e Seguridade (flat)
-        ["BBAS3"] = new(SlugBancario, null),
-        ["BBDC4"] = new(SlugBancario, null),
-        ["ITUB4"] = new(SlugBancario, null),
-        ["CXSE3"] = new(SlugBancario, null),
+        // Bancário e Seguridade → Bancos / Seguridade
+        ["BBAS3"] = new(SlugBancario, SlugBancos),
+        ["BBDC4"] = new(SlugBancario, SlugBancos),
+        ["ITUB4"] = new(SlugBancario, SlugBancos),
+        ["CXSE3"] = new(SlugBancario, SlugSeguridade),
         // FIIs · Papel
         ["AFHI11"] = new(SlugFiis, SlugFiisPapel),
         ["AFHI12"] = new(SlugFiis, SlugFiisPapel),
@@ -90,7 +92,11 @@ public static class ClassificadorCarteira
     /// </summary>
     public static IReadOnlyList<CarteiraSpec> Arvore { get; } =
     [
-        new("Bancário e Seguridade", SlugBancario, 10, []),
+        new("Bancário e Seguridade", SlugBancario, 10,
+        [
+            new("Bancos", SlugBancos, 10),
+            new("Seguridade", SlugSeguridade, 20)
+        ]),
         new("FIIs", SlugFiis, 20,
         [
             new("Papel", SlugFiisPapel, 10),
