@@ -46,6 +46,10 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardAlertas(CancellationToken cancellationToken)
         => PartialView("_DashboardAlertas", await _service.ObterAlertasDashboardAsync(cancellationToken));
 
+    [HttpGet("/Financas/Dashboard/Proventos")]
+    public async Task<IActionResult> DashboardProventos(CancellationToken cancellationToken)
+        => PartialView("_DashboardProventos", await _service.ObterProventosDashboardAsync(cancellationToken));
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportarPasta(CancellationToken cancellationToken)

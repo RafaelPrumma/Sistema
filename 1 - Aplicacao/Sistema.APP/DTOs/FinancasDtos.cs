@@ -314,6 +314,18 @@ public record FinancasImportacaoDto(
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,
     DateTime? CotacoesAtualizadasEm);
 
+public record ProventoTopPagadorDto(
+    string Ticker,
+    string Nome,
+    decimal Valor);
+
+// F-K: resumo de proventos para a ilha lazy-loaded do dashboard.
+// Reaproveita os mesmos cálculos da tela de Proventos (resumo do período + série mensal).
+public record FinancasProventosDashboardDto(
+    ProventosResumoDto Resumo,
+    IReadOnlyList<ProventoMensalDto> Mensais,
+    IReadOnlyList<ProventoTopPagadorDto> TopPagadores);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;

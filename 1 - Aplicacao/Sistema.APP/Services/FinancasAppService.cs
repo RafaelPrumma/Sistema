@@ -90,6 +90,55 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return alertas.Take(8).Select(MapAlerta).ToList();
     }
 
+    // F-K: ilha lazy-loaded do dashboard com o resumo de proventos.
+    // À prova de falha: a ilha é carregada junto com o dashboard, então um erro aqui não pode
+    // derrubar o load — devolvemos um DTO zerado em vez de estourar.
+    public async Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var hoje = DateTime.UtcNow.Date;
+            var todos = await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hoje.AddYears(5), cancellationToken);
+            var recebidos = todos.Where(x => x.PaymentDate <= hoje).ToList();
+
+            var resumo = new ProventosResumoDto(
+                Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year && x.PaymentDate!.Value.Month == hoje.Month).Sum(ValorLiquido), 2),
+                Math.Round(recebidos.Where(x => x.PaymentDate!.Value.Year == hoje.Year).Sum(ValorLiquido), 2),
+                Math.Round(recebidos.Sum(ValorLiquido), 2),
+                Math.Round(todos.Where(x => x.PaymentDate > hoje).Sum(ValorLiquido), 2),
+                todos.Count);
+
+            var mensais = CriarProventosMensais(todos, hoje);
+
+            // Top pagadores dos últimos 12 meses (líquido recebido por ativo).
+            var inicio12m = hoje.AddMonths(-12);
+            var topPagadores = recebidos
+                .Where(x => x.PaymentDate!.Value.Date >= inicio12m)
+                .GroupBy(x => x.AssetId)
+                .Select(g =>
+                {
+                    var asset = g.First().Asset;
+                    return new ProventoTopPagadorDto(
+                        asset?.Ticker ?? asset?.AssetKey ?? "—",
+                        asset?.Name ?? string.Empty,
+                        Math.Round(g.Sum(ValorLiquido), 2));
+                })
+                .Where(x => x.Valor > 0m)
+                .OrderByDescending(x => x.Valor)
+                .Take(5)
+                .ToList();
+
+            return new FinancasProventosDashboardDto(resumo, mensais, topPagadores);
+        }
+        catch
+        {
+            return ProventosDashboardVazio();
+        }
+    }
+
+    private static FinancasProventosDashboardDto ProventosDashboardVazio()
+        => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], []);
+
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
