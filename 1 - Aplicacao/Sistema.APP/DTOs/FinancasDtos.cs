@@ -174,7 +174,10 @@ public record CarteiraFinanceiraResumoDto(
     decimal VariacaoDiaPercentual,
     decimal PercentualPatrimonio,
     int Ativos,
-    IReadOnlyList<CarteiraAtivoResumoDto> Itens);
+    IReadOnlyList<CarteiraAtivoResumoDto> Itens,
+    // F-I: subcarteiras (folhas) de uma carteira-topo. O valor/custo/resultado do pai agrega os filhos
+    // (soma para cima). Carteira-folha ou flat tem a lista vazia.
+    IReadOnlyList<CarteiraFinanceiraResumoDto> Subcarteiras);
 
 public record PeriodoPerformanceDto(string Codigo, string Label, decimal VariacaoPercentual, decimal VariacaoValor);
 

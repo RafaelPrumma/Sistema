@@ -1185,49 +1185,76 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             .ToList();
     }
 
+    // F-I — monta o resumo de carteiras como árvore (topo → subcarteiras). O valor/custo/resultado do
+    // topo AGREGA os ativos diretos + todas as folhas (soma para cima); a variação do dia é ponderada
+    // pelo valor de mercado. Carteiras vazias (sem ativo detido em si nem nas filhas) somem.
     private static IReadOnlyList<CarteiraFinanceiraResumoDto> CriarResumoCarteiras(IReadOnlyList<CarteiraFinanceira> carteiras, IReadOnlyList<CotacaoAtivoDto> ativos, decimal valorPatrimonio)
     {
         var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
-        return carteiras
-            .Select(carteira =>
-            {
-                var itens = carteira.Ativos
-                    .Where(x => x.AtivoFinanceiroId > 0 && ativosPorId.ContainsKey(x.AtivoFinanceiroId))
-                    .Select(x => ativosPorId[x.AtivoFinanceiroId])
-                    .ToList();
-                var valor = itens.Sum(x => x.ValorMercado);
-                var custo = itens.Sum(x => x.CustoEstimado);
-                var resultado = valor - custo;
-                var variacaoDiaValor = itens.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m));
-                var itensResumo = itens
-                    .OrderByDescending(x => x.ValorMercado)
-                    .Select(x => new CarteiraAtivoResumoDto(
-                        x.AtivoId,
-                        x.Ativo,
-                        x.Classe,
-                        x.Symbol,
-                        x.Quantidade,
-                        Math.Round(x.ValorMercado, 2),
-                        valor == 0m ? 0m : Math.Round(x.ValorMercado / valor * 100m, 2),
-                        x.VariacaoDiaPercentual,
-                        Math.Round(x.ResultadoNaoRealizado, 2),
-                        Math.Round(x.ResultadoNaoRealizadoPercentual, 2),
-                        x.Status))
-                    .ToList();
+        var filhasPorPai = carteiras
+            .Where(c => c.ParentId.HasValue)
+            .GroupBy(c => c.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Ordem).ThenBy(c => c.Nome).ToList());
 
-                return new CarteiraFinanceiraResumoDto(
-                    carteira.Id,
-                    carteira.Nome,
-                    carteira.Tipo,
-                    valor,
-                    custo,
-                    resultado,
-                    custo == 0 ? 0 : resultado / custo * 100m,
-                    valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
-                    valorPatrimonio == 0m ? 0m : valor / valorPatrimonio * 100m,
-                    itens.Count,
-                    itensResumo);
-            })
+        // Constrói o resumo de UMA carteira: seus ativos diretos + (recursivo) suas subcarteiras.
+        // A agregação para cima soma valor/custo/variação dos próprios itens com os das filhas.
+        CarteiraFinanceiraResumoDto Montar(CarteiraFinanceira carteira)
+        {
+            var subResumos = filhasPorPai.TryGetValue(carteira.Id, out var filhas)
+                ? filhas.Select(Montar).Where(s => s.ValorMercado != 0m || s.Ativos > 0).ToList()
+                : [];
+
+            var itensDiretos = carteira.Ativos
+                .Where(x => x.AtivoFinanceiroId > 0 && ativosPorId.ContainsKey(x.AtivoFinanceiroId))
+                .Select(x => ativosPorId[x.AtivoFinanceiroId])
+                .ToList();
+
+            // Valor/custo/variação agregados = diretos + soma das filhas (já agregadas).
+            var valor = itensDiretos.Sum(x => x.ValorMercado) + subResumos.Sum(s => s.ValorMercado);
+            var custo = itensDiretos.Sum(x => x.CustoEstimado) + subResumos.Sum(s => s.CustoEstimado);
+            var resultado = valor - custo;
+            var variacaoDiaValor = itensDiretos.Sum(x => x.ValorMercado * ((x.VariacaoDiaPercentual ?? 0m) / 100m))
+                + subResumos.Sum(s => s.ValorMercado * (s.VariacaoDiaPercentual / 100m));
+            var qtdAtivos = itensDiretos.Count + subResumos.Sum(s => s.Ativos);
+
+            var itensResumo = itensDiretos
+                .OrderByDescending(x => x.ValorMercado)
+                .Select(x => new CarteiraAtivoResumoDto(
+                    x.AtivoId,
+                    x.Ativo,
+                    x.Classe,
+                    x.Symbol,
+                    x.Quantidade,
+                    Math.Round(x.ValorMercado, 2),
+                    valor == 0m ? 0m : Math.Round(x.ValorMercado / valor * 100m, 2),
+                    x.VariacaoDiaPercentual,
+                    Math.Round(x.ResultadoNaoRealizado, 2),
+                    Math.Round(x.ResultadoNaoRealizadoPercentual, 2),
+                    x.Status))
+                .ToList();
+
+            return new CarteiraFinanceiraResumoDto(
+                carteira.Id,
+                carteira.Nome,
+                carteira.Tipo,
+                valor,
+                custo,
+                resultado,
+                custo == 0 ? 0 : resultado / custo * 100m,
+                valor == 0 ? 0 : variacaoDiaValor / valor * 100m,
+                valorPatrimonio == 0m ? 0m : valor / valorPatrimonio * 100m,
+                qtdAtivos,
+                itensResumo,
+                subResumos);
+        }
+
+        // Só os topos (ParentId nulo) entram no nível raiz; as filhas vêm aninhadas. Carteiras antigas
+        // flat (sem ParentId, sem filhas) também são "topos" e continuam aparecendo.
+        return carteiras
+            .Where(c => !c.ParentId.HasValue)
+            .OrderBy(c => c.Ordem)
+            .ThenBy(c => c.Nome)
+            .Select(Montar)
             .Where(x => x.Ativos > 0)
             .OrderByDescending(x => x.ValorMercado)
             .ToList();

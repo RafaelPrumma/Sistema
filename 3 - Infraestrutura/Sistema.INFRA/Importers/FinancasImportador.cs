@@ -1486,96 +1486,167 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             lookup.TryAdd(documento.FileName, documento);
     }
 
+    // Usuário que assina as carteiras/vínculos auto-sugeridos. Distingue o que é "de sistema" (a
+    // árvore F-I) do que o usuário cria/edita à mão na tela (que NÃO mexemos).
+    private const string UsuarioAutoCarteira = "financas-importador";
+
+    // Auto-sugestão das carteiras hierárquicas (F-I — specs/investimentos.spec.md). Roda no load do
+    // dashboard, então é IDEMPOTENTE (por Slug) e À PROVA DE FALHA (qualquer exceção é logada e
+    // engolida — não pode derrubar o carregamento). Garante a árvore-alvo do ClassificadorCarteira
+    // (4 topos + subcarteiras), vincula cada ativo DETIDO (posição > 0) à carteira-folha classificada
+    // e desativa carteiras de sistema órfãs de versões antigas (preserva histórico, não apaga).
     private async Task GarantirCarteirasPadraoAsync(CancellationToken cancellationToken)
     {
-        var specs = new (string Nome, string Slug, string Tipo, int Ordem)[]
+        try
         {
-            ("Bancário", "bancario", "Setor", 10),
-            ("Petróleo", "petroleo", "Setor", 20),
-            ("Elétrico", "eletrico", "Setor", 30),
-            ("Commodities", "commodities", "Setor", 40),
-            ("FIIs de papel", "fiis-papel", "Classe", 50),
-            ("FIIs de tijolo", "fiis-tijolo", "Classe", 60),
-            ("Cripto principais", "cripto-principais", "Tese", 70),
-            ("Altcoins", "altcoins", "Tese", 80),
-            ("Memecoins", "memecoins", "Tese", 90),
-            ("Taxas Binance", "taxas-binance", "Uso", 100)
-        };
+            await GarantirCarteirasPadraoInternoAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.AutoCarteirasFalhou(_logger, ex);
+        }
+    }
 
+    private async Task GarantirCarteirasPadraoInternoAsync(CancellationToken cancellationToken)
+    {
         var carteiras = await _context.CarteirasFinanceiras.ToListAsync(cancellationToken);
-        foreach (var spec in specs)
-        {
-            if (carteiras.Any(x => x.Slug == spec.Slug))
-                continue;
 
-            var carteira = new CarteiraFinanceira
+        // 1) Garante topos e subcarteiras da árvore-alvo, idempotente por Slug. Atualiza Nome/Ordem/
+        //    ParentId/Ativo das que já existem (reusa; nunca duplica). Mapeia Slug → carteira.
+        var porSlug = carteiras
+            .GroupBy(c => c.Slug, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var slugsArvore = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        CarteiraFinanceira GarantirCarteira(string nome, string slug, int ordem, int? parentId, string tipo)
+        {
+            slugsArvore.Add(slug);
+            if (porSlug.TryGetValue(slug, out var existente))
             {
-                Nome = spec.Nome,
-                Slug = spec.Slug,
-                Tipo = spec.Tipo,
-                Ordem = spec.Ordem,
+                existente.Nome = nome;
+                existente.Ordem = ordem;
+                existente.ParentId = parentId;
+                existente.Tipo = tipo;
+                existente.IsSistema = true;
+                existente.Ativo = true;
+                return existente;
+            }
+
+            var nova = new CarteiraFinanceira
+            {
+                Nome = nome,
+                Slug = slug,
+                Tipo = tipo,
+                Ordem = ordem,
+                ParentId = parentId,
                 IsSistema = true,
-                UsuarioInclusao = "financas-importador"
+                Ativo = true,
+                UsuarioInclusao = UsuarioAutoCarteira
             };
-            _context.CarteirasFinanceiras.Add(carteira);
-            carteiras.Add(carteira);
+            _context.CarteirasFinanceiras.Add(nova);
+            porSlug[slug] = nova;
+            carteiras.Add(nova);
+            return nova;
+        }
+
+        foreach (var topo in ClassificadorCarteira.Arvore)
+        {
+            var carteiraTopo = GarantirCarteira(topo.Nome, topo.Slug, topo.Ordem, null, "Topo");
+            // Topo precisa ter Id antes de virar ParentId das filhas.
+            await _context.SaveChangesAsync(cancellationToken);
+            foreach (var sub in topo.Subs)
+                GarantirCarteira(sub.Nome, sub.Slug, sub.Ordem, carteiraTopo.Id, "Subcarteira");
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var ativos = await _context.AtivosFinanceiros.ToListAsync(cancellationToken);
+        // 2) Desativa carteiras de SISTEMA de versões antigas que não fazem parte da nova árvore
+        //    (preserva histórico — não apaga; não toca em CarteiraAtivoFinanceiro existente).
+        //    Carteiras criadas/editadas à mão pelo usuário (IsSistema = false) ficam intactas.
+        foreach (var carteira in carteiras.Where(c => c.IsSistema && c.Ativo && !slugsArvore.Contains(c.Slug)))
+            carteira.Ativo = false;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // 3) Posição canônica (qtd) por ativo — mesma regra do dashboard (CalcularPosicaoCanonica +
+        //    eventos corporativos). Só ativos com posição > 0 entram nos cards (spec F-I).
+        var transacoes = await _context.TransacoesFinanceiras
+            .AsNoTracking()
+            .Where(x => x.IsCanonical)
+            .Include(x => x.Asset)
+            .Where(x => x.Asset != null)
+            .OrderBy(x => x.Date)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+        AplicarEventosCorporativos(transacoes, await _context.EventosCorporativos.AsNoTracking().ToListAsync(cancellationToken));
+        var (quantidadePorAtivo, _) = CalcularPosicaoCanonica(transacoes);
+
+        var detidos = quantidadePorAtivo
+            .Where(kv => kv.Value > QuantidadeAbertaCarteira)
+            .Select(kv => kv.Key)
+            .ToHashSet();
+        if (detidos.Count == 0)
+            return;
+
+        var ativos = (await _context.AtivosFinanceiros.ToListAsync(cancellationToken))
+            .ToDictionary(a => a.Id);
         var links = await _context.CarteirasAtivosFinanceiros.ToListAsync(cancellationToken);
-        foreach (var ativo in ativos)
+
+        // Slugs-folha da árvore (qualquer carteira da árvore que NÃO é topo de outra). A remoção do passo
+        // 4 só atinge vínculos auto-sugeridos (carteiras da árvore) — vínculos manuais ficam intactos.
+        var idsCarteirasArvore = porSlug.Values
+            .Where(c => slugsArvore.Contains(c.Slug))
+            .Select(c => c.Id)
+            .ToHashSet();
+
+        // 4) Para cada ativo detido: classifica e garante UM vínculo na carteira-folha (ou topo se a
+        //    classificação não tem folha). Remove vínculos do mesmo ativo a OUTRAS carteiras da árvore
+        //    (não duplica o ativo em vários cards). Não cria vínculo para ativo não classificável.
+        foreach (var assetId in detidos)
         {
-            if (links.Any(x => x.AtivoFinanceiroId == ativo.Id))
+            if (!ativos.TryGetValue(assetId, out var ativo))
                 continue;
 
-            foreach (var slug in ResolverCarteirasAtivo(ativo))
+            var classificacao = ClassificadorCarteira.Classificar(ativo);
+            if (classificacao is null)
+                continue; // ação/ETF fora do mapa → fica sem carteira (não inventa grupo).
+
+            var slugDestino = classificacao.SlugFolha ?? classificacao.SlugTopo;
+            if (!porSlug.TryGetValue(slugDestino, out var carteiraDestino))
+                continue;
+
+            // Remove vínculos auto-sugeridos do ativo a outras carteiras da árvore (evita duplicar o
+            // card). Vínculos a carteiras manuais (fora da árvore) não são tocados.
+            var duplicados = links
+                .Where(l => l.AtivoFinanceiroId == assetId
+                    && l.CarteiraFinanceiraId != carteiraDestino.Id
+                    && idsCarteirasArvore.Contains(l.CarteiraFinanceiraId))
+                .ToList();
+            foreach (var dup in duplicados)
             {
-                var carteira = carteiras.FirstOrDefault(x => x.Slug == slug);
-                if (carteira is null || links.Any(x => x.CarteiraFinanceiraId == carteira.Id && x.AtivoFinanceiroId == ativo.Id))
-                    continue;
-
-                var link = new CarteiraAtivoFinanceiro
-                {
-                    CarteiraFinanceiraId = carteira.Id,
-                    AtivoFinanceiroId = ativo.Id,
-                    UsuarioInclusao = "financas-importador"
-                };
-                _context.CarteirasAtivosFinanceiros.Add(link);
-                links.Add(link);
+                _context.CarteirasAtivosFinanceiros.Remove(dup);
+                links.Remove(dup);
             }
+
+            if (links.Any(l => l.CarteiraFinanceiraId == carteiraDestino.Id && l.AtivoFinanceiroId == assetId))
+                continue;
+
+            var link = new CarteiraAtivoFinanceiro
+            {
+                CarteiraFinanceiraId = carteiraDestino.Id,
+                AtivoFinanceiroId = assetId,
+                UsuarioInclusao = UsuarioAutoCarteira
+            };
+            _context.CarteirasAtivosFinanceiros.Add(link);
+            links.Add(link);
         }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private static IReadOnlyList<string> ResolverCarteirasAtivo(AtivoFinanceiro ativo)
-    {
-        var key = $"{ativo.AssetKey} {ativo.Ticker} {ativo.Name}".ToUpperInvariant();
-        if (ativo.IsCrypto || ativo.AssetClass == ClasseAtivo.Cripto)
-        {
-            if (key.Contains("DOGE")) return ["memecoins"];
-            if (key.Contains("BNB")) return ["taxas-binance", "altcoins"];
-            if (key.Contains("BTC") || key.Contains("ETH") || key.Contains("SOL")) return ["cripto-principais"];
-            return ["altcoins"];
-        }
-
-        if (key.Contains("ITUB") || key.Contains("ITSA") || key.Contains("BBAS") || key.Contains("BBDC") || key.Contains("SANB"))
-            return ["bancario"];
-        if (key.Contains("PETR") || key.Contains("PRIO"))
-            return ["petroleo"];
-        if (key.Contains("TAEE") || key.Contains("EGIE") || key.Contains("ELET") || key.Contains("CMIG") || key.Contains("CPLE") || key.Contains("CPFE"))
-            return ["eletrico"];
-        if (key.Contains("VALE") || key.Contains("GGBR") || key.Contains("GOAU") || key.Contains("CSNA") || key.Contains("USIM"))
-            return ["commodities"];
-        if (ativo.AssetClass == ClasseAtivo.FII)
-        {
-            if (key.Contains("DEVA") || key.Contains("FYTO") || key.Contains("MXRF") || key.Contains("KNCR") || key.Contains("KNIP") || key.Contains("VGIR") || key.Contains("CPTS"))
-                return ["fiis-papel"];
-            return ["fiis-tijolo"];
-        }
-
-        return [];
-    }
+    // Posição mínima para um ativo entrar nos cards de carteira (espelha QuantidadeAbertaMinima do app).
+    private const decimal QuantidadeAbertaCarteira = 0.000000001m;
 
     private static bool IsSupportedFile(string file)
         => Path.GetExtension(file).ToLowerInvariant() is ".pdf" or ".xlsx" or ".csv" or ".zip";
@@ -2003,4 +2074,7 @@ internal static partial class FinancasImportadorLogMessages
 
     [LoggerMessage(EventId = 21, Level = LogLevel.Error, Message = "Reconciliação da posição B3 (F3) falhou; ignorada para não derrubar o dashboard.")]
     public static partial void ReconciliacaoB3Falhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 22, Level = LogLevel.Error, Message = "Auto-sugestão de carteiras (F-I) falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void AutoCarteirasFalhou(ILogger logger, Exception exception);
 }
