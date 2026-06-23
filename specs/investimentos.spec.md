@@ -64,6 +64,25 @@ Algumas carteiras apareciam com **valor zerado** no dashboard. ✅ FEITO: (1) cu
 ### F-K · Card de proventos no dashboard — jun/2026 (✅ FEITO)
 Ilha lazy-loaded `_DashboardProventos` (resumo do período + top pagadores + gráfico mensal, montado no `financas.js` porque script em parcial via innerHTML não executa). Reusa `RendimentoInvestimento` + a lógica da tela de Proventos.
 
+### F-L · Painel de saúde dos dados & transparência (revisão Codex, jun/2026)
+Hoje a ilha "Dados & importação" mostra pasta/documentos/cotações, mas não explica **de onde vem cada valor**. Transformar em painel de **saúde/rastreabilidade**:
+- **Última Posição B3 usada** + período do snapshot; **meses faltantes** (extratos não contíguos).
+- **Arquivos por fonte** (B3/Nubank/Binance/IR): importados, processados, parciais, falhos, duplicados ignorados, abas/linhas lidas, erros. (Há ~58 em `arquivos/b3`, ~26 em `arquivos/financeiro`, vários em `arquivos/ir`.)
+- **Composição do valor**: separar "valor com cotação atual" × "preço de fechamento B3Custodia" × "custo/fallback" (o fallback já existe em `CriarAtivosCotadosDaTabela`, mas a tela mostra só o número final).
+- Trocar **"Posições estimadas"** por **"Posições calculadas vs custódia"**: colunas valor, preço médio, **fonte do preço** e **diferença vs B3**.
+
+### F-M · Card de reconciliação B3 (revisão Codex)
+Tornar a reconciliação (`ReconciliadorPosicaoB3`) explícita p/ o usuário confiar no número: alvo da custódia, calculado por transações, nº de ajustes, **valor total no VARIACAO**, principais ativos ajustados e link p/ as transações `Fonte="Reconciliação"`.
+
+### F-N · Proventos por fonte (revisão Codex)
+No card de proventos, **separar/rotular as fontes**: B3 Extrato, Brapi, IR e Binance Earn (é informação de confiança — FII vem da B3 porque o informe de IR não cobre). Complementa o fix de valores do earn (já feito).
+
+### F-O · Aviso de cripto parcialmente reconciliado (revisão Codex)
+Enquanto não houver saldo de abertura/snapshot real da Binance, o dashboard deve sinalizar **"cripto parcialmente reconciliado"** (a `cripto.spec.md` ainda aponta lacunas de saldo/Earn/valoração). Honestidade > número cego.
+
+### Higiene de specs/skills (revisão Codex) — parcial
+Encoding quebrado em alguns docs (acentos) e notas de agentes desatualizadas. ✅ Corrigido: agente `importador-b3-materializa` dizia "notas mandam" (a decisão final é **B3 manda**). Pendente: varredura de encoding.
+
 ### Ideias novas (pesquisa)
 - **A · Yield on Cost / DY da carteira** — dividendo anual ÷ preço médio (renda futura).
 - **B · Risco × retorno** — volatilidade, Sharpe, max drawdown (Kinvo Premium tem).
