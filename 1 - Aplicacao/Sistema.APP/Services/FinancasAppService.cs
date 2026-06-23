@@ -79,14 +79,67 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault());
     }
 
-    public async Task<IReadOnlyList<PosicaoFinanceiraDto>> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default)
+    // F-L — "Posições calculadas vs custódia". À prova de falha (roda no load): erro → DTO vazio.
+    // (a) composição do valor por fonte do preço; (c) posição calculada × fechamento B3 + diferença.
+    public async Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default)
     {
-        var posicoes = await _uow.Financas.BuscarPosicoesAsync(true, cancellationToken);
-        return posicoes
-            .Where(EhPosicaoEstimativaAbertaVisivel)
-            .Take(12)
-            .Select(MapPosicao)
-            .ToList();
+        try
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+            var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+
+            // Preço de Fechamento da custódia B3 (Provedor=B3Custodia) por ativo — base do "diferença vs B3".
+            var precoB3PorAtivo = cotacoes
+                .Where(c => c.Provedor == ProvedorCotacao.B3Custodia && c.PriceBRL > 0m)
+                .GroupBy(c => c.AtivoFinanceiroId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+
+            // (a) Composição do valor de mercado por fonte do preço usado.
+            decimal comCotacao = 0m, comFechamentoB3 = 0m, comCusto = 0m;
+            foreach (var a in ativos)
+            {
+                if (a.FontePreco == "Custo")
+                    comCusto += a.ValorMercado;
+                else if (a.FontePreco == "Fechamento B3")
+                    comFechamentoB3 += a.ValorMercado;
+                else
+                    comCotacao += a.ValorMercado;
+            }
+            var composicao = new ComposicaoValorDto(
+                Math.Round(comCotacao, 2),
+                Math.Round(comFechamentoB3, 2),
+                Math.Round(comCusto, 2),
+                Math.Round(comCotacao + comFechamentoB3 + comCusto, 2));
+
+            // (c) Posições calculadas vs custódia, com fonte do preço e diferença vs B3.
+            var lista = ativos
+                .Select(a =>
+                {
+                    decimal? precoB3 = precoB3PorAtivo.TryGetValue(a.AtivoId, out var p) ? p : null;
+                    decimal? diferenca = precoB3.HasValue ? Math.Round(a.ValorMercado - a.Quantidade * precoB3.Value, 2) : null;
+                    return new PosicaoCalculadaDto(
+                        a.Ativo,
+                        a.Classe,
+                        a.Quantidade,
+                        Math.Round(a.PrecoMedio, 4),
+                        Math.Round(a.ValorMercado, 2),
+                        a.FontePreco,
+                        precoB3,
+                        diferenca,
+                        a.Status);
+                })
+                .OrderByDescending(x => x.ValorMercado)
+                .Take(15)
+                .ToList();
+
+            return new FinancasPosicoesDashboardDto(composicao, lista);
+        }
+        catch
+        {
+            return new FinancasPosicoesDashboardDto(new ComposicaoValorDto(0m, 0m, 0m, 0m), []);
+        }
     }
 
     public async Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default)
@@ -1291,6 +1344,16 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return estado;
     }
 
+    // F-L: rótulo amigável da fonte do preço (provedor da cotação utilizada).
+    private static string RotuloFontePreco(ProvedorCotacao provedor) => provedor switch
+    {
+        ProvedorCotacao.Brapi => "Cotação (Brapi)",
+        ProvedorCotacao.Binance => "Cotação (Binance)",
+        ProvedorCotacao.B3Custodia => "Fechamento B3",
+        ProvedorCotacao.Manual => "Cotação (manual)",
+        _ => "Cotação"
+    };
+
     private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAcumulada> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
     {
         // Prefere uma cotação utilizável (PriceBRL > 0) e SÓ DEPOIS a mais recente. Sem isso, uma
@@ -1317,6 +1380,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 // Status só reflete cotação viva quando o preço foi de fato usado; senão sinaliza
                 // "SemCotacao" (cobre também a cotação obsoleta/erro com PriceBRL <= 0).
                 var status = precoAtual.HasValue ? (cotacao?.Status.ToString() ?? "SemCotacao") : "SemCotacao";
+                // F-L: fonte do preço que valorou a posição. Custo quando caiu no fallback; senão o
+                // provedor da cotação usada (Brapi/Binance ao vivo vs B3Custódia = fechamento da Posição).
+                var fontePreco = !precoAtual.HasValue ? "Custo" : RotuloFontePreco(cotacao!.Provedor);
 
                 return new CotacaoAtivoDto(
                     asset.Id,
@@ -1333,7 +1399,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     precoAtual.HasValue ? cotacao?.ChangePercent : null,
                     cotacao?.RetrievedAt,
                     status,
-                    "Calculada");
+                    "Calculada",
+                    fontePreco);
             })
             .OrderByDescending(x => x.ValorMercado)
             .ToList();

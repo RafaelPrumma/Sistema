@@ -45,7 +45,7 @@ public class FinancasControllerTests
             [],
             new ImportacaoFinanceiraResumoDto(null, 0, 0, 0, null),
             null);
-        IReadOnlyList<PosicaoFinanceiraDto> posicoes = [];
+        var posicoes = new FinancasPosicoesDashboardDto(new ComposicaoValorDto(0, 0, 0, 0), []);
         IReadOnlyList<AlertaConfiabilidadeDto> alertas = [];
         var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], [], []);
 

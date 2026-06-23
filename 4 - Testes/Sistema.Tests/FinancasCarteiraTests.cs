@@ -266,7 +266,7 @@ public class FinancasCarteiraTests
         Assert.Equal(10m, porFonte["Binance Earn"]);
         Assert.DoesNotContain("Brapi", porFonte.Keys); // a linha pura Brapi está fora dos 12M
         // Soma dos percentuais ~100 e ordenado por valor desc.
-        Assert.Equal("B3 Extrato", dto.PorFonte.First().Fonte);
+        Assert.Equal("B3 Extrato", dto.PorFonte[0].Fonte);
         Assert.Equal(100m, dto.PorFonte.Sum(x => x.Percentual), 0);
     }
 
@@ -324,9 +324,9 @@ public class FinancasCarteiraTests
         Assert.Equal(100m, dto.AlvoTotalCustodia);  // 100 (BBAS3) + 0 (CPTS11)
         Assert.Equal(130m, dto.CalculadoTotal);     // 80 + 50
         // Maior ajuste em valor primeiro: BBAS3 (R$500) antes de CPTS11 (R$450).
-        Assert.Equal("BBAS3", dto.PrincipaisAtivos.First().Ticker);
-        Assert.Equal(20m, dto.PrincipaisAtivos.First().Diferenca);
-        Assert.Equal(500m, dto.PrincipaisAtivos.First().ValorAjuste);
+        Assert.Equal("BBAS3", dto.PrincipaisAtivos[0].Ticker);
+        Assert.Equal(20m, dto.PrincipaisAtivos[0].Diferenca);
+        Assert.Equal(500m, dto.PrincipaisAtivos[0].ValorAjuste);
         Assert.DoesNotContain(dto.PrincipaisAtivos, x => x.Ticker == "VARIACAO");
     }
 
@@ -342,6 +342,54 @@ public class FinancasCarteiraTests
         Assert.False(dto.TemDados);
         Assert.Equal(0, dto.NumeroAjustes);
         Assert.Empty(dto.PrincipaisAtivos);
+    }
+
+    [Fact]
+    public async Task PosicoesDashboardDeveComporValorPorFonteEDiferencaVsB3()
+    {
+        // BBAS3: tem cotação Brapi (ao vivo) E fechamento B3 → valora pela Brapi, mas mostra dif vs B3.
+        var bbas = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "BB", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        // DEVA11: só tem fechamento B3Custódia → valora por fechamento B3, dif = 0.
+        var deva = new AtivoFinanceiro { Id = 2, AssetKey = "DEVA11", Ticker = "DEVA11", Name = "FII DEVANT", AssetClass = ClasseAtivo.FII, Market = "B3" };
+        // PETR4: sem cotação alguma → cai no custo (fallback).
+        var petr = new AtivoFinanceiro { Id = 3, AssetKey = "PETR4", Ticker = "PETR4", Name = "Petrobras", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+
+        var transacoes = new List<TransacaoFinanceira>
+        {
+            Compra(bbas, 100m, 20m, new DateTime(2026, 1, 10)), // custo 2000
+            Compra(deva, 10m, 100m, new DateTime(2026, 1, 10)), // custo 1000
+            Compra(petr, 50m, 30m, new DateTime(2026, 1, 10))   // custo 1500 (fallback)
+        };
+        var agora = DateTime.UtcNow;
+        var cotacoes = new List<CotacaoAtivoFinanceiro>
+        {
+            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.Brapi, Symbol = "BBAS3", PriceBRL = 25m, Price = 25m, RetrievedAt = agora, RawJson = "{}" },
+            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.B3Custodia, Symbol = "BBAS3", PriceBRL = 24m, Price = 24m, RetrievedAt = agora.AddDays(-1), RawJson = "{}" },
+            new() { AtivoFinanceiroId = deva.Id, AtivoFinanceiro = deva, Provedor = ProvedorCotacao.B3Custodia, Symbol = "DEVA11", PriceBRL = 110m, Price = 110m, RetrievedAt = agora, RawJson = "{}" }
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync(cotacoes);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterPosicoesDashboardAsync();
+
+        // Composição: BBAS3 (100×25=2500) cotação; DEVA11 (10×110=1100) fechamento B3; PETR4 (1500) custo.
+        Assert.Equal(2500m, dto.Composicao.ComCotacao);
+        Assert.Equal(1100m, dto.Composicao.ComFechamentoB3);
+        Assert.Equal(1500m, dto.Composicao.ComCusto);
+        Assert.Equal(5100m, dto.Composicao.Total);
+
+        var bbasDto = dto.Posicoes.Single(x => x.Ticker == "BBAS3");
+        Assert.Equal("Cotação (Brapi)", bbasDto.FontePreco);
+        Assert.Equal(24m, bbasDto.PrecoB3);
+        Assert.Equal(100m, bbasDto.DiferencaB3); // 2500 − 100×24 = 100
+
+        var petrDto = dto.Posicoes.Single(x => x.Ticker == "PETR4");
+        Assert.Equal("Custo", petrDto.FontePreco);
+        Assert.Null(petrDto.PrecoB3);
+        Assert.Null(petrDto.DiferencaB3);
     }
 
     private static TransacaoFinanceira Reconciliacao(AtivoFinanceiro ativo, TipoOperacaoFinanceira tipo, decimal qtd, decimal preco, DateTime data, decimal alvo, decimal calculado)

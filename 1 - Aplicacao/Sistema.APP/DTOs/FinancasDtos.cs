@@ -148,7 +148,10 @@ public record CotacaoAtivoDto(
     decimal? VariacaoDiaPercentual,
     DateTime? AtualizadoEm,
     string Status,
-    string Confianca);
+    string Confianca,
+    // F-L: de onde veio o preço que valorou a posição — "Cotação" (Brapi/Binance ao vivo),
+    // "B3Custódia" (fechamento da aba Posição) ou "Custo" (fallback ao preço médio, sem cotação).
+    string FontePreco = "Custo");
 
 public record CarteiraAtivoResumoDto(
     int AtivoId,
@@ -338,6 +341,30 @@ public record FinancasProventosDashboardDto(
     IReadOnlyList<ProventoMensalDto> Mensais,
     IReadOnlyList<ProventoTopPagadorDto> TopPagadores,
     IReadOnlyList<ProventoFonteDto> PorFonte);
+
+// F-L: painel de saúde/transparência. Posição calculada (das transações) confrontada com a custódia
+// oficial da B3 (Preço de Fechamento da aba Posição), com a fonte do preço que valorou cada ativo.
+public record PosicaoCalculadaDto(
+    string Ticker,
+    string Classe,
+    decimal Quantidade,
+    decimal PrecoMedio,
+    decimal ValorMercado,
+    string FontePreco,
+    decimal? PrecoB3,        // Preço de Fechamento B3Custódia (null = sem snapshot da B3 p/ o ativo)
+    decimal? DiferencaB3,    // valorMercado − (qtd × precoB3); null quando não há preço B3
+    string Status);
+
+// F-L (a): composição do valor de mercado por fonte do preço — cotação ao vivo × fechamento B3 × custo.
+public record ComposicaoValorDto(
+    decimal ComCotacao,      // valorado por cotação ao vivo (Brapi/Binance)
+    decimal ComFechamentoB3, // valorado pelo fechamento B3Custódia
+    decimal ComCusto,        // fallback ao custo (sem cotação utilizável)
+    decimal Total);
+
+public record FinancasPosicoesDashboardDto(
+    ComposicaoValorDto Composicao,
+    IReadOnlyList<PosicaoCalculadaDto> Posicoes);
 
 // F-M: card de reconciliação B3. Torna o ReconciliadorPosicaoB3 explícito para o usuário confiar
 // no número: alvo da custódia vs calculado por transações, nº de ajustes e o valor que foi parar no
