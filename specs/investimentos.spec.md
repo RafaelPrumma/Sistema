@@ -33,23 +33,23 @@ Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para 
 ### F-H · Alertas de preço/provento — #7
 Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
 
-### F-I · Carteiras hierárquicas (rework) — jun/2026 (DEFINIDO)
-Reorganizar os grupos com **subcarteiras** (hoje é flat: `FinanceiroCarteira` + `FinanceiroCarteiraAtivo`; precisa de hierarquia — `ParentId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
+### F-I · Carteiras hierárquicas (rework) — jun/2026 (✅ FEITO)
+Reorganizar os grupos com **subcarteiras** (hierarquia via `ParentId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
 
-- **Topo (4):** `Bancário e Seguridade` · `FIIs` · `Comodities e energia` · `Criptomoedas`.
-  - "Comodities e energia" **junta** petróleo + minério + energia (petróleo é commodity *e* energia).
-  - "Bancário e Seguridade" absorve seguradoras (CXSE3).
-- **Subcarteiras:** FIIs → **Papel** / **Tijolo**; Comodities e energia → **Petróleo** / **Mineração e Metais** / **Energia**; Criptos → **BTC** / **Altcoins** / **Memecoins**. "Bancário e Seguridade" fica flat (sem sub).
+- **Topo (4):** `Bancário e Seguridade` · `FIIs` · `Minério e energia` · `Criptomoedas`.
+  - "Minério e energia" **junta** petróleo + minério/metais + energia (petróleo é commodity *e* energia; cabe VALE, ouro e Petrobras).
+- **Subcarteiras:** Bancário e Seguridade → **Bancos** / **Seguridade**; FIIs → **Papel** / **Tijolo**; Minério e energia → **Petróleo** / **Mineração e Metais** (VALE + ouro) / **Energia**; Criptos → **BTC** / **Altcoins** / **Memecoins**.
 
 **Mapa de classificação (custódia B3 2026-maio + cripto §10 cripto.spec) — semeado, editável na tela depois:**
 | Topo | Sub | Ativos |
 |---|---|---|
-| Bancário e Seguridade | (flat) | BBAS3, BBDC4, ITUB4, CXSE3 |
+| Bancário e Seguridade | Bancos | BBAS3, BBDC4, ITUB4 |
+| Bancário e Seguridade | Seguridade | CXSE3 |
 | FIIs | Papel | AFHI11, AFHI12, CPTS11, DEVA11, FYTO11, KNSC11, RECR11, RECR12, RZAK11 |
 | FIIs | Tijolo | HGLG11 |
-| Comodities e energia | Petróleo | PETR4 |
-| Comodities e energia | Mineração e Metais | VALE3, GOLD11 |
-| Comodities e energia | Energia | TAEE4 |
+| Minério e energia | Petróleo | PETR4 |
+| Minério e energia | Mineração e Metais | VALE3, GOLD11 (ouro) |
+| Minério e energia | Energia | TAEE4 |
 | Criptomoedas | BTC | BTC |
 | Criptomoedas | Altcoins | WBETH, BNSOL, XRP, BNB |
 | Criptomoedas | Memecoins | DOGE |
@@ -59,10 +59,10 @@ Reorganizar os grupos com **subcarteiras** (hoje é flat: `FinanceiroCarteira` +
 - A **auto-sugestão** (`GarantirCarteirasPadraoAsync`) cria topo+sub idempotente e vincula os ativos detidos à subcarteira-folha. UI do dashboard agrupa carteira→subcarteira com agregação de valor para cima (pai = soma dos filhos).
 
 ### F-J · Carteiras com valor zerado (bug) — jun/2026
-Algumas carteiras aparecem com **valor zerado** no dashboard. Investigar: ativo sem cotação contribui 0 (relacionado ao F-D fallback), mapeamento ativo→carteira incompleto, ou carteira sem ativos com cotação. Corrigir a valoração (usar custo como fallback consistente, garantir que todo ativo da carteira valore).
+Algumas carteiras apareciam com **valor zerado** no dashboard. ✅ FEITO: (1) custo (PM) como piso consistente quando não há cotação + status `SemCotacao` confiável; (2) a coluna **Resultado** ficava 0 nas carteiras B3 (ação/FII não cota sem token Brapi → mercado = custo → resultado 0) — resolvido alimentando uma cotação `ProvedorCotacao.B3Custodia` com o **Preço de Fechamento** da aba Posição do extrato B3 (custódia oficial), e fazendo a valoração preferir cotação utilizável (PriceBRL>0) à mais recente.
 
-### F-K · Card de proventos no dashboard — jun/2026
-Falta o **card de proventos** no dashboard (resumo de proventos do período; os dados já existem — `RendimentoInvestimento` + a tela de Proventos). Adicionar como ilha lazy-loaded (padrão `Dashboard*`).
+### F-K · Card de proventos no dashboard — jun/2026 (✅ FEITO)
+Ilha lazy-loaded `_DashboardProventos` (resumo do período + top pagadores + gráfico mensal, montado no `financas.js` porque script em parcial via innerHTML não executa). Reusa `RendimentoInvestimento` + a lógica da tela de Proventos.
 
 ### Ideias novas (pesquisa)
 - **A · Yield on Cost / DY da carteira** — dividendo anual ÷ preço médio (renda futura).

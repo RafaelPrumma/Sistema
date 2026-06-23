@@ -102,7 +102,7 @@ public static class ClassificadorCarteira
             new("Papel", SlugFiisPapel, 10),
             new("Tijolo", SlugFiisTijolo, 20)
         ]),
-        new("Comodities e energia", SlugComodities, 30,
+        new("Minério e energia", SlugComodities, 30,
         [
             new("Petróleo", SlugComoditiesPetroleo, 10),
             new("Mineração e Metais", SlugComoditiesMineracao, 20),
