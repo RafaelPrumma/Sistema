@@ -47,7 +47,7 @@ public class FinancasControllerTests
             null);
         IReadOnlyList<PosicaoFinanceiraDto> posicoes = [];
         IReadOnlyList<AlertaConfiabilidadeDto> alertas = [];
-        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], []);
+        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], [], []);
 
         service.Setup(x => x.ObterPatrimonioDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(patrimonio);
         service.Setup(x => x.ObterCarteirasDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(carteiras);
@@ -86,7 +86,7 @@ public class FinancasControllerTests
     public async Task DashboardProventosDeveRetornarParcialDaIlha()
     {
         var service = new Mock<IFinancasAppService>();
-        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], []);
+        var proventos = new FinancasProventosDashboardDto(new ProventosResumoDto(0, 0, 0, 0, 0), [], [], []);
         service.Setup(x => x.ObterProventosDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
         var controller = new FinancasController(service.Object);
 

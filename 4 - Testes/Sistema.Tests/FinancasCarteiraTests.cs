@@ -237,6 +237,53 @@ public class FinancasCarteiraTests
         Assert.Equal(TipoDocumentoFinanceiro.BinanceSpotOrders, context.DocumentosFinanceiros.Single(x => x.Id == 3).DocumentKind);
     }
 
+    [Fact]
+    public async Task ProventosDashboardDeveAgruparRecebidoPorFonte()
+    {
+        var fii = new AtivoFinanceiro { Id = 1, AssetKey = "DEVA11", Ticker = "DEVA11", Name = "FII DEVANT", AssetClass = ClasseAtivo.FII, Market = "B3" };
+        var acao = new AtivoFinanceiro { Id = 2, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "Banco do Brasil", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        var cripto = new AtivoFinanceiro { Id = 3, AssetKey = "BTC", Ticker = "BTC", Name = "Bitcoin", AssetClass = ClasseAtivo.Cripto, IsCrypto = true, Market = "Binance" };
+
+        var hoje = DateTime.UtcNow.Date;
+        var proventos = new List<RendimentoInvestimento>
+        {
+            Provento(fii, 100m, "B3 Extrato", hoje.AddMonths(-1)),
+            Provento(acao, 40m, "InformeIR2025", hoje.AddMonths(-2)),
+            Provento(acao, 60m, "B3 Extrato+Brapi", hoje.AddMonths(-3)),  // fonte combinada → primeira manda (B3)
+            Provento(cripto, 10m, "Binance", hoje.AddMonths(-1)),
+            Provento(fii, 999m, "Brapi", hoje.AddYears(-2))               // fora dos 12M → ignorado
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarProventosPorPeriodoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterProventosDashboardAsync();
+
+        var porFonte = dto.PorFonte.ToDictionary(x => x.Fonte, x => x.Valor);
+        Assert.Equal(160m, porFonte["B3 Extrato"]);   // 100 (FII) + 60 (combinada B3+Brapi)
+        Assert.Equal(40m, porFonte["Informe IR"]);
+        Assert.Equal(10m, porFonte["Binance Earn"]);
+        Assert.DoesNotContain("Brapi", porFonte.Keys); // a linha pura Brapi está fora dos 12M
+        // Soma dos percentuais ~100 e ordenado por valor desc.
+        Assert.Equal("B3 Extrato", dto.PorFonte.First().Fonte);
+        Assert.Equal(100m, dto.PorFonte.Sum(x => x.Percentual), 0);
+    }
+
+    private static RendimentoInvestimento Provento(AtivoFinanceiro ativo, decimal valor, string fonte, DateTime pagamento)
+        => new()
+        {
+            AssetId = ativo.Id,
+            Asset = ativo,
+            Amount = valor,
+            TaxWithheld = 0m,
+            PaymentDate = pagamento,
+            IncomeType = "Rendimento",
+            Source = fonte,
+            Fonte = fonte,
+            RawJson = "{}"
+        };
+
     private static FinancasAppService CriarService(IFinancasRepository repo)
     {
         var uow = new Mock<IUnitOfWork>();

@@ -319,12 +319,22 @@ public record ProventoTopPagadorDto(
     string Nome,
     decimal Valor);
 
+// F-N: quanto do provento recebido (12M) veio de cada fonte (B3 Extrato, Brapi, Binance Earn, IR).
+// É informação de confiança: FII vem da B3 porque o informe de IR só cobre ações.
+public record ProventoFonteDto(
+    string Fonte,
+    decimal Valor,
+    decimal Percentual,
+    int Quantidade);
+
 // F-K: resumo de proventos para a ilha lazy-loaded do dashboard.
 // Reaproveita os mesmos cálculos da tela de Proventos (resumo do período + série mensal).
+// F-N: PorFonte separa o recebido (12M) por origem do dado.
 public record FinancasProventosDashboardDto(
     ProventosResumoDto Resumo,
     IReadOnlyList<ProventoMensalDto> Mensais,
-    IReadOnlyList<ProventoTopPagadorDto> TopPagadores);
+    IReadOnlyList<ProventoTopPagadorDto> TopPagadores,
+    IReadOnlyList<ProventoFonteDto> PorFonte);
 
 public class FinancasDashboardDto
 {

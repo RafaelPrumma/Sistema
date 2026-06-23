@@ -110,10 +110,14 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
             var mensais = CriarProventosMensais(todos, hoje);
 
-            // Top pagadores dos últimos 12 meses (líquido recebido por ativo).
+            // Recebidos dos últimos 12 meses, reusado por Top pagadores e PorFonte (F-N).
             var inicio12m = hoje.AddMonths(-12);
-            var topPagadores = recebidos
+            var recebidos12m = recebidos
                 .Where(x => x.PaymentDate!.Value.Date >= inicio12m)
+                .ToList();
+
+            // Top pagadores dos últimos 12 meses (líquido recebido por ativo).
+            var topPagadores = recebidos12m
                 .GroupBy(x => x.AssetId)
                 .Select(g =>
                 {
@@ -128,7 +132,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 .Take(5)
                 .ToList();
 
-            return new FinancasProventosDashboardDto(resumo, mensais, topPagadores);
+            var porFonte = CriarProventosPorFonte(recebidos12m);
+
+            return new FinancasProventosDashboardDto(resumo, mensais, topPagadores, porFonte);
         }
         catch
         {
@@ -136,8 +142,53 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         }
     }
 
+    // F-N — quebra do recebido (12M) por FONTE do dado (B3 Extrato, Brapi, Binance Earn, Informe IR).
+    // A Fonte do RendimentoInvestimento pode vir combinada com "+" (ex.: "B3 Extrato+Brapi"); nesse
+    // caso a primeira fonte "manda" para o rótulo (a B3 é primária quando presente). É informação de
+    // confiança: FII vem da B3 porque o informe de IR só cobre ações.
+    private static IReadOnlyList<ProventoFonteDto> CriarProventosPorFonte(IReadOnlyList<RendimentoInvestimento> recebidos)
+    {
+        var grupos = recebidos
+            .GroupBy(RotuloFonteProvento)
+            .Select(g => new { Fonte = g.Key, Valor = Math.Round(g.Sum(ValorLiquido), 2), Quantidade = g.Count() })
+            .Where(x => x.Valor > 0m)
+            .ToList();
+
+        var total = grupos.Sum(x => x.Valor);
+        return grupos
+            .OrderByDescending(x => x.Valor)
+            .Select(x => new ProventoFonteDto(
+                x.Fonte,
+                x.Valor,
+                total == 0m ? 0m : Math.Round(x.Valor / total * 100m, 1),
+                x.Quantidade))
+            .ToList();
+    }
+
+    // Normaliza a Fonte crua do provento para um rótulo amigável e estável. A primeira fonte da
+    // string combinada ("B3 Extrato+Brapi") define o rótulo; "InformeIR2025" → "Informe IR".
+    private static string RotuloFonteProvento(RendimentoInvestimento r)
+    {
+        var bruta = string.IsNullOrWhiteSpace(r.Fonte) ? r.Source : r.Fonte;
+        if (string.IsNullOrWhiteSpace(bruta))
+            return "Outras fontes";
+
+        var primeira = bruta.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? bruta.Trim();
+
+        if (primeira.StartsWith("InformeIR", StringComparison.OrdinalIgnoreCase) || primeira.Contains("Informe", StringComparison.OrdinalIgnoreCase))
+            return "Informe IR";
+        if (primeira.Contains("B3", StringComparison.OrdinalIgnoreCase))
+            return "B3 Extrato";
+        if (primeira.Contains("Brapi", StringComparison.OrdinalIgnoreCase))
+            return "Brapi";
+        if (primeira.Contains("Binance", StringComparison.OrdinalIgnoreCase))
+            return "Binance Earn";
+        return primeira;
+    }
+
     private static FinancasProventosDashboardDto ProventosDashboardVazio()
-        => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], []);
+        => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], [], []);
 
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
