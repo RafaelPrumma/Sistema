@@ -32,6 +32,12 @@
         </div>
     </section>
 
+    <section id="financeProventosIsland" class="finance-island mb-3" aria-busy="true" aria-live="polite">
+        <div class="finance-skeleton finance-skeleton--table" role="status">
+            <span class="visually-hidden">Carregando proventos...</span>
+        </div>
+    </section>
+
     <section id="financeImportacaoIsland" class="finance-island mb-3" aria-busy="true" aria-live="polite">
         <div class="finance-skeleton" role="status">
             <span class="visually-hidden">Carregando dados de importação...</span>
@@ -51,12 +57,6 @@
             </div>
         </section>
     </div>
-
-    <section id="financeProventosIsland" class="finance-island mt-3" aria-busy="true" aria-live="polite">
-        <div class="finance-skeleton finance-skeleton--table" role="status">
-            <span class="visually-hidden">Carregando proventos...</span>
-        </div>
-    </section>
 </div>
 
 @await Html.PartialAsync("_NovaTransacaoModal")

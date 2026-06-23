@@ -8,6 +8,7 @@ using Sistema.APP.DTOs;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.INFRA.Data;
+using Sistema.INFRA.Importers;
 
 namespace Sistema.INFRA.Services;
 
@@ -297,6 +298,13 @@ public class FinancasMarketDataService(
     // com fallback na cotação atual). Não alteram a quantidade da posição — é renda, como o dividendo.
     private async Task<bool> AtualizarProventosCriptoEarnAsync(CancellationToken cancellationToken)
     {
+        // Self-healing: purga os proventos de earn de cripto antes de regenerar — reflete a regra de
+        // classificação atual e remove lançamentos antigos incorretos (ex.: principal de staking que
+        // entrava como reward, estourando o card). A regeneração abaixo recria só o rendimento real.
+        await _context.RendimentosInvestimento
+            .Where(x => x.IncomeType == "Rendimento (Earn)")
+            .ExecuteDeleteAsync(cancellationToken);
+
         var earns = await _context.TransacoesCripto
             .Where(x => x.Amount > 0m && x.TransactionDate != null &&
                 (x.OperationType == TipoOperacaoFinanceira.Rendimento ||
@@ -304,6 +312,12 @@ public class FinancasMarketDataService(
                  x.RawType.Contains("INTEREST") || x.RawType.Contains("DISTRIBUTION") || x.RawType.Contains("AIRDROP") ||
                  x.RawType.Contains("SAVINGS")))
             .ToListAsync(cancellationToken);
+
+        // Só rendimento REAL (juros/reward/airdrop). Alinha com CriptoNetting.Classificar: exclui
+        // staking-purchase (ETH→WBETH, SOL→BNSOL) e subscription — são principal/permuta, NÃO renda.
+        // Eram capturados pelo "STAK" e valorados a preço cheio, estourando o card (ex.: WBETH ~R$ 48k,
+        // quase a posição inteira). Agora o earn de cripto bate com o que realmente é rendimento.
+        earns = earns.Where(x => CriptoNetting.Classificar(x.RawType) == CategoriaCripto.Rendimento).ToList();
         if (earns.Count == 0)
             return false;
 
