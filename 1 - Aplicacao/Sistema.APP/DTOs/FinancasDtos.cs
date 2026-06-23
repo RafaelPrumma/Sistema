@@ -339,6 +339,25 @@ public record FinancasProventosDashboardDto(
     IReadOnlyList<ProventoTopPagadorDto> TopPagadores,
     IReadOnlyList<ProventoFonteDto> PorFonte);
 
+// F-M: card de reconciliação B3. Torna o ReconciliadorPosicaoB3 explícito para o usuário confiar
+// no número: alvo da custódia vs calculado por transações, nº de ajustes e o valor que foi parar no
+// ativo virtual VARIACAO (a diferença não explicada pelos relatórios).
+public record ReconciliacaoAtivoDto(
+    string Ticker,
+    string Nome,
+    decimal Alvo,
+    decimal Calculado,
+    decimal Diferenca,
+    decimal ValorAjuste);
+
+public record FinancasReconciliacaoDto(
+    bool TemDados,
+    int NumeroAjustes,
+    decimal ValorTotalVariacao,
+    decimal AlvoTotalCustodia,
+    decimal CalculadoTotal,
+    IReadOnlyList<ReconciliacaoAtivoDto> PrincipaisAtivos);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;

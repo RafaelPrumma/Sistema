@@ -1,0 +1,88 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasReconciliacaoDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C2", br);
+    string Qtd(decimal value) => value.ToString("N4", br);
+}
+
+@* F-M: a reconciliação só aparece quando há ajustes (Fonte="Reconciliação"). Sem dados, a ilha some. *@
+@if (Model.TemDados)
+{
+    <div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-shield-check me-1"></i>Reconciliação B3</h6>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Transacoes" asp-route-origem="Manual" title="Transações de ajuste (Fonte: Reconciliação)">
+                    Ver ajustes
+                </a>
+            </div>
+
+            <p class="small text-secondary mb-3">
+                Sua posição é levada ao alvo da <strong>custódia oficial da B3</strong> (aba Posição).
+                A diferença não explicada pelos relatórios vai para o ativo <strong>VARIAÇÃO</strong>,
+                mantendo o patrimônio total e deixando a discrepância visível.
+            </p>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Ajustes</div>
+                        <div class="fs-5 fw-semibold">@Model.NumeroAjustes.ToString("N0", br)</div>
+                        <div class="small text-secondary">ativos reconciliados</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Valor no ativo VARIAÇÃO</div>
+                        <div class="fs-5 fw-semibold @(Model.ValorTotalVariacao >= 0 ? "text-success" : "text-danger")">@Money(Model.ValorTotalVariacao)</div>
+                        <div class="small text-secondary">diferença vs custódia</div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Alvo da custódia</div>
+                        <div class="fs-6 fw-semibold">@Qtd(Model.AlvoTotalCustodia) <span class="small text-secondary">cotas</span></div>
+                        <div class="small text-secondary">calculado: @Qtd(Model.CalculadoTotal)</div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.PrincipaisAtivos.Count > 0)
+            {
+                <div class="small text-secondary mb-1">Principais ativos ajustados</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ativo</th>
+                                <th class="text-end">Alvo (B3)</th>
+                                <th class="text-end">Calculado</th>
+                                <th class="text-end">Diferença</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var a in Model.PrincipaisAtivos)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@a.Ticker</div>
+                                    <div class="small text-secondary text-truncate" style="max-width:220px">@a.Nome</div>
+                                </td>
+                                <td class="text-end">@Qtd(a.Alvo)</td>
+                                <td class="text-end">@Qtd(a.Calculado)</td>
+                                <td class="text-end @(a.Diferenca >= 0 ? "text-success" : "text-danger")">
+                                    @(a.Diferenca >= 0 ? "+" : "")@Qtd(a.Diferenca)
+                                </td>
+                                <td class="text-end">@Money(a.ValorAjuste)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

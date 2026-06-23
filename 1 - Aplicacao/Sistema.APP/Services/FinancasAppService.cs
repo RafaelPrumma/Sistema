@@ -195,6 +195,84 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     private static FinancasProventosDashboardDto ProventosDashboardVazio()
         => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], [], []);
 
+    // Contrato com o ReconciliadorPosicaoB3 (camada INFRA, fora do alcance do APP): as transações de
+    // ajuste têm Fonte="Reconciliação" e a contrapartida cai no ativo virtual AssetKey="VARIACAO".
+    // Mantidos como literais aqui porque sobrevivem ao resync (são o "contrato" da feature).
+    private const string FonteReconciliacao = "Reconciliação";
+    private const string AssetKeyVariacao = "VARIACAO";
+
+    // F-M — torna a reconciliação da Posição B3 explícita. Lê as transações Fonte="Reconciliação"
+    // (à prova de falha: erro aqui não pode derrubar o dashboard). O ativo-side leva a posição ao alvo
+    // da custódia; a contrapartida no ativo VARIACAO absorve o valor da diferença não explicada.
+    public async Task<FinancasReconciliacaoDto> ObterReconciliacaoDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            var ajustes = transacoes
+                .Where(t => t.Fonte == FonteReconciliacao && t.Asset is not null)
+                .ToList();
+            if (ajustes.Count == 0)
+                return ReconciliacaoVazia();
+
+            // Valor líquido parado no ativo VARIACAO = soma assinada (Compra +, Venda −) das suas linhas.
+            var variacao = ajustes.Where(t => t.Asset!.AssetKey == AssetKeyVariacao).ToList();
+            var valorTotalVariacao = Math.Round(variacao.Sum(t => DeltaQuantidade(t)), 2);
+
+            // Ajustes do ativo real (exclui a contrapartida VARIACAO). Alvo/Calculado vêm do RawJson
+            // gravado pelo reconciliador; fallback: deriva do próprio ajuste se o JSON faltar.
+            var ativosAjustados = ajustes
+                .Where(t => t.Asset!.AssetKey != AssetKeyVariacao)
+                .Select(t =>
+                {
+                    var (alvo, calculado) = LerAlvoCalculado(t.RawJson);
+                    var diferenca = alvo - calculado;
+                    return new ReconciliacaoAtivoDto(
+                        t.Asset!.Ticker ?? t.Asset.AssetKey ?? "—",
+                        t.Asset.Name ?? string.Empty,
+                        Math.Round(alvo, 8),
+                        Math.Round(calculado, 8),
+                        Math.Round(diferenca, 8),
+                        Math.Round(t.Quantity * t.UnitPrice, 2));
+                })
+                .OrderByDescending(x => Math.Abs(x.ValorAjuste))
+                .ToList();
+
+            return new FinancasReconciliacaoDto(
+                TemDados: true,
+                NumeroAjustes: ativosAjustados.Count,
+                ValorTotalVariacao: valorTotalVariacao,
+                AlvoTotalCustodia: Math.Round(ativosAjustados.Sum(x => x.Alvo), 8),
+                CalculadoTotal: Math.Round(ativosAjustados.Sum(x => x.Calculado), 8),
+                PrincipaisAtivos: ativosAjustados.Take(8).ToList());
+        }
+        catch
+        {
+            return ReconciliacaoVazia();
+        }
+    }
+
+    private static FinancasReconciliacaoDto ReconciliacaoVazia()
+        => new(false, 0, 0m, 0m, 0m, []);
+
+    // Extrai Alvo/Calculado do RawJson { Alvo, Calculado, PrecoMedio } gravado pelo reconciliador.
+    private static (decimal Alvo, decimal Calculado) LerAlvoCalculado(string? rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+            return (0m, 0m);
+        try
+        {
+            using var doc = JsonDocument.Parse(rawJson);
+            var root = doc.RootElement;
+            decimal Ler(string nome) => root.TryGetProperty(nome, out var v) && v.TryGetDecimal(out var d) ? d : 0m;
+            return (Ler("Alvo"), Ler("Calculado"));
+        }
+        catch
+        {
+            return (0m, 0m);
+        }
+    }
+
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);

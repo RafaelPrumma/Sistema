@@ -83,6 +83,21 @@ public class FinancasControllerTests
     }
 
     [Fact]
+    public async Task DashboardReconciliacaoDeveRetornarParcialDaIlha()
+    {
+        var service = new Mock<IFinancasAppService>();
+        var reconciliacao = new FinancasReconciliacaoDto(false, 0, 0, 0, 0, []);
+        service.Setup(x => x.ObterReconciliacaoDashboardAsync(It.IsAny<CancellationToken>())).ReturnsAsync(reconciliacao);
+        var controller = new FinancasController(service.Object);
+
+        var result = Assert.IsType<PartialViewResult>(await controller.DashboardReconciliacao(CancellationToken.None));
+
+        Assert.Equal("_DashboardReconciliacao", result.ViewName);
+        Assert.Same(reconciliacao, result.Model);
+        service.Verify(x => x.ObterReconciliacaoDashboardAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task DashboardProventosDeveRetornarParcialDaIlha()
     {
         var service = new Mock<IFinancasAppService>();

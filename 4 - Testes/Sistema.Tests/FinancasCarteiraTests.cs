@@ -293,6 +293,72 @@ public class FinancasCarteiraTests
         Assert.Equal(comCripto, dto.CriptoParcialmenteReconciliada);
     }
 
+    [Fact]
+    public async Task ReconciliacaoDashboardDeveResumirAjustesEValorNaVariacao()
+    {
+        var bbas = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "Banco do Brasil", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        var cpts = new AtivoFinanceiro { Id = 2, AssetKey = "CPTS11", Ticker = "CPTS11", Name = "FII Capitania", AssetClass = ClasseAtivo.FII, Market = "B3" };
+        var variacao = new AtivoFinanceiro { Id = 9, AssetKey = "VARIACAO", Ticker = "VARIACAO", Name = "Ajuste de Reconciliação", AssetClass = ClasseAtivo.Outro, Market = "B3" };
+        var hoje = DateTime.UtcNow.Date;
+
+        var transacoes = new List<TransacaoFinanceira>
+        {
+            // BBAS3: alvo 100, calculado 80 → faltam 20 cotas (Compra) ao PM 25 = R$ 500.
+            Reconciliacao(bbas, TipoOperacaoFinanceira.Compra, 20m, 25m, hoje, alvo: 100m, calculado: 80m),
+            // CPTS11: alvo 0, calculado 50 → sobram 50 (Venda) ao PM 9 = R$ 450 (fantasma zerado).
+            Reconciliacao(cpts, TipoOperacaoFinanceira.Venda, 50m, 9m, hoje, alvo: 0m, calculado: 50m),
+            // Contrapartidas no VARIACAO (inverso): BBAS3 deu compra → VARIACAO vende 500; CPTS11 venda → VARIACAO compra 450.
+            Reconciliacao(variacao, TipoOperacaoFinanceira.Venda, 500m, 1m, hoje, alvo: 0m, calculado: 0m),
+            Reconciliacao(variacao, TipoOperacaoFinanceira.Compra, 450m, 1m, hoje, alvo: 0m, calculado: 0m)
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterReconciliacaoDashboardAsync();
+
+        Assert.True(dto.TemDados);
+        Assert.Equal(2, dto.NumeroAjustes); // só os ativos reais (VARIACAO não conta)
+        Assert.Equal(-50m, dto.ValorTotalVariacao); // VARIACAO: Compra 450 − Venda 500
+        Assert.Equal(100m, dto.AlvoTotalCustodia);  // 100 (BBAS3) + 0 (CPTS11)
+        Assert.Equal(130m, dto.CalculadoTotal);     // 80 + 50
+        // Maior ajuste em valor primeiro: BBAS3 (R$500) antes de CPTS11 (R$450).
+        Assert.Equal("BBAS3", dto.PrincipaisAtivos.First().Ticker);
+        Assert.Equal(20m, dto.PrincipaisAtivos.First().Diferenca);
+        Assert.Equal(500m, dto.PrincipaisAtivos.First().ValorAjuste);
+        Assert.DoesNotContain(dto.PrincipaisAtivos, x => x.Ticker == "VARIACAO");
+    }
+
+    [Fact]
+    public async Task ReconciliacaoDashboardSemAjustesDevolveVazio()
+    {
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterReconciliacaoDashboardAsync();
+
+        Assert.False(dto.TemDados);
+        Assert.Equal(0, dto.NumeroAjustes);
+        Assert.Empty(dto.PrincipaisAtivos);
+    }
+
+    private static TransacaoFinanceira Reconciliacao(AtivoFinanceiro ativo, TipoOperacaoFinanceira tipo, decimal qtd, decimal preco, DateTime data, decimal alvo, decimal calculado)
+        => new()
+        {
+            AssetId = ativo.Id,
+            Asset = ativo,
+            OperationType = tipo,
+            Quantity = qtd,
+            UnitPrice = preco,
+            GrossAmount = qtd * preco,
+            Date = data,
+            Fonte = "Reconciliação",
+            IsCanonical = true,
+            RawJson = System.Text.Json.JsonSerializer.Serialize(new { Alvo = alvo, Calculado = calculado, PrecoMedio = preco })
+        };
+
     private static RendimentoInvestimento Provento(AtivoFinanceiro ativo, decimal valor, string fonte, DateTime pagamento)
         => new()
         {

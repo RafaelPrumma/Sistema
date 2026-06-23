@@ -17,7 +17,8 @@
     importacao: document.getElementById('financeImportacaoIsland'),
     posicoes: document.getElementById('financePosicoesIsland'),
     alertas: document.getElementById('financeAlertasIsland'),
-    proventos: document.getElementById('financeProventosIsland')
+    proventos: document.getElementById('financeProventosIsland'),
+    reconciliacao: document.getElementById('financeReconciliacaoIsland')
   };
 
   let proventosChart = null;
@@ -358,6 +359,7 @@
     await Promise.allSettled([
       loadPatrimonio(),
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
+      loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
       loadPartial(islands.alertas, dashboard.dataset.alertasUrl),
