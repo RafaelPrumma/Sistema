@@ -307,7 +307,10 @@ public record FinancasPatrimonioDto(
     EvolucaoPatrimonioDto Evolucao);
 
 public record FinancasCarteirasDto(
-    IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras);
+    IReadOnlyList<CarteiraFinanceiraResumoDto> Carteiras,
+    // F-O: cripto ainda não tem saldo de abertura/snapshot real da Binance (ver cripto.spec.md F2).
+    // Quando há posição cripto, sinalizamos "parcialmente reconciliado" — honestidade > número cego.
+    bool CriptoParcialmenteReconciliada = false);
 
 public record FinancasImportacaoDto(
     IReadOnlyList<FinanceiroKpiDto> Kpis,

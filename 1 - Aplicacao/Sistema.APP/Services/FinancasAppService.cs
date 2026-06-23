@@ -53,7 +53,12 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
         var valorMercadoTotal = ativos.Sum(x => x.ValorMercado);
 
-        return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal));
+        // F-O: cripto não tem snapshot/saldo real importado (a Binance não tem aba "Posição" como a B3),
+        // então a posição cripto ainda depende do netting do ledger (cripto.spec.md F2 em aberto).
+        // Sinaliza "parcialmente reconciliado" sempre que houver posição cripto detida.
+        var criptoParcial = posicoes.Any(p => p.Asset.IsCrypto);
+
+        return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal), criptoParcial);
     }
 
     public async Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default)

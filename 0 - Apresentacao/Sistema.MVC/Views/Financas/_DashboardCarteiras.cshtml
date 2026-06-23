@@ -121,6 +121,19 @@
                     <i class="bi bi-list-ul me-1"></i>Ver transações
                 </a>
             </div>
+            @* F-O: a Binance não fornece snapshot de custódia (como a aba Posição da B3), então a posição
+               cripto ainda vem só do netting do ledger e pode estar incompleta (ver cripto.spec.md F2). *@
+            @if (Model.CriptoParcialmenteReconciliada)
+            {
+                <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 small mb-3" role="status">
+                    <i class="bi bi-exclamation-triangle mt-1"></i>
+                    <div>
+                        <strong>Cripto parcialmente reconciliada.</strong>
+                        Ainda não há saldo de abertura/snapshot real da Binance — a posição de cripto é
+                        calculada pelo netting do extrato e pode divergir da corretora (ex.: saldo em Earn).
+                    </div>
+                </div>
+            }
             <div class="table-responsive">
                 <table class="table table-sm align-middle finance-assets">
                     <thead>

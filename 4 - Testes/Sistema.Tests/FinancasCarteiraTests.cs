@@ -270,6 +270,29 @@ public class FinancasCarteiraTests
         Assert.Equal(100m, dto.PorFonte.Sum(x => x.Percentual), 0);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CarteirasDashboardSinalizaCriptoParcialmenteReconciliadaQuandoHaPosicaoCripto(bool comCripto)
+    {
+        var acao = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "BB", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        var btc = new AtivoFinanceiro { Id = 2, AssetKey = "BTC", Ticker = "BTC", Name = "Bitcoin", AssetClass = ClasseAtivo.Cripto, IsCrypto = true, Market = "Binance" };
+
+        var transacoes = new List<TransacaoFinanceira> { Compra(acao, 10m, 20m, new DateTime(2026, 1, 10)) };
+        if (comCripto)
+            transacoes.Add(Compra(btc, 0.05m, 200000m, new DateTime(2026, 1, 10)));
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCarteirasComAtivosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterCarteirasDashboardAsync();
+
+        Assert.Equal(comCripto, dto.CriptoParcialmenteReconciliada);
+    }
+
     private static RendimentoInvestimento Provento(AtivoFinanceiro ativo, decimal valor, string fonte, DateTime pagamento)
         => new()
         {
