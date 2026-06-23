@@ -211,6 +211,13 @@ public class CarteiraFinanceira : AuditableEntity
     public bool IsSistema { get; set; }
     public bool Ativo { get; set; } = true;
     public int Ordem { get; set; }
+
+    // Hierarquia (F-I): carteira-topo tem ParentId nulo; subcarteira aponta para a topo.
+    // Self-FK nullable, OnDelete restrict (ver CarteiraFinanceiraMap).
+    public int? ParentId { get; set; }
+    public CarteiraFinanceira? Parent { get; set; }
+    public ICollection<CarteiraFinanceira> Filhas { get; set; } = new List<CarteiraFinanceira>();
+
     public ICollection<CarteiraAtivoFinanceiro> Ativos { get; set; } = new List<CarteiraAtivoFinanceiro>();
 }
 
