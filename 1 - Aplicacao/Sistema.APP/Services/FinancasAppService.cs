@@ -1122,9 +1122,15 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
                 var precoAtual = cotacao is { PriceBRL: > 0m } ? cotacao.PriceBRL : (decimal?)null;
                 var custo = pos.Custo;
+                // F-D/F-J: sem cotação utilizável (ação B3 sem token Brapi, cripto sem preço) o valor de
+                // mercado cai no CUSTO (preço médio) — piso consistente, nunca 0 para ativo detido. Sem
+                // isso a carteira inteira aparecia zerada. Não inventa cotação: custo é só piso.
                 var valorMercado = precoAtual.HasValue ? pos.Quantidade * precoAtual.Value : custo;
                 var resultado = valorMercado - custo;
                 var percentual = custo == 0m ? 0m : resultado / custo * 100m;
+                // Status só reflete cotação viva quando o preço foi de fato usado; senão sinaliza
+                // "SemCotacao" (cobre também a cotação obsoleta/erro com PriceBRL <= 0).
+                var status = precoAtual.HasValue ? (cotacao?.Status.ToString() ?? "SemCotacao") : "SemCotacao";
 
                 return new CotacaoAtivoDto(
                     asset.Id,
@@ -1138,9 +1144,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     custo,
                     resultado,
                     percentual,
-                    cotacao?.ChangePercent,
+                    precoAtual.HasValue ? cotacao?.ChangePercent : null,
                     cotacao?.RetrievedAt,
-                    cotacao?.Status.ToString() ?? "SemCotacao",
+                    status,
                     "Calculada");
             })
             .OrderByDescending(x => x.ValorMercado)
