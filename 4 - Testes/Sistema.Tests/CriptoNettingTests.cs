@@ -160,6 +160,76 @@ public class CriptoNettingTests
     }
 
     [Fact]
+    public void LinhasLegitimasDuplicadas_DoLedger_NaoColapsam()
+    {
+        // §11: o ledger da Binance pode ter linhas LEGÍTIMAS iguais — mesmo timestamp, moeda, operação e
+        // quantidade (caso real: USDT). Cada linha é um staging distinto (id). O netting NÃO deduplica por
+        // ativo/qtd/op → as duas linhas viram dois movimentos canônicos (com SourceStagingId distintos,
+        // que alimentam a chave natural por staging "BinanceLedger|TransacaoCripto|{StagingId}").
+        var movimentos = CriptoNetting.Netar(new[]
+        {
+            Bruto("USDT", "Binance Convert", -55.3525m, 1),
+            Bruto("USDT", "Binance Convert", -55.3525m, 2)
+        });
+
+        Assert.Equal(2, movimentos.Count);
+        Assert.All(movimentos, m => Assert.Equal(TipoOperacaoFinanceira.Venda, m.OperationType));
+        Assert.All(movimentos, m => Assert.Equal(55.3525m, m.Quantity));
+        // Os dois movimentos têm SourceStagingId distintos → chaves naturais distintas (não colapsam).
+        Assert.Equal(2, movimentos.Select(m => m.SourceStagingId).Distinct().Count());
+    }
+
+    [Fact]
+    public void Usdt_QueFechaEmZero_MaterializaTodasAsPernas_SemSaldoFantasma()
+    {
+        // Cenário USDT do §11: o ledger bruto fecha em zero (entradas = saídas), inclusive com pernas
+        // LEGÍTIMAS idênticas. Todas as pernas precisam materializar (entradas e saídas) para o saldo
+        // líquido bater em zero — colapsar as duplicatas deixaria saldo fantasma.
+        var movimentos = CriptoNetting.Netar(new[]
+        {
+            Bruto("USDT", "Buy Crypto With Fiat", 100m, 1),
+            Bruto("USDT", "Binance Convert", -55.3525m, 2),
+            Bruto("USDT", "Binance Convert", -55.3525m, 3), // duplicata legítima da anterior
+            Bruto("USDT", "Simple Earn Flexible Interest", 10.705m, 4)
+        });
+
+        // Todas as 4 pernas viram movimento (nenhuma é colapsada/descartada por chave natural).
+        Assert.Equal(4, movimentos.Count);
+        Assert.Equal(4, movimentos.Select(m => m.SourceStagingId).Distinct().Count());
+
+        // Saldo líquido: +100 -55.3525 -55.3525 +10.705 = 0 → sem fantasma e sem negativo.
+        var saldo = movimentos.Sum(m => m.OperationType == TipoOperacaoFinanceira.Venda ? -m.Quantity : m.Quantity);
+        Assert.Equal(0m, saldo);
+    }
+
+    [Fact]
+    public void StablecoinsUsdtUsdcFdusd_SaoCripto_NaoFiat()
+    {
+        // §11: USDT/USDC/FDUSD continuam sendo cripto (netam normalmente), não fiat — só somem da
+        // carteira quando a posição líquida zera (coberto pelo teste acima).
+        Assert.False(CriptoNetting.EhFiat("USDT"));
+        Assert.False(CriptoNetting.EhFiat("USDC"));
+        Assert.False(CriptoNetting.EhFiat("FDUSD"));
+
+        var movimentos = CriptoNetting.Netar(new[]
+        {
+            Bruto("USDC", "Binance Convert", -10m, 1),
+            Bruto("FDUSD", "Binance Convert", 10m, 2)
+        });
+        Assert.Equal(TipoOperacaoFinanceira.Venda, Assert.Single(movimentos, m => m.AssetSymbol == "USDC").OperationType);
+        Assert.Equal(TipoOperacaoFinanceira.Compra, Assert.Single(movimentos, m => m.AssetSymbol == "FDUSD").OperationType);
+    }
+
+    [Fact]
+    public void StakingPurchase_NaoEhRendimento_EhPermuta()
+    {
+        // §11: WBETH2.0 - Staking e SOL Staking - Purchase são permutas de staking (abatem ETH/SOL,
+        // aumentam WBETH/BNSOL), NÃO rendimento.
+        Assert.Equal(CategoriaCripto.Permuta, CriptoNetting.Classificar("WBETH2.0 - Staking"));
+        Assert.Equal(CategoriaCripto.Permuta, CriptoNetting.Classificar("SOL Staking - Purchase"));
+    }
+
+    [Fact]
     public void ChangeZeroOuSimboloVazio_NaoGeramMovimento()
     {
         var movimentos = CriptoNetting.Netar(new[]

@@ -293,7 +293,11 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
     // Versão da regra de materialização. Ao incrementar, o resync apaga as transações de
     // importação e refaz a partir do staging com a regra nova (corrige cargas antigas sozinho).
-    private const int MaterializacaoVersao = 11;
+    // 11→12 (jun/2026, §11): cripto deixa de deduplicar pela chave natural ativo/data/qtd/preço e
+    // passa a usar chave por linha de staging ("BinanceLedger|TransacaoCripto|{StagingId}"). Linhas
+    // legítimas idênticas do ledger Binance (caso USDT, que fecha em zero) não colapsam mais → o
+    // resync re-materializa a cripto sem o saldo fantasma em FinanceiroPosicaoAtivo.
+    private const int MaterializacaoVersao = 12;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -552,10 +556,16 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 estoque[assetId] = (novaQtd, novoCusto);
             }
 
-            var chaveNatural = mov.Timestamp.HasValue
-                ? GerarChaveNatural(CriptoNetting.Fonte, assetId, mov.Timestamp.Value, mov.OperationType, mov.Quantity, preco)
-                : null;
-            if (chaveNatural != null && !chavesNaturais.Add(chaveNatural))
+            // Chave natural BASEADA NO STAGING (não em ativo/data/op/qtd/preço). O ledger da Binance
+            // ("Histórico de Transações") tem linhas LEGÍTIMAS idênticas — mesmo timestamp, moeda,
+            // operação e quantidade (caso real: USDT, cujo ledger fecha em zero). Deduplicar pela chave
+            // ativo/data/qtd/preço (GerarChaveNatural) colapsava essas duplicatas legítimas e deixava
+            // saldo fantasma em FinanceiroPosicaoAtivo. A dedup correta do ledger cripto é POR LINHA de
+            // staging — cada TransacaoCripto é única — e o DuplicateGroupKey ("TransacaoCripto#{StagingId}")
+            // já garante a idempotência por re-materialização. A dedup cross-source por chave natural não é
+            // necessária aqui: o netting usa fonte única do .xlsx ("Histórico de Transações").
+            var chaveNatural = $"BinanceLedger|TransacaoCripto|{mov.SourceStagingId}";
+            if (!chavesNaturais.Add(chaveNatural))
                 continue;
 
             novas.Add(new TransacaoFinanceira
