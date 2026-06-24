@@ -71,6 +71,22 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var ultimaImportacao = await _uow.Financas.ObterUltimaImportacaoArquivoAsync(cancellationToken);
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
 
+        // F-L(b): rastreabilidade dos arquivos por fonte/status. À prova de falha (roda no load do
+        // dashboard): qualquer erro na agregação devolve lista vazia/null, sem derrubar a ilha.
+        IReadOnlyList<RastreabilidadeFonteDto> fontes = [];
+        RastreabilidadeB3Dto? rastreabilidadeB3 = null;
+        try
+        {
+            var rastreaveis = await _uow.Financas.BuscarRastreabilidadeDocumentosAsync(cancellationToken);
+            fontes = CriarRastreabilidadeFontes(rastreaveis);
+            rastreabilidadeB3 = CriarRastreabilidadeB3(rastreaveis);
+        }
+        catch
+        {
+            fontes = [];
+            rastreabilidadeB3 = null;
+        }
+
         return new FinancasImportacaoDto(
             CriarKpis(carga),
             new ImportacaoFinanceiraResumoDto(
@@ -79,8 +95,171 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Processado or StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
                 documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
                 ultimaImportacao?.SourceFolder),
-            cotacoes.OrderByDescending(x => x.ConsultadoEm).Select(x => (DateTime?)x.ConsultadoEm).FirstOrDefault());
+            cotacoes.OrderByDescending(x => x.ConsultadoEm).Select(x => (DateTime?)x.ConsultadoEm).FirstOrDefault(),
+            fontes,
+            rastreabilidadeB3);
     }
+
+    // F-L(b): agrupa os documentos por fonte amigável (B3 / Nubank / Binance / IR / Outros) e resume o
+    // status de parse de cada grupo + os documentos com tipo, período e contagem de linhas/abas/alertas.
+    private static IReadOnlyList<RastreabilidadeFonteDto> CriarRastreabilidadeFontes(IReadOnlyList<RastreabilidadeDocumentoProjecao> docs)
+    {
+        if (docs.Count == 0)
+            return [];
+
+        return docs
+            .GroupBy(FonteDoDocumento)
+            .Select(g =>
+            {
+                var itens = g
+                    .Select(d => new RastreabilidadeDocumentoDto(
+                        d.FileName,
+                        RotuloTipoDocumento(d.DocumentKind),
+                        PeriodoDoDocumento(d),
+                        RotuloParse(d.ParseStatus),
+                        RotuloStatus(d.Status),
+                        d.LinhasLidas,
+                        d.Abas,
+                        d.Alertas))
+                    .OrderByDescending(x => x.Periodo, StringComparer.Ordinal)
+                    .ThenBy(x => x.Arquivo, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new RastreabilidadeFonteDto(
+                    g.Key,
+                    g.Count(),
+                    g.Count(d => d.ParseStatus == StatusParseDocumentoFinanceiro.Processado),
+                    g.Count(d => d.ParseStatus == StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
+                    g.Count(d => d.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
+                    g.Sum(d => d.LinhasLidas),
+                    g.Sum(d => d.Alertas),
+                    itens);
+            })
+            .OrderBy(x => OrdemFonte(x.Fonte))
+            .ThenBy(x => x.Fonte, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    // F-L(b): saúde da custódia B3 — último período de extrato consolidado (a Posição mais recente usada
+    // na reconciliação) + meses faltantes na série mensal (extratos não contíguos).
+    private static RastreabilidadeB3Dto? CriarRastreabilidadeB3(IReadOnlyList<RastreabilidadeDocumentoProjecao> docs)
+    {
+        var periodos = docs
+            .Where(d => d.DocumentKind == TipoDocumentoFinanceiro.ExtratoConsolidadoB3)
+            .Select(d => ExtrairReferencePeriod(d.RawMetadataJson))
+            .Where(p => p is not null)
+            .Select(p => p!)
+            .Distinct()
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
+
+        if (periodos.Count == 0)
+            return null;
+
+        var primeiro = periodos[0];
+        var ultimo = periodos[^1];
+        var faltantes = MesesEntre(primeiro, ultimo)
+            .Where(m => !periodos.Contains(m))
+            .ToList();
+
+        return new RastreabilidadeB3Dto(ultimo, primeiro, periodos.Count, faltantes);
+    }
+
+    // Gera a série de "yyyy-MM" entre dois períodos (inclusive) para detectar lacunas; entradas inválidas
+    // resultam em série vazia (à prova de falha).
+    private static IEnumerable<string> MesesEntre(string inicio, string fim)
+    {
+        if (!TentarParsearPeriodo(inicio, out var atual) || !TentarParsearPeriodo(fim, out var ultimo))
+            yield break;
+
+        while (atual <= ultimo)
+        {
+            yield return $"{atual.Year:D4}-{atual.Month:D2}";
+            atual = atual.AddMonths(1);
+        }
+    }
+
+    private static bool TentarParsearPeriodo(string periodo, out DateTime data)
+        => DateTime.TryParseExact(periodo, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out data);
+
+    private static string? ExtrairReferencePeriod(string? rawMetadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawMetadataJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(rawMetadataJson);
+            return doc.RootElement.TryGetProperty("referencePeriod", out var p) && p.ValueKind == JsonValueKind.String
+                ? p.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    // Período exibido: referencePeriod (yyyy-MM) quando o documento tem (ex.: extrato B3); senão o ano.
+    private static string? PeriodoDoDocumento(RastreabilidadeDocumentoProjecao d)
+        => ExtrairReferencePeriod(d.RawMetadataJson) ?? (d.ReferenceYear.HasValue ? d.ReferenceYear.Value.ToString(CultureInfo.InvariantCulture) : null);
+
+    // DocumentKind → fonte amigável (grupo da ilha).
+    private static string FonteDoDocumento(RastreabilidadeDocumentoProjecao d) => d.DocumentKind switch
+    {
+        TipoDocumentoFinanceiro.ExtratoConsolidadoB3 or TipoDocumentoFinanceiro.NotaNegociacaoB3 => "B3",
+        TipoDocumentoFinanceiro.ExtratoInvestimentosNubank or TipoDocumentoFinanceiro.ExtratoContaNubank => "Nubank",
+        TipoDocumentoFinanceiro.BinanceTransactions or TipoDocumentoFinanceiro.BinanceSpotTrades
+            or TipoDocumentoFinanceiro.BinanceSpotOrders or TipoDocumentoFinanceiro.BinanceConvertOrders
+            or TipoDocumentoFinanceiro.BinanceDeposits or TipoDocumentoFinanceiro.CsvBinance => "Binance",
+        TipoDocumentoFinanceiro.InformeRendimentos => "Informe IR",
+        _ => "Outros"
+    };
+
+    private static int OrdemFonte(string fonte) => fonte switch
+    {
+        "B3" => 0,
+        "Nubank" => 1,
+        "Binance" => 2,
+        "Informe IR" => 3,
+        _ => 4
+    };
+
+    // DocumentKind → rótulo do tipo de documento (linha da tabela).
+    private static string RotuloTipoDocumento(TipoDocumentoFinanceiro kind) => kind switch
+    {
+        TipoDocumentoFinanceiro.ExtratoConsolidadoB3 => "B3 Extrato",
+        TipoDocumentoFinanceiro.NotaNegociacaoB3 => "Nota B3",
+        TipoDocumentoFinanceiro.ExtratoInvestimentosNubank => "Nubank Investimentos",
+        TipoDocumentoFinanceiro.ExtratoContaNubank => "Nubank Conta",
+        TipoDocumentoFinanceiro.BinanceTransactions => "Binance Transações",
+        TipoDocumentoFinanceiro.BinanceSpotTrades => "Binance Spot Trades",
+        TipoDocumentoFinanceiro.BinanceSpotOrders => "Binance Spot Orders",
+        TipoDocumentoFinanceiro.BinanceConvertOrders => "Binance Convert",
+        TipoDocumentoFinanceiro.BinanceDeposits => "Binance Depósitos",
+        TipoDocumentoFinanceiro.CsvBinance => "Binance CSV",
+        TipoDocumentoFinanceiro.InformeRendimentos => "Informe IR",
+        TipoDocumentoFinanceiro.JsonConsolidado => "JSON Consolidado",
+        _ => "Desconhecido"
+    };
+
+    private static string RotuloParse(StatusParseDocumentoFinanceiro status) => status switch
+    {
+        StatusParseDocumentoFinanceiro.Processado => "Processado",
+        StatusParseDocumentoFinanceiro.ParcialmenteProcessado => "Parcial",
+        StatusParseDocumentoFinanceiro.SemDadosEstruturados => "Sem dados",
+        StatusParseDocumentoFinanceiro.Falhou => "Falhou",
+        _ => "Pendente"
+    };
+
+    private static string RotuloStatus(StatusDocumentoFinanceiro status) => status switch
+    {
+        StatusDocumentoFinanceiro.Processado => "Processado",
+        StatusDocumentoFinanceiro.ParcialmenteProcessado => "Parcial",
+        StatusDocumentoFinanceiro.Falhou => "Falhou",
+        StatusDocumentoFinanceiro.PendenteValidacao => "Pendente",
+        _ => "Importado"
+    };
 
     // F-L — "Posições calculadas vs custódia". À prova de falha (roda no load): erro → DTO vazio.
     // (a) composição do valor por fonte do preço; (c) posição calculada × fechamento B3 + diferença.

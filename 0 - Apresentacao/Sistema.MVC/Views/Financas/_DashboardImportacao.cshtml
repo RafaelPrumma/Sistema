@@ -4,6 +4,17 @@
 @{
     var br = CultureInfo.GetCultureInfo("pt-BR");
     string Money(decimal value) => value.ToString("C", br);
+    var fontes = Model.RastreabilidadeFontes ?? new List<RastreabilidadeFonteDto>();
+    var b3 = Model.RastreabilidadeB3;
+    // Status de parse → cor do chip.
+    string ParseClasse(string status) => status switch
+    {
+        "Processado" => "text-bg-success",
+        "Parcial" => "text-bg-warning",
+        "Falhou" => "text-bg-danger",
+        "Sem dados" => "text-bg-secondary",
+        _ => "text-bg-light"
+    };
 }
 
 <div class="card finance-data-section" data-aos="fade-up" data-aos-duration="220">
@@ -35,10 +46,7 @@
                 </div>
             </div>
 
-            @* F-L (b) TODO: detalhar arquivos por fonte/status (B3/Nubank/Binance/IR: processados/parciais/
-               falhos, período, duplicados ignorados, linhas lidas). Requer novas queries de agregação por
-               DocumentKind/ParseStatus no repositório — deixado como próximo passo. *@
-            <div class="row g-3">
+            <div class="row g-3 mb-3">
             @foreach (var kpi in Model.Kpis)
             {
                 <div class="col-md-6 col-xl-3">
@@ -52,6 +60,95 @@
                 </div>
             }
             </div>
+
+            @* F-L (b): saúde da custódia B3 — última Posição usada + lacunas na série de extratos. *@
+            @if (b3 is not null)
+            {
+                <div class="alert @(b3.MesesFaltantes.Count == 0 ? "alert-success" : "alert-warning") d-flex flex-wrap gap-3 align-items-center py-2">
+                    <span><i class="bi bi-bank me-1"></i><strong>Custódia B3</strong></span>
+                    <span class="small">Última Posição: <strong>@(b3.UltimoPeriodoPosicao ?? "—")</strong></span>
+                    <span class="small">Extratos importados: <strong>@b3.ExtratosImportados.ToString("N0", br)</strong> (desde @(b3.PrimeiroPeriodoExtrato ?? "—"))</span>
+                    @if (b3.MesesFaltantes.Count == 0)
+                    {
+                        <span class="small"><i class="bi bi-check-circle me-1"></i>Série mensal contígua</span>
+                    }
+                    else
+                    {
+                        <span class="small"><i class="bi bi-exclamation-triangle me-1"></i>Meses faltantes (@b3.MesesFaltantes.Count): @string.Join(", ", b3.MesesFaltantes)</span>
+                    }
+                </div>
+            }
+
+            @* F-L (b): rastreabilidade dos arquivos por fonte/status (B3 / Nubank / Binance / IR / Outros). *@
+            @if (fontes.Count == 0)
+            {
+                <div class="text-secondary small"><i class="bi bi-info-circle me-1"></i>Nenhum arquivo importado para rastrear ainda.</div>
+            }
+            else
+            {
+                <div class="row g-3">
+                @foreach (var fonte in fontes)
+                {
+                    <div class="col-12 col-xl-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">@fonte.Fonte</h6>
+                                    <span class="small text-secondary">@fonte.Documentos.ToString("N0", br) doc(s) &middot; @fonte.LinhasLidas.ToString("N0", br) linhas</span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    <span class="badge text-bg-success" title="Documentos processados">@fonte.Processados processados</span>
+                                    @if (fonte.Parciais > 0)
+                                    {
+                                        <span class="badge text-bg-warning" title="Processados parcialmente">@fonte.Parciais parciais</span>
+                                    }
+                                    @if (fonte.Falhos > 0)
+                                    {
+                                        <span class="badge text-bg-danger" title="Falha de parse / sem dados estruturados">@fonte.Falhos falhos</span>
+                                    }
+                                    @if (fonte.Alertas > 0)
+                                    {
+                                        <span class="badge text-bg-secondary" title="Alertas de confiabilidade ligados a estes documentos (duplicados/erros)"><i class="bi bi-flag me-1"></i>@fonte.Alertas alertas</span>
+                                    }
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Documento</th>
+                                                <th>Período</th>
+                                                <th>Parse</th>
+                                                <th class="text-end">Abas/Linhas</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach (var doc in fonte.Itens)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold text-truncate" style="max-width: 260px;" title="@doc.Arquivo">@doc.Arquivo</div>
+                                                    <div class="small text-secondary">@doc.Tipo</div>
+                                                </td>
+                                                <td><span class="small">@(doc.Periodo ?? "—")</span></td>
+                                                <td>
+                                                    <span class="badge @ParseClasse(doc.StatusParse)">@doc.StatusParse</span>
+                                                    @if (doc.Alertas > 0)
+                                                    {
+                                                        <span class="badge text-bg-secondary ms-1" title="@doc.Alertas alerta(s) de confiabilidade"><i class="bi bi-flag"></i> @doc.Alertas</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end small text-secondary">@doc.Abas.ToString("N0", br) / @doc.LinhasLidas.ToString("N0", br)</td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                </div>
+            }
         </div>
     </div>
 </div>

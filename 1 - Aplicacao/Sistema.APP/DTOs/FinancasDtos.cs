@@ -318,7 +318,42 @@ public record FinancasCarteirasDto(
 public record FinancasImportacaoDto(
     IReadOnlyList<FinanceiroKpiDto> Kpis,
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,
-    DateTime? CotacoesAtualizadasEm);
+    DateTime? CotacoesAtualizadasEm,
+    // F-L(b): rastreabilidade dos arquivos por fonte/status + saúde da custódia B3.
+    IReadOnlyList<RastreabilidadeFonteDto> RastreabilidadeFontes = null!,
+    RastreabilidadeB3Dto? RastreabilidadeB3 = null);
+
+// F-L(b): um documento importado, com o que dá para rastrear dele (tipo, período, status, linhas/abas
+// lidas e nº de sinais de alerta/erro/duplicidade ligados ao documento).
+public record RastreabilidadeDocumentoDto(
+    string Arquivo,
+    string Tipo,            // rótulo do DocumentKind (ex.: "B3 Extrato", "Nota Nubank")
+    string? Periodo,        // referencePeriod (yyyy-MM) quando houver; senão o ano de referência
+    string StatusParse,     // rótulo amigável do ParseStatus
+    string Status,          // rótulo amigável do Status
+    int LinhasLidas,
+    int Abas,
+    int Alertas);
+
+// F-L(b): resumo de uma fonte (B3 / Nubank / Binance / IR / Outros) com a contagem por status de parse
+// e a lista de documentos. "Parciais"/"Falhos" sinalizam o que não entrou inteiro.
+public record RastreabilidadeFonteDto(
+    string Fonte,
+    int Documentos,
+    int Processados,
+    int Parciais,
+    int Falhos,
+    int LinhasLidas,
+    int Alertas,
+    IReadOnlyList<RastreabilidadeDocumentoDto> Itens);
+
+// F-L(b): saúde da custódia B3 — última Posição usada na reconciliação (período do snapshot) e meses
+// faltantes entre o primeiro e o último extrato consolidado (lacunas na série mensal).
+public record RastreabilidadeB3Dto(
+    string? UltimoPeriodoPosicao,        // maior referencePeriod entre os extratos B3 (yyyy-MM)
+    string? PrimeiroPeriodoExtrato,
+    int ExtratosImportados,
+    IReadOnlyList<string> MesesFaltantes);
 
 public record ProventoTopPagadorDto(
     string Ticker,

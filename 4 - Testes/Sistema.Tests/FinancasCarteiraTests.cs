@@ -392,6 +392,56 @@ public class FinancasCarteiraTests
         Assert.Null(petrDto.DiferencaB3);
     }
 
+    [Fact]
+    public async Task ImportacaoDashboardDeveAgruparArquivosPorFonteEStatus()
+    {
+        // 2 extratos B3 (jan e mar/2026, com fev faltando → lacuna), 1 nota Nubank parcial, 1 Binance falho com alerta,
+        // 1 informe IR. RawMetadata do B3 carrega referencePeriod; demais usam ReferenceYear.
+        string Meta(string periodo) => System.Text.Json.JsonSerializer.Serialize(new { referencePeriod = periodo });
+        var docs = new List<RastreabilidadeDocumentoProjecao>
+        {
+            new(1, "b3-2026-01.xlsx", TipoDocumentoFinanceiro.ExtratoConsolidadoB3, StatusParseDocumentoFinanceiro.Processado, StatusDocumentoFinanceiro.Processado, 2026, Meta("2026-01"), LinhasLidas: 120, Abas: 6, Alertas: 0),
+            new(2, "b3-2026-03.xlsx", TipoDocumentoFinanceiro.ExtratoConsolidadoB3, StatusParseDocumentoFinanceiro.Processado, StatusDocumentoFinanceiro.Processado, 2026, Meta("2026-03"), LinhasLidas: 130, Abas: 6, Alertas: 0),
+            new(3, "nota-nubank.pdf", TipoDocumentoFinanceiro.ExtratoInvestimentosNubank, StatusParseDocumentoFinanceiro.ParcialmenteProcessado, StatusDocumentoFinanceiro.ParcialmenteProcessado, 2025, "{}", LinhasLidas: 8, Abas: 0, Alertas: 0),
+            new(4, "binance.xlsx", TipoDocumentoFinanceiro.BinanceTransactions, StatusParseDocumentoFinanceiro.Falhou, StatusDocumentoFinanceiro.Falhou, 2024, "{}", LinhasLidas: 0, Abas: 0, Alertas: 2),
+            new(5, "informe-ir.pdf", TipoDocumentoFinanceiro.InformeRendimentos, StatusParseDocumentoFinanceiro.Processado, StatusDocumentoFinanceiro.Processado, 2025, "{}", LinhasLidas: 15, Abas: 0, Alertas: 0)
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.ObterCargaMaisRecenteAsync(It.IsAny<CancellationToken>())).ReturnsAsync((CargaFinanceira?)null);
+        repo.Setup(r => r.BuscarDocumentosMonitoradosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.ObterUltimaImportacaoArquivoAsync(It.IsAny<CancellationToken>())).ReturnsAsync((ImportacaoFinanceiraArquivo?)null);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarRastreabilidadeDocumentosAsync(It.IsAny<CancellationToken>())).ReturnsAsync(docs);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterImportacaoDashboardAsync();
+
+        var fontes = dto.RastreabilidadeFontes.ToDictionary(x => x.Fonte);
+        Assert.Equal(4, dto.RastreabilidadeFontes.Count); // B3, Nubank, Binance, Informe IR
+        // B3 vem primeiro (ordem de fonte) e soma 2 docs/250 linhas processados.
+        Assert.Equal("B3", dto.RastreabilidadeFontes[0].Fonte);
+        Assert.Equal(2, fontes["B3"].Documentos);
+        Assert.Equal(2, fontes["B3"].Processados);
+        Assert.Equal(250, fontes["B3"].LinhasLidas);
+        // Nubank: 1 parcial.
+        Assert.Equal(1, fontes["Nubank"].Parciais);
+        Assert.Equal(0, fontes["Nubank"].Processados);
+        // Binance: 1 falho com 2 alertas.
+        Assert.Equal(1, fontes["Binance"].Falhos);
+        Assert.Equal(2, fontes["Binance"].Alertas);
+        // Período do extrato B3 sai como referencePeriod; nota Nubank cai no ano.
+        Assert.Contains(fontes["B3"].Itens, i => i.Periodo == "2026-03" && i.Tipo == "B3 Extrato");
+        Assert.Contains(fontes["Nubank"].Itens, i => i.Periodo == "2025");
+
+        // Custódia B3: última posição = 2026-03; fev/2026 faltando entre jan e mar.
+        Assert.NotNull(dto.RastreabilidadeB3);
+        Assert.Equal("2026-03", dto.RastreabilidadeB3!.UltimoPeriodoPosicao);
+        Assert.Equal("2026-01", dto.RastreabilidadeB3.PrimeiroPeriodoExtrato);
+        Assert.Equal(2, dto.RastreabilidadeB3.ExtratosImportados);
+        Assert.Equal(["2026-02"], dto.RastreabilidadeB3.MesesFaltantes);
+    }
+
     private static TransacaoFinanceira Reconciliacao(AtivoFinanceiro ativo, TipoOperacaoFinanceira tipo, decimal qtd, decimal preco, DateTime data, decimal alvo, decimal calculado)
         => new()
         {

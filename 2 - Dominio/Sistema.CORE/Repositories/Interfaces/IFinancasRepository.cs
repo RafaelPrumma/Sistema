@@ -34,6 +34,9 @@ public interface IFinancasRepository
     Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CarteiraFinanceira>> BuscarCarteirasComAtivosAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default);
+    // F-L(b): rastreabilidade dos arquivos importados (kind/parse/status + contagem de abas/linhas lidas
+    // de ConteudoBruto + nº de alertas por documento). Agregação por fonte/status fica na camada APP.
+    Task<IReadOnlyList<RastreabilidadeDocumentoProjecao>> BuscarRastreabilidadeDocumentosAsync(CancellationToken cancellationToken = default);
     Task<ImportacaoFinanceiraArquivo?> ObterUltimaImportacaoArquivoAsync(CancellationToken cancellationToken = default);
 
     // Tabela única de transações (fonte de verdade): importação materializada + lançamentos manuais.

@@ -225,6 +225,34 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .OrderByDescending(x => x.DataInclusao)
             .ToListAsync(cancellationToken);
 
+    // F-L(b): rastreabilidade por documento. Conta linhas/abas de ConteudoBruto e alertas em SQL (subquery
+    // correlacionada por DocumentoFinanceiroId / EntityType+EntityId); o RawMetadataJson volta cru para o
+    // serviço derivar fonte/período. Mesmo filtro de BuscarDocumentosMonitoradosAsync (só pasta monitorada).
+    public async Task<IReadOnlyList<RastreabilidadeDocumentoProjecao>> BuscarRastreabilidadeDocumentosAsync(CancellationToken cancellationToken = default)
+    {
+        var tipoDocumento = nameof(DocumentoFinanceiro);
+        return await _context.DocumentosFinanceiros
+            .AsNoTracking()
+            .Where(x => x.ImportacaoFinanceiraArquivoId != null)
+            .OrderByDescending(x => x.DataInclusao)
+            .Select(x => new RastreabilidadeDocumentoProjecao(
+                x.Id,
+                x.FileName,
+                x.DocumentKind,
+                x.ParseStatus,
+                x.Status,
+                x.ReferenceYear,
+                x.RawMetadataJson,
+                _context.ConteudosBrutosFinanceiros.Count(c => c.DocumentoFinanceiroId == x.Id),
+                _context.ConteudosBrutosFinanceiros
+                    .Where(c => c.DocumentoFinanceiroId == x.Id && c.SheetName != null)
+                    .Select(c => c.SheetName)
+                    .Distinct()
+                    .Count(),
+                _context.AlertasConfiabilidade.Count(a => a.EntityType == tipoDocumento && a.EntityId == x.Id)))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<ImportacaoFinanceiraArquivo?> ObterUltimaImportacaoArquivoAsync(CancellationToken cancellationToken = default)
         => _context.ImportacoesFinanceirasArquivo
             .AsNoTracking()
