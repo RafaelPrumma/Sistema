@@ -14,6 +14,7 @@ Importação (notas/Binance), posição/preço médio (`CalcularPosicoes`), prov
 - Nomes fisicos das tabelas principais permanecem: `FinanceiroAtivo`, `FinanceiroCarteira`, `FinanceiroCarteiraAtivo`, `FinanceiroCotacaoAtivo`, `FinanceiroPosicaoEstimativa`.
 - Campos padronizados em PT-BR: `Chave`, `Sigla`, `Nome`, `Classe`, `Mercado`, `Moeda`, `EhCripto`, `Ativo`, `PapelConceitual`, `CarteiraPaiId`, `CarteiraPai`, `EhSistema`, `AtivoFinanceiroId`, `AtivoFinanceiro`, `Simbolo`, `Preco`, `PrecoBRL`, `Variacao`, `VariacaoPercentual`, `HorarioMercado`, `ConsultadoEm`, `ExpiraEm`, `MensagemErro`, `Quantidade`, `PrecoMedio`, `TotalInvestido`, `TotalVendido`, `ResultadoRealizado`, `PosicaoAtualEstimada`, `NivelConfianca`, `UltimaOperacaoEm`.
 - `Slug` fica em ingles por ser identificador tecnico estavel para URL/chave interna.
+- O card Carteiras depende de `FinanceiroPosicaoAtivo`; hotfixes de dados devem preservar `FinanceiroTransacao` como fonte auditavel e depois recalcular ou ajustar explicitamente a projecao.
 
 ## Features
 
