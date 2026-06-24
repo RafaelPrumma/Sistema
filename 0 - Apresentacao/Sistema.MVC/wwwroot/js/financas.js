@@ -176,10 +176,17 @@
     };
   }
 
+  function corAportes() { return cssVar('--bs-secondary-color', '#6c757d'); }
+
+  // 'cor' pode ser uma cor única (só patrimônio) ou um array [patrimônio, aportes] quando a linha de
+  // aportes está sobreposta. A linha de aportes é discreta (tracejada, cor secundária, sem preenchimento).
   function chartOptions(series, cor) {
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    const comAportes = series.length > 1;
+    const cores = Array.isArray(cor) ? cor : [cor];
     return {
       chart: {
-        type: 'area',
+        type: 'line',
         height: 340,
         toolbar: { show: false },
         zoom: { enabled: false },
@@ -187,12 +194,15 @@
         fontFamily: 'inherit',
         background: 'transparent'
       },
-      theme: { mode: document.body.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light' },
+      theme: { mode: dark ? 'dark' : 'light' },
       series,
-      colors: [cor],
+      colors: cores,
       dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 2 },
-      fill: gradiente(),
+      stroke: { curve: 'smooth', width: comAportes ? [2, 2] : 2, dashArray: comAportes ? [0, 6] : 0 },
+      fill: comAportes
+        ? { type: ['gradient', 'solid'], gradient: gradiente().gradient, opacity: [1, 0] }
+        : gradiente(),
+      legend: { show: comAportes, position: 'top', horizontalAlign: 'left', labels: { colors: cssVar('--bs-body-color', '#212529') } },
       grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
       xaxis: {
         type: 'datetime',
@@ -202,7 +212,7 @@
         tooltip: { enabled: false }
       },
       yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
-      tooltip: { x: { format: 'dd/MM/yyyy' }, y: { formatter: value => money.format(value) } }
+      tooltip: { theme: dark ? 'dark' : 'light', shared: comAportes, x: { format: 'dd/MM/yyyy' }, y: { formatter: value => money.format(value) } }
     };
   }
 
@@ -292,14 +302,19 @@
       `<span class="${positivo ? 'text-success' : 'text-danger'}">${positivo ? '+' : ''}${money.format(variacao)} (${positivo ? '+' : ''}${pct.format(percentual)}%)</span>` +
       `<span class="finance-hero-today ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>`;
 
-    const series = [{ name: rotuloDe(serieAtual), data: pontos(valores, inicio) }];
+    // Linha de aportes (custo acumulado) só faz sentido sobre o patrimônio total — não por setor.
+    const aportes = serieAtual === 'total' ? (dados.custoAcumulado || []) : [];
+    const temAportes = aportes.length === dados.datas.length && aportes.some(v => v !== 0);
+    const series = [{ name: 'Patrimônio', type: 'area', data: pontos(valores, inicio) }];
+    if (temAportes) series.push({ name: 'Aportes', type: 'line', data: pontos(aportes, inicio) });
+    const cores = temAportes ? [cor, corAportes()] : cor;
+
     const chartContainer = document.getElementById('financeEvolucao');
     if (!chart && chartContainer && window.ApexCharts) {
-      chart = new ApexCharts(chartContainer, chartOptions(series, cor));
+      chart = new ApexCharts(chartContainer, chartOptions(series, cores));
       chart.render();
     } else if (chart) {
-      chart.updateOptions({ colors: [cor], fill: gradiente() }, false, false);
-      chart.updateSeries(series, !prefersReducedMotion);
+      chart.updateOptions(chartOptions(series, cores), false, !prefersReducedMotion);
     }
     renderSetores(inicio);
   }

@@ -442,6 +442,76 @@ public class FinancasCarteiraTests
         Assert.Equal(["2026-02"], dto.RastreabilidadeB3.MesesFaltantes);
     }
 
+    [Fact]
+    public async Task EvolucaoDeveExporCustoAcumuladoQueCresceNasComprasEReduzNasVendas()
+    {
+        var acao = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var hoje = DateTime.UtcNow.Date;
+        // Dentro da janela de 1 ano do gráfico. Compra 2.000, +1.000 num dia seguinte, venda de 50 cotas (−1.000).
+        var compra1 = hoje.AddMonths(-6);   // 100 × 20 = 2.000
+        var compra2 = hoje.AddMonths(-4);   //  50 × 20 = 1.000 (acumulado 3.000)
+        var venda = hoje.AddMonths(-2);     //  50 × 20 = 1.000 a menos (acumulado 2.000)
+
+        var transacoes = new List<TransacaoFinanceira>
+        {
+            Compra(acao, 100m, 20m, compra1),
+            Compra(acao, 50m, 20m, compra2),
+            Venda(acao, 50m, 20m, venda)
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarHistoricoPrecosAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCarteirasComAtivosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterEvolucaoPatrimonioAsync();
+
+        // Série alinhada ao eixo de datas, monotônica não-decrescente até a venda.
+        Assert.Equal(dto.Datas.Count, dto.CustoAcumulado.Count);
+        decimal Em(DateTime data)
+        {
+            var idx = dto.Datas.ToList().FindIndex(d => d == data.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            return dto.CustoAcumulado[idx];
+        }
+
+        Assert.Equal(0m, dto.CustoAcumulado[0]);            // nada antes da 1ª compra
+        Assert.Equal(2000m, Em(compra1));                   // sobe na compra
+        Assert.Equal(3000m, Em(compra2));                   // continua subindo no aporte seguinte
+        Assert.Equal(2000m, Em(venda));                     // reduz na venda
+        Assert.Equal(2000m, dto.CustoAcumulado[^1]);        // forward-fill até hoje
+        // Não-decrescente entre 1ª compra e véspera da venda.
+        var iC1 = dto.Datas.ToList().FindIndex(d => d == compra1.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        var iV = dto.Datas.ToList().FindIndex(d => d == venda.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        for (var i = iC1 + 1; i < iV; i++)
+            Assert.True(dto.CustoAcumulado[i] >= dto.CustoAcumulado[i - 1]);
+    }
+
+    [Fact]
+    public async Task EvolucaoDeveSomarComprasAnterioresAoInicioNaBaseDoCustoAcumulado()
+    {
+        var acao = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var hoje = DateTime.UtcNow.Date;
+        // Compra há 2 anos (antes da janela de 1 ano) deve entrar na base (1º dia) do custo acumulado.
+        var transacoes = new List<TransacaoFinanceira>
+        {
+            Compra(acao, 10m, 50m, hoje.AddYears(-2)) // 500
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarHistoricoPrecosAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCarteirasComAtivosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterEvolucaoPatrimonioAsync();
+
+        Assert.Equal(500m, dto.CustoAcumulado[0]);
+        Assert.Equal(500m, dto.CustoAcumulado[^1]);
+    }
+
     private static TransacaoFinanceira Reconciliacao(AtivoFinanceiro ativo, TipoOperacaoFinanceira tipo, decimal qtd, decimal preco, DateTime data, decimal alvo, decimal calculado)
         => new()
         {

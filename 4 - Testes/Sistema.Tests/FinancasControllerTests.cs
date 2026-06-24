@@ -38,7 +38,7 @@ public class FinancasControllerTests
     public async Task EndpointsDasIlhasDevemRetornarResultadosIndependentes()
     {
         var service = new Mock<IFinancasAppService>();
-        var evolucao = new EvolucaoPatrimonioDto([], [], 0, 0, [], []);
+        var evolucao = new EvolucaoPatrimonioDto([], [], [], 0, 0, [], []);
         var patrimonio = new FinancasPatrimonioDto(10, 8, 2, evolucao);
         var carteiras = new FinancasCarteirasDto([]);
         var importacao = new FinancasImportacaoDto(

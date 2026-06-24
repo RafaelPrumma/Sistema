@@ -250,6 +250,9 @@ public record SerieEvolucaoDto(
 public record EvolucaoPatrimonioDto(
     IReadOnlyList<string> Datas,
     IReadOnlyList<decimal> Total,
+    // Custo acumulado (aportes líquidos = compras − vendas, acumulado por data) alinhado a Datas;
+    // sobreposto ao patrimônio no gráfico para comparar mercado × quanto foi aportado.
+    IReadOnlyList<decimal> CustoAcumulado,
     decimal VariacaoDiaTotal,
     decimal ValorAtualTotal,
     IReadOnlyList<SerieEvolucaoDto> Setores,

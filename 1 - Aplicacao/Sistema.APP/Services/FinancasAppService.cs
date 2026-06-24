@@ -927,6 +927,29 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             }
         }
 
+        // Custo acumulado (aportes líquidos): compra entra (+), venda sai (−), acumulado e forward-fill
+        // sobre o MESMO eixo de datas. Compras antes do início somam na base; reflete o caixa investido,
+        // não o custo da posição aberta (que zera em saída total). Reaproveita DeltaQuantidade p/ o sentido.
+        var custoAcumulado = new decimal[totalDias];
+        var aportesPorData = transacoes
+            .Select(t => (Data: t.Date.Date, Valor: DeltaQuantidade(t) switch
+            {
+                > 0m => ValorMovimento(t),
+                < 0m => -ValorMovimento(t),
+                _ => 0m
+            }))
+            .Where(x => x.Valor != 0m)
+            .GroupBy(x => x.Data)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Valor));
+        decimal acumuladoAportes = 0m;
+        for (int di = 0; di < totalDias; di++)
+        {
+            acumuladoAportes += datas[di] == inicio
+                ? aportesPorData.Where(kv => kv.Key <= inicio).Sum(kv => kv.Value)
+                : aportesPorData.TryGetValue(datas[di], out var v) ? v : 0m;
+            custoAcumulado[di] = acumuladoAportes;
+        }
+
         decimal atual = total.Length > 0 ? total[^1] : 0m;
         PeriodoPerformanceDto Periodo(string codigo, string label, DateTime baseData)
         {
@@ -984,6 +1007,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return new EvolucaoPatrimonioDto(
             datas.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList(),
             total.Select(v => Math.Round(v, 2)).ToList(),
+            custoAcumulado.Select(v => Math.Round(v, 2)).ToList(),
             variacaoDiaTotal,
             Math.Round(atual, 2),
             setores,
@@ -1199,6 +1223,10 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     }
 
     // Efeito de uma transação no estoque do ativo (Quantity é sempre positiva; o tipo dá o sentido).
+    // Valor em caixa do movimento (aporte/resgate). Prefere o bruto da nota; cai p/ qtd×preço (+taxas) quando ausente.
+    private static decimal ValorMovimento(TransacaoFinanceira t)
+        => t.GrossAmount > 0m ? t.GrossAmount : t.Quantity * t.UnitPrice + t.Fees;
+
     private static decimal DeltaQuantidade(TransacaoFinanceira t) => t.OperationType switch
     {
         TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Deposito or TipoOperacaoFinanceira.Rendimento => t.Quantity,
