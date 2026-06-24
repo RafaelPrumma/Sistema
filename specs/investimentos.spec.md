@@ -5,6 +5,16 @@
 ## Estado atual
 Importação (notas/Binance), posição/preço médio (`CalcularPosicoes`), proventos (Brapi+earn+IR), dashboard em ilhas, carteiras/grupos, resumo analítico. Falta o abaixo.
 
+### Modelo financeiro materializado (jun/2026)
+`FinanceiroTransacao` continua sendo a fonte da verdade auditavel. A tabela `FinanceiroPosicaoAtivo` e um read model/projecao recalculavel: pode ser apagada e reconstruida a partir das transacoes canonicas, ja com eventos corporativos aplicados pelo carregador central.
+
+- Dashboard financeiro: patrimonio, carteiras e posicoes devem ler `FinanceiroPosicaoAtivo` + `FinanceiroCotacaoAtivo` + `FinanceiroCarteiraAtivo`, evitando recalcular todas as transacoes em cada ilha.
+- Recalcular `FinanceiroPosicaoAtivo` apos importacao/reprocessamento, ressincronizacao canonica, CRUD manual de transacao e CRUD de evento corporativo.
+- `RawJson` permanece como nome padrao nas tabelas que ja guardam payload bruto. `FinanceiroPosicaoAtivo` nao tem `RawJson`, pois nao representa payload externo; e uma projecao calculada.
+- Nomes fisicos das tabelas principais permanecem: `FinanceiroAtivo`, `FinanceiroCarteira`, `FinanceiroCarteiraAtivo`, `FinanceiroCotacaoAtivo`, `FinanceiroPosicaoEstimativa`.
+- Campos padronizados em PT-BR: `Chave`, `Sigla`, `Nome`, `Classe`, `Mercado`, `Moeda`, `EhCripto`, `Ativo`, `PapelConceitual`, `CarteiraPaiId`, `CarteiraPai`, `EhSistema`, `AtivoFinanceiroId`, `AtivoFinanceiro`, `Simbolo`, `Preco`, `PrecoBRL`, `Variacao`, `VariacaoPercentual`, `HorarioMercado`, `ConsultadoEm`, `ExpiraEm`, `MensagemErro`, `Quantidade`, `PrecoMedio`, `TotalInvestido`, `TotalVendido`, `ResultadoRealizado`, `PosicaoAtualEstimada`, `NivelConfianca`, `UltimaOperacaoEm`.
+- `Slug` fica em ingles por ser identificador tecnico estavel para URL/chave interna.
+
 ## Features
 
 ### F-A · Eventos corporativos (split/grupamento) — #2
@@ -34,7 +44,7 @@ Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para 
 Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
 
 ### F-I · Carteiras hierárquicas (rework) — jun/2026 (✅ FEITO)
-Reorganizar os grupos com **subcarteiras** (hierarquia via `ParentId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
+Reorganizar os grupos com **subcarteiras** (hierarquia via `CarteiraPaiId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
 
 - **Topo (4):** `Bancário e Seguridade` · `FIIs` · `Minério e energia` · `Criptomoedas`.
   - "Minério e energia" **junta** petróleo + minério/metais + energia (petróleo é commodity *e* energia; cabe VALE, ouro e Petrobras).
@@ -59,7 +69,7 @@ Reorganizar os grupos com **subcarteiras** (hierarquia via `ParentId` self-FK nu
 - A **auto-sugestão** (`GarantirCarteirasPadraoAsync`) cria topo+sub idempotente e vincula os ativos detidos à subcarteira-folha. UI do dashboard agrupa carteira→subcarteira com agregação de valor para cima (pai = soma dos filhos).
 
 ### F-J · Carteiras com valor zerado (bug) — jun/2026
-Algumas carteiras apareciam com **valor zerado** no dashboard. ✅ FEITO: (1) custo (PM) como piso consistente quando não há cotação + status `SemCotacao` confiável; (2) a coluna **Resultado** ficava 0 nas carteiras B3 (ação/FII não cota sem token Brapi → mercado = custo → resultado 0) — resolvido alimentando uma cotação `ProvedorCotacao.B3Custodia` com o **Preço de Fechamento** da aba Posição do extrato B3 (custódia oficial), e fazendo a valoração preferir cotação utilizável (PriceBRL>0) à mais recente.
+Algumas carteiras apareciam com **valor zerado** no dashboard. ✅ FEITO: (1) custo (PM) como piso consistente quando não há cotação + status `SemCotacao` confiável; (2) a coluna **Resultado** ficava 0 nas carteiras B3 (ação/FII não cota sem token Brapi → mercado = custo → resultado 0) — resolvido alimentando uma cotação `ProvedorCotacao.B3Custodia` com o **Preço de Fechamento** da aba Posição do extrato B3 (custódia oficial), e fazendo a valoração preferir cotação utilizável (`PrecoBRL` > 0) à mais recente.
 
 ### F-K · Card de proventos no dashboard — jun/2026 (✅ FEITO)
 Ilha lazy-loaded `_DashboardProventos` (resumo do período + top pagadores + gráfico mensal, montado no `financas.js` porque script em parcial via innerHTML não executa). Reusa `RendimentoInvestimento` + a lógica da tela de Proventos.
