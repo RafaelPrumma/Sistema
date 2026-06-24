@@ -297,7 +297,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     // passa a usar chave por linha de staging ("BinanceLedger|TransacaoCripto|{StagingId}"). Linhas
     // legítimas idênticas do ledger Binance (caso USDT, que fecha em zero) não colapsam mais → o
     // resync re-materializa a cripto sem o saldo fantasma em FinanceiroPosicaoAtivo.
-    private const int MaterializacaoVersao = 12;
+    private const int MaterializacaoVersao = 13;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -463,14 +463,17 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         }
     }
 
-    // F1 (cripto) — netting da Binance: materializa a posição correta por QUANTIDADE a partir do ledger
+    // F1/F2 (cripto) — netting da Binance: materializa a posição correta por QUANTIDADE a partir do ledger
     // ("Histórico de Transações"/CSV), que cobre TUDO como pernas assinadas (Alterar) com o mesmo
-    // timestamp. A lógica de classificação/netting (pura) está em CriptoNetting; aqui fica só o que é
-    // stateful: resolver o preço da perna pelo PM corrente do ativo (→ realizado ≈ 0 na F1; valoração
-    // BRL é F2) e gravar em TransacaoFinanceira. As pernas de permuta/earn que a regra antiga ignorava
-    // (sem Price) agora entram → a origem das trocas é abatida (somem fantasmas/negativos) e BRL/fiat
-    // sai da posição. Spot/Convert/Depósitos continuam no staging para auditoria, mas NÃO são
-    // materializados (o ledger já cobre o efeito econômico deles — evita dobrar).
+    // timestamp. A lógica de classificação/netting (pura) está em CriptoNetting e a valoração (pura) em
+    // CriptoValorador; aqui fica só o que é stateful: montar o lookup de preço de mercado BRL na data
+    // (histórico diário Binance + fallback de cotação) e gravar em TransacaoFinanceira.
+    // F2 (§4/§5): cada perna é valorada ao preço de MERCADO em BRL na data — venda/permuta-origem = valor
+    // de alienação; compra com fiat = BRL pago; permuta-destino e earn = mercado na data (earn NÃO 0). Sem
+    // preço: valor neutro (PM corrente/0) + AlertaConfiabilidade "PRECO_CRIPTO_FALTANTE" + confiança baixa.
+    // As pernas de permuta/earn que a regra antiga ignorava (sem Price) entram → a origem das trocas é
+    // abatida (somem fantasmas/negativos) e BRL/fiat sai da posição. Spot/Convert/Depósitos continuam no
+    // staging para auditoria, mas NÃO são materializados (o ledger já cobre o efeito econômico — evita dobrar).
     private async Task MaterializarCriptoNettingAsync(
         List<TransacaoFinanceira> novas,
         HashSet<string> jaMaterializadas,
@@ -509,6 +512,48 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 .ToListAsync(cancellationToken))
             .GroupBy(a => a.Chave, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+        var assetIds = assetIdPorChave.Values.ToHashSet();
+
+        // F2 — valoração em BRL na data (§4/§5). Preço de mercado BRL por ativo: histórico diário da
+        // Binance (CloseBRL, Interval "1d") com fallback no candle anterior mais próximo; depois na cotação
+        // atual (PrecoBRL). Mesma lógica de PrecoEm de AtualizarProventosCriptoEarnAsync.
+        var historicoBrl = (await _context.PrecosHistoricosAtivosFinanceiros
+                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.Interval == "1d" && assetIds.Contains(x.AtivoFinanceiroId))
+                .Select(x => new { x.AtivoFinanceiroId, x.Date, x.CloseBRL })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Date).Select(x => (x.Date, x.CloseBRL)).ToList());
+
+        var cotacaoAtualBrl = (await _context.CotacoesAtivosFinanceiros
+                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.PrecoBRL > 0m && assetIds.Contains(x.AtivoFinanceiroId))
+                .Select(x => new { x.AtivoFinanceiroId, x.PrecoBRL, x.ConsultadoEm })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ConsultadoEm).First().PrecoBRL);
+
+        decimal? PrecoMercadoBrl(int assetId, DateTime data)
+        {
+            if (historicoBrl.TryGetValue(assetId, out var serie) && serie.Count > 0)
+            {
+                decimal? close = null;
+                foreach (var (d, c) in serie)
+                {
+                    if (d.Date <= data.Date) close = c;
+                    else break;
+                }
+                if (close is > 0m) return close;
+                if (serie[0].CloseBRL > 0m) return serie[0].CloseBRL; // anterior ao 1º candle: usa o mais antigo
+            }
+            return cotacaoAtualBrl.TryGetValue(assetId, out var atual) ? atual : (decimal?)null;
+        }
+
+        // BRL pago/recebido por linha de staging (compra com fiat → custo direto, mais fiel que o close).
+        var totalFiatPorStaging = staging
+            .Where(x => x.Total is > 0m)
+            .GroupBy(x => x.Id)
+            .ToDictionary(g => g.Key, g => g.First().Total);
+
+        var cargaIdAlerta = staging[0].CargaFinanceiraId; // p/ vincular o alerta de preço faltante à carga
 
         // Lógica pura: classifica e neta as pernas. Mantém a ordem (timestamp, id) para o PM corrente.
         var brutos = staging.Select(tx => new MovimentoCriptoBruto(
@@ -516,8 +561,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         var canonicos = CriptoNetting.Netar(brutos);
 
         // PM corrente por ativo (estoque + custo), reconstruído na ordem cronológica para precificar a
-        // perna de saída ao PM do ativo (realizado ≈ 0). Custo aqui é placeholder da F1 (1 por unidade
-        // nas compras de troca; 0 no earn) — a valoração real em BRL é F2.
+        // perna de saída ao PM do ativo (realizado ≈ 0 quando falta preço) e como valor neutro de fallback.
         var estoque = new Dictionary<int, (decimal Qtd, decimal Custo)>();
 
         foreach (var mov in canonicos)
@@ -531,15 +575,16 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             estoque.TryGetValue(assetId, out var pos);
             var pm = pos.Qtd > 0m ? pos.Custo / pos.Qtd : 0m;
 
-            // Preço da perna: earn = 0; saída = PM corrente (→ realizado ≈ 0); entrada de troca = PM
-            // corrente do destino se já houver estoque, senão 1 (placeholder; valoração é F2).
-            decimal preco;
-            if (mov.PrecoZero)
-                preco = 0m;
-            else if (mov.OperationType == TipoOperacaoFinanceira.Venda)
-                preco = pm;
-            else
-                preco = pm > 0m ? pm : 1m;
+            // F2 — valoração BRL na data por perna (helper puro). earn = mercado na data (custo da posição,
+            // NÃO 0); venda/permuta-origem = mercado na data (valor de alienação); compra com fiat = BRL
+            // pago; permuta-destino = mercado na data. Sem preço → valor neutro + alerta + confiança baixa.
+            var dataPerna = (mov.Timestamp ?? DateTime.UtcNow).Date;
+            totalFiatPorStaging.TryGetValue(mov.SourceStagingId, out var totalFiat);
+            var valoracao = CriptoValorador.Valorar(mov, PrecoMercadoBrl(assetId, dataPerna), totalFiat, pm);
+            var preco = valoracao.UnitPrice;
+            var confianca = valoracao.Confianca;
+            if (valoracao.PrecoFaltante)
+                RegistrarAlertaPrecoCriptoFaltante(cargaIdAlerta, assetId, mov.AssetSymbol, dataPerna);
 
             // Atualiza o estoque para o próximo PM.
             if (mov.OperationType is TipoOperacaoFinanceira.Compra or TipoOperacaoFinanceira.Rendimento)
@@ -586,10 +631,34 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 DuplicateGroupKey = chave,
                 ChaveNatural = chaveNatural,
                 IsCanonical = true,
-                ConfidenceLevel = NivelConfianca.Media,
+                ConfidenceLevel = confianca,
                 RawJson = "{}",
                 UsuarioInclusao = "financas-importador"
             });
+        }
+    }
+
+    // F2 — alerta quando NÃO há preço de mercado BRL para valorar a perna cripto (§5: não chutar). À prova
+    // de falha: qualquer erro ao registrar o alerta é engolido — não pode derrubar o load do dashboard.
+    private void RegistrarAlertaPrecoCriptoFaltante(int cargaId, int assetId, string symbol, DateTime data)
+    {
+        try
+        {
+            _context.AlertasConfiabilidade.Add(new AlertaConfiabilidade
+            {
+                CargaFinanceiraId = cargaId,
+                EntityType = nameof(AtivoFinanceiro),
+                EntityId = assetId,
+                Severity = SeveridadeAlerta.Atencao,
+                Code = "PRECO_CRIPTO_FALTANTE",
+                Message = $"Sem preço de mercado BRL para valorar {symbol} em {data:yyyy-MM-dd}; perna materializada com valor neutro e confiança baixa.",
+                Details = $"{{\"asset\":\"{symbol}\",\"date\":\"{data:yyyy-MM-dd}\"}}",
+                UsuarioInclusao = "financas-importador"
+            });
+        }
+        catch (Exception ex)
+        {
+            FinancasImportadorLogMessages.MaterializacaoCriptoFalhou(_logger, symbol, ex);
         }
     }
 
@@ -2095,4 +2164,7 @@ internal static partial class FinancasImportadorLogMessages
 
     [LoggerMessage(EventId = 23, Level = LogLevel.Warning, Message = "Cotação de custódia B3 (Preço de Fechamento) falhou; ignorada para não derrubar o dashboard.")]
     public static partial void CotacaoCustodiaB3Falhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 24, Level = LogLevel.Warning, Message = "Falha ao registrar alerta de preço cripto faltante para {Asset}; ignorada para não derrubar a materialização.")]
+    public static partial void MaterializacaoCriptoFalhou(ILogger logger, string asset, Exception exception);
 }
