@@ -151,8 +151,8 @@ public static class CalculadoraIr
         return estado.Values
             .Where(v => v.Qtd > 0.000001m)
             .Select(v => new BemDireitoIrDto(
-                v.Asset.Ticker ?? v.Asset.AssetKey ?? v.Asset.Name ?? "?",
-                v.Asset.AssetClass.ToString(),
+                v.Asset.Sigla ?? v.Asset.Chave ?? v.Asset.Nome ?? "?",
+                v.Asset.Classe.ToString(),
                 Math.Round(v.Qtd, 8),
                 Math.Round(v.Custo, 2)))
             .OrderBy(b => b.Classe).ThenBy(b => b.Ticker)
@@ -217,10 +217,10 @@ public static class CalculadoraIr
 
     private static RegraNatureza? Regra(AtivoFinanceiro a)
     {
-        if (a.IsCrypto || a.AssetClass == ClasseAtivo.Cripto)
+        if (a.EhCripto || a.Classe == ClasseAtivo.Cripto)
             return new RegraNatureza("Cripto", 35000m, AliquotaGanhoCapital);
 
-        return a.AssetClass switch
+        return a.Classe switch
         {
             ClasseAtivo.Acao => new RegraNatureza("Ações", 20000m, _ => 0.15m),
             ClasseAtivo.FII => new RegraNatureza("FII", 0m, _ => 0.20m),

@@ -114,11 +114,11 @@ public partial class FinancasImportador
                     ExtratoB3Materializador.ClassePorTicker(mov.Ticker), false, mov.Ticker);
 
                 // RF/TD/BDR/ETF ficam fora do cálculo (classes não modeladas) — não materializamos.
-                if (ativo.AssetClass is ClasseAtivo.RendaFixa or ClasseAtivo.Caixa)
+                if (ativo.Classe is ClasseAtivo.RendaFixa or ClasseAtivo.Caixa)
                     continue;
 
                 var broker = string.IsNullOrWhiteSpace(mov.Broker) ? "NU Invest" : mov.Broker!;
-                var chave = ExtratoB3Materializador.ChaveNegociacao(ativo.AssetKey, anoMes, mov.OperationType, broker);
+                var chave = ExtratoB3Materializador.ChaveNegociacao(ativo.Chave, anoMes, mov.OperationType, broker);
 
                 // Idempotência: o mesmo agregado (reimportar o mesmo mês) não duplica no staging.
                 if (_context.NegociacoesMensaisB3.Local.Any(x => x.ChaveNatural == chave)

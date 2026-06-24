@@ -133,11 +133,11 @@ public static class DbInitializer
         var tickers = definicoes.Select(d => d.Ticker).Distinct().ToList();
         var ativos = context.AtivosFinanceiros
             .IgnoreQueryFilters()
-            .Where(a => a.Ticker != null && tickers.Contains(a.Ticker!))
+            .Where(a => a.Sigla != null && tickers.Contains(a.Sigla!))
             .ToList();
 
-        var ativosPorTicker = ativos
-            .GroupBy(a => a.Ticker!)
+        var ativosPorSigla = ativos
+            .GroupBy(a => a.Sigla!)
             .ToDictionary(g => g.Key, g => g.First());
 
         var novos = new List<EventoCorporativo>();
@@ -146,7 +146,7 @@ public static class DbInitializer
             if (chavesExistentes.Contains(chave))
                 continue;
 
-            if (!ativosPorTicker.TryGetValue(ticker, out var ativo))
+            if (!ativosPorSigla.TryGetValue(ticker, out var ativo))
                 continue; // Ativo ainda não existe no banco; será semeado na próxima importação.
 
             novos.Add(new EventoCorporativo

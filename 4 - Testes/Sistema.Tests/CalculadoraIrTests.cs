@@ -11,7 +11,7 @@ namespace Sistema.Tests;
 public class CalculadoraIrTests
 {
     private static AtivoFinanceiro Ativo(int id, string ticker, ClasseAtivo classe, bool cripto = false)
-        => new() { Id = id, AssetKey = ticker, Ticker = ticker, Name = ticker, AssetClass = classe, IsCrypto = cripto };
+        => new() { Id = id, Chave = ticker, Sigla = ticker, Nome = ticker, Classe = classe, EhCripto = cripto };
 
     private static TransacaoFinanceira Tx(AtivoFinanceiro a, string data, TipoOperacaoFinanceira tipo, decimal qtd, decimal preco)
         => new()

@@ -52,13 +52,13 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .Where(x => x.CargaFinanceiraId == cargaId && x.IsCanonical);
 
         if (!string.IsNullOrWhiteSpace(termo))
-            query = query.Where(x => x.OriginalAssetName.Contains(termo) || x.SourceFile.Contains(termo) || (x.Asset != null && x.Asset.Name.Contains(termo)));
+            query = query.Where(x => x.OriginalAssetName.Contains(termo) || x.SourceFile.Contains(termo) || (x.Asset != null && x.Asset.Nome.Contains(termo)));
 
         if (ano.HasValue)
             query = query.Where(x => x.TradeDate.HasValue && x.TradeDate.Value.Year == ano.Value);
 
         if (!string.IsNullOrWhiteSpace(classe) && Enum.TryParse<ClasseAtivo>(classe, true, out var classeAtivo))
-            query = query.Where(x => x.Asset != null && x.Asset.AssetClass == classeAtivo);
+            query = query.Where(x => x.Asset != null && x.Asset.Classe == classeAtivo);
 
         return await query.OrderByDescending(x => x.TradeDate).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
     }
@@ -102,7 +102,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
     public async Task<IReadOnlyList<EstimativaPosicaoCarteira>> BuscarPosicoesAsync(bool? somenteAbertas, CancellationToken cancellationToken = default)
     {
         var cargaId = await ObterCargaIdAsync(cancellationToken);
-        var query = _context.EstimativasPosicaoCarteira.AsNoTracking().Include(x => x.Asset).Where(x => x.CargaFinanceiraId == cargaId);
+        var query = _context.EstimativasPosicaoCarteira.AsNoTracking().Include(x => x.AtivoFinanceiro).Where(x => x.CargaFinanceiraId == cargaId);
         if (somenteAbertas.HasValue)
         {
             query = query.Where(x => somenteAbertas.Value
@@ -110,7 +110,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
                 : x.Status == StatusEstimativaPosicao.EncerradaPorOperacoes);
         }
 
-        return await query.OrderByDescending(x => x.EstimatedCurrentPosition).ThenBy(x => x.Asset!.Name).ToListAsync(cancellationToken);
+        return await query.OrderByDescending(x => x.PosicaoAtualEstimada).ThenBy(x => x.AtivoFinanceiro!.Nome).ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<AlertaConfiabilidade>> BuscarAlertasAsync(CancellationToken cancellationToken = default)
@@ -153,7 +153,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             query = query.Where(x =>
                 x.IncomeType.Contains(termo) ||
                 x.Source.Contains(termo) ||
-                (x.Asset != null && (x.Asset.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)))));
+                (x.Asset != null && (x.Asset.Nome.Contains(termo) || (x.Asset.Sigla != null && x.Asset.Sigla.Contains(termo)))));
 
         return await query.OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
     }
@@ -171,11 +171,11 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
         var cargaId = await ObterCargaIdAsync(cancellationToken);
         return await _context.EstimativasPosicaoCarteira
             .AsNoTracking()
-            .Where(x => x.CargaFinanceiraId == cargaId && x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.Asset != null)
-            .Select(x => x.Asset!)
+            .Where(x => x.CargaFinanceiraId == cargaId && x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.AtivoFinanceiro != null)
+            .Select(x => x.AtivoFinanceiro!)
             .Distinct()
-            .OrderBy(x => x.AssetClass)
-            .ThenBy(x => x.Ticker ?? x.AssetKey)
+            .OrderBy(x => x.Classe)
+            .ThenBy(x => x.Sigla ?? x.Chave)
             .ToListAsync(cancellationToken);
     }
 
@@ -183,8 +183,23 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
         => await _context.CotacoesAtivosFinanceiros
             .AsNoTracking()
             .Include(x => x.AtivoFinanceiro)
-            .OrderByDescending(x => x.RetrievedAt)
+            .OrderByDescending(x => x.ConsultadoEm)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PosicaoAtivo>> BuscarPosicoesAtivosAsync(CancellationToken cancellationToken = default)
+        => await _context.PosicoesAtivos
+            .AsNoTracking()
+            .Include(x => x.AtivoFinanceiro)
+            .Where(x => x.AtivoFinanceiro != null)
+            .OrderBy(x => x.AtivoFinanceiro!.Sigla ?? x.AtivoFinanceiro.Chave)
+            .ToListAsync(cancellationToken);
+
+    public async Task SubstituirPosicoesAtivosAsync(IReadOnlyList<PosicaoAtivo> posicoes, CancellationToken cancellationToken = default)
+    {
+        await _context.PosicoesAtivos.ExecuteDeleteAsync(cancellationToken);
+        if (posicoes.Count > 0)
+            await _context.PosicoesAtivos.AddRangeAsync(posicoes, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default)
         => await _context.PrecosHistoricosAtivosFinanceiros
@@ -268,7 +283,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
 
         if (!string.IsNullOrWhiteSpace(termo))
             query = query.Where(x =>
-                (x.Asset != null && (x.Asset.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)))) ||
+                (x.Asset != null && (x.Asset.Nome.Contains(termo) || (x.Asset.Sigla != null && x.Asset.Sigla.Contains(termo)))) ||
                 x.Broker.Contains(termo));
 
         return await query.OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
@@ -284,7 +299,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
         var ordenacoes = new Dictionary<string, Func<IQueryable<TransacaoFinanceira>, bool, IOrderedQueryable<TransacaoFinanceira>>>(StringComparer.OrdinalIgnoreCase)
         {
             ["data"] = (q, d) => d ? q.OrderByDescending(x => x.Date) : q.OrderBy(x => x.Date),
-            ["ticker"] = (q, d) => d ? q.OrderByDescending(x => x.Asset!.Ticker) : q.OrderBy(x => x.Asset!.Ticker),
+            ["ticker"] = (q, d) => d ? q.OrderByDescending(x => x.Asset!.Sigla) : q.OrderBy(x => x.Asset!.Sigla),
             ["tipo"] = (q, d) => d ? q.OrderByDescending(x => x.OperationType) : q.OrderBy(x => x.OperationType),
             ["quantidade"] = (q, d) => d ? q.OrderByDescending(x => x.Quantity) : q.OrderBy(x => x.Quantity),
             ["precoUnitario"] = (q, d) => d ? q.OrderByDescending(x => x.UnitPrice) : q.OrderBy(x => x.UnitPrice),
@@ -295,7 +310,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
 
         return query.ToDataTablesAsync(
             request,
-            (q, termo) => q.Where(x => x.Asset!.Name.Contains(termo) || (x.Asset.Ticker != null && x.Asset.Ticker.Contains(termo)) || x.Broker.Contains(termo)),
+            (q, termo) => q.Where(x => x.Asset!.Nome.Contains(termo) || (x.Asset.Sigla != null && x.Asset.Sigla.Contains(termo)) || x.Broker.Contains(termo)),
             ordenacoes,
             "data",
             cancellationToken);
@@ -318,7 +333,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
 
     public Task<AtivoFinanceiro?> ObterAtivoPorChaveOuTickerAsync(string chaveOuTicker, CancellationToken cancellationToken = default)
         => _context.AtivosFinanceiros.FirstOrDefaultAsync(
-            x => x.AssetKey == chaveOuTicker || (x.Ticker != null && x.Ticker == chaveOuTicker),
+            x => x.Chave == chaveOuTicker || (x.Sigla != null && x.Sigla == chaveOuTicker),
             cancellationToken);
 
     public async Task AdicionarAtivoAsync(AtivoFinanceiro ativo, CancellationToken cancellationToken = default)
@@ -329,7 +344,7 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
         var query = _context.EventosCorporativos.AsNoTracking().Include(x => x.AtivoFinanceiro).AsQueryable();
         if (!string.IsNullOrWhiteSpace(termo))
             query = query.Where(x =>
-                (x.AtivoFinanceiro != null && (x.AtivoFinanceiro.Ticker != null && x.AtivoFinanceiro.Ticker.Contains(termo)))
+                (x.AtivoFinanceiro != null && (x.AtivoFinanceiro.Sigla != null && x.AtivoFinanceiro.Sigla.Contains(termo)))
                 || x.Fonte.Contains(termo));
         return await query.OrderByDescending(x => x.Data).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
     }

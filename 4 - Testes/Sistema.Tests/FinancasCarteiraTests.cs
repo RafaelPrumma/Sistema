@@ -49,40 +49,40 @@ public class FinancasCarteiraTests
         var banco = new AtivoFinanceiro
         {
             Id = 1,
-            AssetKey = "ITUB4",
-            Ticker = "ITUB4",
-            Name = "Itau",
-            AssetClass = ClasseAtivo.Acao,
-            Market = "B3"
+            Chave = "ITUB4",
+            Sigla = "ITUB4",
+            Nome = "Itau",
+            Classe = ClasseAtivo.Acao,
+            Mercado = "B3"
         };
         var criptoZerada = new AtivoFinanceiro
         {
             Id = 2,
-            AssetKey = "MATIC",
-            Ticker = "MATIC",
-            Name = "MATIC",
-            AssetClass = ClasseAtivo.Cripto,
-            IsCrypto = true,
-            Market = "Binance"
+            Chave = "MATIC",
+            Sigla = "MATIC",
+            Nome = "MATIC",
+            Classe = ClasseAtivo.Cripto,
+            EhCripto = true,
+            Mercado = "Binance"
         };
         var fiiSemCotacao = new AtivoFinanceiro
         {
             Id = 3,
-            AssetKey = "DEVA11",
-            Ticker = "DEVA11",
-            Name = "FII DEVANT CI",
-            AssetClass = ClasseAtivo.FII,
-            Market = "B3"
+            Chave = "DEVA11",
+            Sigla = "DEVA11",
+            Nome = "FII DEVANT CI",
+            Classe = ClasseAtivo.FII,
+            Mercado = "B3"
         };
         var maticDust = new AtivoFinanceiro
         {
             Id = 4,
-            AssetKey = "MATIC",
-            Ticker = "MATIC",
-            Name = "MATIC",
-            AssetClass = ClasseAtivo.Cripto,
-            IsCrypto = true,
-            Market = "Binance"
+            Chave = "MATIC",
+            Sigla = "MATIC",
+            Nome = "MATIC",
+            Classe = ClasseAtivo.Cripto,
+            EhCripto = true,
+            Mercado = "Binance"
         };
 
         var transacoes = new List<TransacaoFinanceira>
@@ -100,11 +100,11 @@ public class FinancasCarteiraTests
                 AtivoFinanceiroId = banco.Id,
                 AtivoFinanceiro = banco,
                 Provedor = ProvedorCotacao.Brapi,
-                Symbol = "ITUB4",
-                PriceBRL = 25m,
-                Price = 25m,
-                ChangePercent = 1.5m,
-                RetrievedAt = DateTime.UtcNow,
+                Simbolo = "ITUB4",
+                PrecoBRL = 25m,
+                Preco = 25m,
+                VariacaoPercentual = 1.5m,
+                ConsultadoEm = DateTime.UtcNow,
                 RawJson = "{}"
             },
             new()
@@ -112,10 +112,10 @@ public class FinancasCarteiraTests
                 AtivoFinanceiroId = maticDust.Id,
                 AtivoFinanceiro = maticDust,
                 Provedor = ProvedorCotacao.Binance,
-                Symbol = "MATIC",
-                PriceBRL = 2m,
-                Price = 2m,
-                RetrievedAt = DateTime.UtcNow,
+                Simbolo = "MATIC",
+                PrecoBRL = 2m,
+                Preco = 2m,
+                ConsultadoEm = DateTime.UtcNow,
                 RawJson = "{}"
             }
         };
@@ -170,20 +170,20 @@ public class FinancasCarteiraTests
         var canonico = new AtivoFinanceiro
         {
             Id = 1,
-            AssetKey = "BBDC4",
-            Ticker = "BBDC4",
-            Name = "BRADESCO PN",
-            AssetClass = ClasseAtivo.Acao,
-            Market = "B3",
+            Chave = "BBDC4",
+            Sigla = "BBDC4",
+            Nome = "BRADESCO PN",
+            Classe = ClasseAtivo.Acao,
+            Mercado = "B3",
             UsuarioInclusao = "teste"
         };
         var fragmento = new AtivoFinanceiro
         {
             Id = 2,
-            AssetKey = "BRADESCO PN EJ N1",
-            Name = "BRADESCO PN EJ N1",
-            AssetClass = ClasseAtivo.Acao,
-            Market = "B3",
+            Chave = "BRADESCO PN EJ N1",
+            Nome = "BRADESCO PN EJ N1",
+            Classe = ClasseAtivo.Acao,
+            Mercado = "B3",
             DataExclusao = DateTime.UtcNow,
             UsuarioInclusao = "teste"
         };
@@ -191,14 +191,14 @@ public class FinancasCarteiraTests
         context.AddRange(carga, canonico, fragmento, carteira);
         context.CarteirasAtivosFinanceiros.Add(new CarteiraAtivoFinanceiro { Id = 1, CarteiraFinanceiraId = 1, AtivoFinanceiroId = 2, UsuarioInclusao = "teste" });
         context.CotacoesAtivosFinanceiros.AddRange(
-            new CotacaoAtivoFinanceiro { Id = 1, AtivoFinanceiroId = 1, Provedor = ProvedorCotacao.Brapi, Symbol = "BBDC4", Price = 10m, PriceBRL = 10m, RetrievedAt = DateTime.UtcNow.AddDays(-1), RawJson = "{}", UsuarioInclusao = "teste" },
-            new CotacaoAtivoFinanceiro { Id = 2, AtivoFinanceiroId = 2, Provedor = ProvedorCotacao.Brapi, Symbol = "BRADESCO PN", Price = 12m, PriceBRL = 12m, RetrievedAt = DateTime.UtcNow, RawJson = "{}", UsuarioInclusao = "teste" });
+            new CotacaoAtivoFinanceiro { Id = 1, AtivoFinanceiroId = 1, Provedor = ProvedorCotacao.Brapi, Simbolo = "BBDC4", Preco = 10m, PrecoBRL = 10m, ConsultadoEm = DateTime.UtcNow.AddDays(-1), RawJson = "{}", UsuarioInclusao = "teste" },
+            new CotacaoAtivoFinanceiro { Id = 2, AtivoFinanceiroId = 2, Provedor = ProvedorCotacao.Brapi, Simbolo = "BRADESCO PN", Preco = 12m, PrecoBRL = 12m, ConsultadoEm = DateTime.UtcNow, RawJson = "{}", UsuarioInclusao = "teste" });
         context.PrecosHistoricosAtivosFinanceiros.AddRange(
             new PrecoHistoricoAtivoFinanceiro { Id = 1, AtivoFinanceiroId = 1, Provedor = ProvedorCotacao.Brapi, Symbol = "BBDC4", Date = new DateTime(2026, 1, 1), Interval = "1d", Close = 10m, CloseBRL = 10m, RawJson = "{}", UsuarioInclusao = "teste" },
             new PrecoHistoricoAtivoFinanceiro { Id = 2, AtivoFinanceiroId = 2, Provedor = ProvedorCotacao.Brapi, Symbol = "BRADESCO PN", Date = new DateTime(2026, 1, 2), Interval = "1d", Close = 11m, CloseBRL = 11m, RawJson = "{}", UsuarioInclusao = "teste" });
         context.OperacoesB3.Add(new OperacaoB3 { Id = 1, CargaFinanceiraId = 1, AssetId = 2, OriginalAssetName = "BRADESCO PN EJ N1", RawJson = "{}", UsuarioInclusao = "teste" });
         context.TransacoesFinanceiras.Add(new TransacaoFinanceira { Id = 1, AssetId = 2, Date = DateTime.UtcNow, OperationType = TipoOperacaoFinanceira.Compra, Quantity = 10m, UnitPrice = 10m, GrossAmount = 100m, RawJson = "{}", UsuarioInclusao = "teste" });
-        context.EstimativasPosicaoCarteira.Add(new EstimativaPosicaoCarteira { Id = 1, CargaFinanceiraId = 1, AssetId = 2, RawJson = "{}", UsuarioInclusao = "teste" });
+        context.EstimativasPosicaoCarteira.Add(new EstimativaPosicaoCarteira { Id = 1, CargaFinanceiraId = 1, AtivoFinanceiroId = 2, RawJson = "{}", UsuarioInclusao = "teste" });
         context.RendimentosInvestimento.Add(new RendimentoInvestimento { Id = 1, AssetId = 2, IncomeType = "Dividendo", Source = "Teste", Fonte = "Teste", RawJson = "{}", UsuarioInclusao = "teste" });
         await context.SaveChangesAsync();
 
@@ -208,9 +208,9 @@ public class FinancasCarteiraTests
         Assert.All(context.CarteirasAtivosFinanceiros.IgnoreQueryFilters(), x => Assert.Equal(1, x.AtivoFinanceiroId));
         Assert.All(context.OperacoesB3.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
         Assert.All(context.TransacoesFinanceiras.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
-        Assert.All(context.EstimativasPosicaoCarteira.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
+        Assert.All(context.EstimativasPosicaoCarteira.IgnoreQueryFilters(), x => Assert.Equal(1, x.AtivoFinanceiroId));
         Assert.All(context.RendimentosInvestimento.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
-        Assert.Equal(12m, context.CotacoesAtivosFinanceiros.Single(x => x.AtivoFinanceiroId == 1 && x.DataExclusao == null).PriceBRL);
+        Assert.Equal(12m, context.CotacoesAtivosFinanceiros.Single(x => x.AtivoFinanceiroId == 1 && x.DataExclusao == null).PrecoBRL);
         Assert.Contains(context.PrecosHistoricosAtivosFinanceiros, x => x.AtivoFinanceiroId == 1 && x.Date == new DateTime(2026, 1, 2));
         Assert.Equal("4", context.Configuracoes.Single(x => x.Chave == "ReparoAtivosVersao").Valor);
     }
@@ -240,9 +240,9 @@ public class FinancasCarteiraTests
     [Fact]
     public async Task ProventosDashboardDeveAgruparRecebidoPorFonte()
     {
-        var fii = new AtivoFinanceiro { Id = 1, AssetKey = "DEVA11", Ticker = "DEVA11", Name = "FII DEVANT", AssetClass = ClasseAtivo.FII, Market = "B3" };
-        var acao = new AtivoFinanceiro { Id = 2, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "Banco do Brasil", AssetClass = ClasseAtivo.Acao, Market = "B3" };
-        var cripto = new AtivoFinanceiro { Id = 3, AssetKey = "BTC", Ticker = "BTC", Name = "Bitcoin", AssetClass = ClasseAtivo.Cripto, IsCrypto = true, Market = "Binance" };
+        var fii = new AtivoFinanceiro { Id = 1, Chave = "DEVA11", Sigla = "DEVA11", Nome = "FII DEVANT", Classe = ClasseAtivo.FII, Mercado = "B3" };
+        var acao = new AtivoFinanceiro { Id = 2, Chave = "BBAS3", Sigla = "BBAS3", Nome = "Banco do Brasil", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var cripto = new AtivoFinanceiro { Id = 3, Chave = "BTC", Sigla = "BTC", Nome = "Bitcoin", Classe = ClasseAtivo.Cripto, EhCripto = true, Mercado = "Binance" };
 
         var hoje = DateTime.UtcNow.Date;
         var proventos = new List<RendimentoInvestimento>
@@ -275,8 +275,8 @@ public class FinancasCarteiraTests
     [InlineData(false)]
     public async Task CarteirasDashboardSinalizaCriptoParcialmenteReconciliadaQuandoHaPosicaoCripto(bool comCripto)
     {
-        var acao = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "BB", AssetClass = ClasseAtivo.Acao, Market = "B3" };
-        var btc = new AtivoFinanceiro { Id = 2, AssetKey = "BTC", Ticker = "BTC", Name = "Bitcoin", AssetClass = ClasseAtivo.Cripto, IsCrypto = true, Market = "Binance" };
+        var acao = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var btc = new AtivoFinanceiro { Id = 2, Chave = "BTC", Sigla = "BTC", Nome = "Bitcoin", Classe = ClasseAtivo.Cripto, EhCripto = true, Mercado = "Binance" };
 
         var transacoes = new List<TransacaoFinanceira> { Compra(acao, 10m, 20m, new DateTime(2026, 1, 10)) };
         if (comCripto)
@@ -296,9 +296,9 @@ public class FinancasCarteiraTests
     [Fact]
     public async Task ReconciliacaoDashboardDeveResumirAjustesEValorNaVariacao()
     {
-        var bbas = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "Banco do Brasil", AssetClass = ClasseAtivo.Acao, Market = "B3" };
-        var cpts = new AtivoFinanceiro { Id = 2, AssetKey = "CPTS11", Ticker = "CPTS11", Name = "FII Capitania", AssetClass = ClasseAtivo.FII, Market = "B3" };
-        var variacao = new AtivoFinanceiro { Id = 9, AssetKey = "VARIACAO", Ticker = "VARIACAO", Name = "Ajuste de Reconciliação", AssetClass = ClasseAtivo.Outro, Market = "B3" };
+        var bbas = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "Banco do Brasil", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var cpts = new AtivoFinanceiro { Id = 2, Chave = "CPTS11", Sigla = "CPTS11", Nome = "FII Capitania", Classe = ClasseAtivo.FII, Mercado = "B3" };
+        var variacao = new AtivoFinanceiro { Id = 9, Chave = "VARIACAO", Sigla = "VARIACAO", Nome = "Ajuste de Reconciliação", Classe = ClasseAtivo.Outro, Mercado = "B3" };
         var hoje = DateTime.UtcNow.Date;
 
         var transacoes = new List<TransacaoFinanceira>
@@ -348,11 +348,11 @@ public class FinancasCarteiraTests
     public async Task PosicoesDashboardDeveComporValorPorFonteEDiferencaVsB3()
     {
         // BBAS3: tem cotação Brapi (ao vivo) E fechamento B3 → valora pela Brapi, mas mostra dif vs B3.
-        var bbas = new AtivoFinanceiro { Id = 1, AssetKey = "BBAS3", Ticker = "BBAS3", Name = "BB", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        var bbas = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
         // DEVA11: só tem fechamento B3Custódia → valora por fechamento B3, dif = 0.
-        var deva = new AtivoFinanceiro { Id = 2, AssetKey = "DEVA11", Ticker = "DEVA11", Name = "FII DEVANT", AssetClass = ClasseAtivo.FII, Market = "B3" };
+        var deva = new AtivoFinanceiro { Id = 2, Chave = "DEVA11", Sigla = "DEVA11", Nome = "FII DEVANT", Classe = ClasseAtivo.FII, Mercado = "B3" };
         // PETR4: sem cotação alguma → cai no custo (fallback).
-        var petr = new AtivoFinanceiro { Id = 3, AssetKey = "PETR4", Ticker = "PETR4", Name = "Petrobras", AssetClass = ClasseAtivo.Acao, Market = "B3" };
+        var petr = new AtivoFinanceiro { Id = 3, Chave = "PETR4", Sigla = "PETR4", Nome = "Petrobras", Classe = ClasseAtivo.Acao, Mercado = "B3" };
 
         var transacoes = new List<TransacaoFinanceira>
         {
@@ -363,9 +363,9 @@ public class FinancasCarteiraTests
         var agora = DateTime.UtcNow;
         var cotacoes = new List<CotacaoAtivoFinanceiro>
         {
-            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.Brapi, Symbol = "BBAS3", PriceBRL = 25m, Price = 25m, RetrievedAt = agora, RawJson = "{}" },
-            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.B3Custodia, Symbol = "BBAS3", PriceBRL = 24m, Price = 24m, RetrievedAt = agora.AddDays(-1), RawJson = "{}" },
-            new() { AtivoFinanceiroId = deva.Id, AtivoFinanceiro = deva, Provedor = ProvedorCotacao.B3Custodia, Symbol = "DEVA11", PriceBRL = 110m, Price = 110m, RetrievedAt = agora, RawJson = "{}" }
+            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.Brapi, Simbolo = "BBAS3", PrecoBRL = 25m, Preco = 25m, ConsultadoEm = agora, RawJson = "{}" },
+            new() { AtivoFinanceiroId = bbas.Id, AtivoFinanceiro = bbas, Provedor = ProvedorCotacao.B3Custodia, Simbolo = "BBAS3", PrecoBRL = 24m, Preco = 24m, ConsultadoEm = agora.AddDays(-1), RawJson = "{}" },
+            new() { AtivoFinanceiroId = deva.Id, AtivoFinanceiro = deva, Provedor = ProvedorCotacao.B3Custodia, Simbolo = "DEVA11", PrecoBRL = 110m, Preco = 110m, ConsultadoEm = agora, RawJson = "{}" }
         };
 
         var repo = new Mock<IFinancasRepository>();
@@ -430,12 +430,14 @@ public class FinancasCarteiraTests
         importador.Setup(x => x.GarantirCargaInicialAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var marketData = new Mock<IFinancasMarketDataService>();
+        var projection = new Mock<IPosicaoAtivoProjectionService>();
+        projection.Setup(x => x.RecalcularAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var log = new Mock<ILogAppService>();
         var mensagem = new Mock<IMensagemAppService>();
         var execution = new Mock<IExecutionContext>();
         execution.SetupGet(x => x.Usuario).Returns("teste");
 
-        return new FinancasAppService(uow.Object, importador.Object, marketData.Object, log.Object, mensagem.Object, execution.Object);
+        return new FinancasAppService(uow.Object, importador.Object, marketData.Object, projection.Object, log.Object, mensagem.Object, execution.Object);
     }
 
     private static AppDbContext CriarContexto()

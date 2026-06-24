@@ -8,7 +8,7 @@ using Sistema.CORE.Repositories.Interfaces;
 
 namespace Sistema.APP.Services;
 
-public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador, IFinancasMarketDataService marketData, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IFinancasAppService
+public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador, IFinancasMarketDataService marketData, IPosicaoAtivoProjectionService projection, ILogAppService log, IMensagemAppService mensagem, IExecutionContext execution) : IFinancasAppService
 {
     private const decimal QuantidadeAbertaMinima = 0.000000001m;
     private const decimal ValorDustCriptoMaximoBrl = 10m;
@@ -16,14 +16,18 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     private readonly IUnitOfWork _uow = uow;
     private readonly IFinancasImportador _importador = importador;
     private readonly IFinancasMarketDataService _marketData = marketData;
+    private readonly IPosicaoAtivoProjectionService _projection = projection;
     private readonly ILogAppService _log = log;
     private readonly IMensagemAppService _mensagem = mensagem;
     private readonly IExecutionContext _execution = execution;
 
     private string UsuarioAtual => string.IsNullOrWhiteSpace(_execution.Usuario) ? "sistema" : _execution.Usuario!;
 
-    public Task PrepararDashboardAsync(CancellationToken cancellationToken = default)
-        => _importador.GarantirCargaInicialAsync(cancellationToken);
+    public async Task PrepararDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        await _importador.GarantirCargaInicialAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
+    }
 
     public async Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default)
     {
@@ -34,7 +38,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var evolucao = CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
-        var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+        var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
         var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
 
         return new FinancasPatrimonioDto(
@@ -46,17 +50,16 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
     public async Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default)
     {
-        var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
-        var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+        var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
         var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
         var valorMercadoTotal = ativos.Sum(x => x.ValorMercado);
 
         // F-O: cripto não tem snapshot/saldo real importado (a Binance não tem aba "Posição" como a B3),
         // então a posição cripto ainda depende do netting do ledger (cripto.spec.md F2 em aberto).
         // Sinaliza "parcialmente reconciliado" sempre que houver posição cripto detida.
-        var criptoParcial = posicoes.Any(p => p.Asset.IsCrypto);
+        var criptoParcial = posicoes.Any(p => p.AtivoFinanceiro?.EhCripto == true);
 
         return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal), criptoParcial);
     }
@@ -76,7 +79,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Processado or StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
                 documentos.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
                 ultimaImportacao?.SourceFolder),
-            cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault());
+            cotacoes.OrderByDescending(x => x.ConsultadoEm).Select(x => (DateTime?)x.ConsultadoEm).FirstOrDefault());
     }
 
     // F-L — "Posições calculadas vs custódia". À prova de falha (roda no load): erro → DTO vazio.
@@ -85,16 +88,15 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     {
         try
         {
-            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
             var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
-            var posicoes = CalcularPosicoes(transacoes).Values.Where(p => p.Quantidade > QuantidadeAbertaMinima).ToList();
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
             var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
 
             // Preço de Fechamento da custódia B3 (Provedor=B3Custodia) por ativo — base do "diferença vs B3".
             var precoB3PorAtivo = cotacoes
-                .Where(c => c.Provedor == ProvedorCotacao.B3Custodia && c.PriceBRL > 0m)
+                .Where(c => c.Provedor == ProvedorCotacao.B3Custodia && c.PrecoBRL > 0m)
                 .GroupBy(c => c.AtivoFinanceiroId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.ConsultadoEm).First().PrecoBRL);
 
             // (a) Composição do valor de mercado por fonte do preço usado.
             decimal comCotacao = 0m, comFechamentoB3 = 0m, comCusto = 0m;
@@ -181,8 +183,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 {
                     var asset = g.First().Asset;
                     return new ProventoTopPagadorDto(
-                        asset?.Ticker ?? asset?.AssetKey ?? "—",
-                        asset?.Name ?? string.Empty,
+                        asset?.Sigla ?? asset?.Chave ?? "—",
+                        asset?.Nome ?? string.Empty,
                         Math.Round(g.Sum(ValorLiquido), 2));
                 })
                 .Where(x => x.Valor > 0m)
@@ -269,20 +271,20 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 return ReconciliacaoVazia();
 
             // Valor líquido parado no ativo VARIACAO = soma assinada (Compra +, Venda −) das suas linhas.
-            var variacao = ajustes.Where(t => t.Asset!.AssetKey == AssetKeyVariacao).ToList();
+            var variacao = ajustes.Where(t => t.Asset!.Chave == AssetKeyVariacao).ToList();
             var valorTotalVariacao = Math.Round(variacao.Sum(t => DeltaQuantidade(t)), 2);
 
             // Ajustes do ativo real (exclui a contrapartida VARIACAO). Alvo/Calculado vêm do RawJson
             // gravado pelo reconciliador; fallback: deriva do próprio ajuste se o JSON faltar.
             var ativosAjustados = ajustes
-                .Where(t => t.Asset!.AssetKey != AssetKeyVariacao)
+                .Where(t => t.Asset!.Chave != AssetKeyVariacao)
                 .Select(t =>
                 {
                     var (alvo, calculado) = LerAlvoCalculado(t.RawJson);
                     var diferenca = alvo - calculado;
                     return new ReconciliacaoAtivoDto(
-                        t.Asset!.Ticker ?? t.Asset.AssetKey ?? "—",
-                        t.Asset.Name ?? string.Empty,
+                        t.Asset!.Sigla ?? t.Asset.Chave ?? "—",
+                        t.Asset.Nome ?? string.Empty,
                         Math.Round(alvo, 8),
                         Math.Round(calculado, 8),
                         Math.Round(diferenca, 8),
@@ -372,7 +374,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 documentosMonitorados.Count(x => x.ParseStatus == StatusParseDocumentoFinanceiro.Processado || x.ParseStatus == StatusParseDocumentoFinanceiro.ParcialmenteProcessado),
                 documentosMonitorados.Count(x => x.ParseStatus is StatusParseDocumentoFinanceiro.Falhou or StatusParseDocumentoFinanceiro.SemDadosEstruturados),
                 ultimaImportacao?.SourceFolder),
-            CotacoesAtualizadasEm = cotacoes.OrderByDescending(x => x.RetrievedAt).Select(x => (DateTime?)x.RetrievedAt).FirstOrDefault(),
+            CotacoesAtualizadasEm = cotacoes.OrderByDescending(x => x.ConsultadoEm).Select(x => (DateTime?)x.ConsultadoEm).FirstOrDefault(),
             ValorMercadoTotal = valorMercadoTotal,
             ProventosMensais = proventosMensais,
             CustoEstimadoTotal = ativosCotados.Sum(x => x.CustoEstimado),
@@ -551,9 +553,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             r.Id,
             r.PaymentDate,
             r.ReferenceDate,
-            r.Asset?.Ticker ?? r.Asset?.AssetKey ?? string.Empty,
-            r.Asset?.Name ?? string.Empty,
-            r.Asset?.AssetClass.ToString() ?? string.Empty,
+            r.Asset?.Sigla ?? r.Asset?.Chave ?? string.Empty,
+            r.Asset?.Nome ?? string.Empty,
+            r.Asset?.Classe.ToString() ?? string.Empty,
             string.IsNullOrWhiteSpace(r.IncomeType) ? "Provento" : r.IncomeType,
             r.Quantity,
             r.RatePerShare,
@@ -657,7 +659,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var datas = Enumerable.Range(0, totalDias).Select(i => inicio.AddDays(i)).ToList();
         var cotacaoPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.ConsultadoEm).First());
 
         // Agrupa por carteira/grupo (Setor, Tese de cripto, Classe de FII...). Cada ativo cai na
         // primeira carteira que o contém, na ordem definida. Ativos sem grupo vão para "Outros".
@@ -735,8 +737,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var preco = ultimoPreco > 0m ? ultimoPreco : precoMedio;
                 if (di == totalDias - 1
                     && cotacaoPorAtivo.TryGetValue(grupo.Key, out var cotAtual)
-                    && cotAtual.PriceBRL > 0m)
-                    preco = cotAtual.PriceBRL;
+                    && cotAtual.PrecoBRL > 0m)
+                    preco = cotAtual.PrecoBRL;
 
                 var valor = quantidade > QuantidadeAbertaMinima ? quantidade * preco : 0m;
                 if (!EhValorPosicaoVisivel(assetGrupo, quantidade, valor))
@@ -773,13 +775,13 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         decimal valorCotadoDiaTotal = 0m, varDiaValorTotal = 0m;
         foreach (var pos in posicoesAtuais.Values.Where(p => p.Quantidade > QuantidadeAbertaMinima))
         {
-            if (!cotacaoPorAtivo.TryGetValue(pos.Asset.Id, out var cot) || cot.PriceBRL <= 0m)
+            if (!cotacaoPorAtivo.TryGetValue(pos.Asset.Id, out var cot) || cot.PrecoBRL <= 0m)
                 continue;
 
-            var valorAtual = pos.Quantidade * cot.PriceBRL;
+            var valorAtual = pos.Quantidade * cot.PrecoBRL;
             if (!EhValorPosicaoVisivel(pos.Asset, pos.Quantidade, valorAtual))
                 continue;
-            var varValor = valorAtual * ((cot.ChangePercent ?? 0m) / 100m);
+            var varValor = valorAtual * ((cot.VariacaoPercentual ?? 0m) / 100m);
             var setorAtivo = setorPorAtivo.TryGetValue(pos.Asset.Id, out var s) ? s : "Outros";
             diaPorSetor.TryGetValue(setorAtivo, out var acc);
             diaPorSetor[setorAtivo] = (acc.Valor + valorAtual, acc.VarValor + varValor);
@@ -825,7 +827,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
         var precoAtualPorAtivo = cotacoes
             .GroupBy(c => c.AtivoFinanceiroId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.RetrievedAt).First().PriceBRL);
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.ConsultadoEm).First().PrecoBRL);
 
         // Proventos líquidos recebidos no período, por ativo — entram no retorno total (ganho de capital
         // sozinho ignora dividendos/JCP/rendimentos de FII).
@@ -908,8 +910,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
             ativos.Add(new ResumoAtivoDto(
                 TickerDe(pos.Asset),
-                pos.Asset.Name,
-                pos.Asset.AssetClass.ToString(),
+                pos.Asset.Nome,
+                pos.Asset.Classe.ToString(),
                 Math.Round(pos.Quantidade, 8),
                 Math.Round(precoMedio, 4),
                 Math.Round(pos.Custo, 2),
@@ -941,7 +943,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             vendas.OrderByDescending(v => v.Data).ToList());
     }
 
-    private static string TickerDe(AtivoFinanceiro a) => a.Ticker ?? a.AssetKey ?? a.Name ?? string.Empty;
+    private static string TickerDe(AtivoFinanceiro a) => a.Sigla ?? a.Chave ?? a.Nome ?? string.Empty;
 
     private static bool EhAtivoCotadoVisivel(CotacaoAtivoDto ativo)
     {
@@ -957,23 +959,56 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         if (quantidade <= QuantidadeAbertaMinima)
             return false;
 
-        return (!ativo.IsCrypto && ativo.AssetClass != ClasseAtivo.Cripto)
+        return (!ativo.EhCripto && ativo.Classe != ClasseAtivo.Cripto)
             || valorMercado >= ValorDustCriptoMaximoBrl;
     }
 
     private static bool EhPosicaoEstimativaAbertaVisivel(EstimativaPosicaoCarteira posicao)
     {
-        if (posicao.Status != StatusEstimativaPosicao.AbertaOuResidual || posicao.Quantity <= QuantidadeAbertaMinima)
+        if (posicao.Status != StatusEstimativaPosicao.AbertaOuResidual || posicao.Quantidade <= QuantidadeAbertaMinima)
             return false;
 
-        var ativo = posicao.Asset;
-        if (ativo is null || (!ativo.IsCrypto && ativo.AssetClass != ClasseAtivo.Cripto))
+        var ativo = posicao.AtivoFinanceiro;
+        if (ativo is null || (!ativo.EhCripto && ativo.Classe != ClasseAtivo.Cripto))
             return true;
 
-        var valor = posicao.EstimatedCurrentPosition != 0m
-            ? Math.Abs(posicao.EstimatedCurrentPosition)
-            : Math.Abs(posicao.Quantity * posicao.AveragePrice);
+        var valor = posicao.PosicaoAtualEstimada != 0m
+            ? Math.Abs(posicao.PosicaoAtualEstimada)
+            : Math.Abs(posicao.Quantidade * posicao.PrecoMedio);
         return valor >= ValorDustCriptoMaximoBrl;
+    }
+
+    private async Task<IReadOnlyList<PosicaoAtivo>> ObterPosicoesAtivosProjetadasAsync(CancellationToken cancellationToken)
+    {
+        var posicoes = await _uow.Financas.BuscarPosicoesAtivosAsync(cancellationToken) ?? [];
+        if (posicoes.Count > 0)
+            return posicoes.Where(p => p.Quantidade > QuantidadeAbertaMinima && p.AtivoFinanceiro is not null).ToList();
+
+        await _projection.RecalcularAsync(cancellationToken);
+        posicoes = await _uow.Financas.BuscarPosicoesAtivosAsync(cancellationToken) ?? [];
+        if (posicoes.Count == 0)
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            posicoes = CalculadoraPosicaoAtivo.Calcular(transacoes)
+                .Select(p => new PosicaoAtivo
+                {
+                    AtivoFinanceiroId = p.AtivoFinanceiroId,
+                    AtivoFinanceiro = p.AtivoFinanceiro,
+                    Quantidade = p.Quantidade,
+                    PrecoMedio = p.PrecoMedio,
+                    CustoTotal = p.CustoTotal,
+                    TotalComprado = p.TotalComprado,
+                    TotalVendido = p.TotalVendido,
+                    ResultadoRealizado = p.ResultadoRealizado,
+                    UltimaOperacaoEm = p.UltimaOperacaoEm,
+                    Status = p.Status,
+                    CalculadoEm = DateTime.UtcNow,
+                    VersaoCalculo = "fallback"
+                })
+                .ToList();
+        }
+
+        return posicoes.Where(p => p.Quantidade > QuantidadeAbertaMinima && p.AtivoFinanceiro is not null).ToList();
     }
 
     private sealed class PosicaoAcumulada
@@ -1033,14 +1068,14 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             var classe = Enum.TryParse<ClasseAtivo>(validacao.Classe, true, out var c) ? c : ClasseAtivo.Outro;
             ativo = new AtivoFinanceiro
             {
-                AssetKey = ticker,
-                Ticker = ticker,
-                Name = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
-                AssetClass = classe,
-                Market = validacao.IsCrypto ? "Binance" : "B3",
-                Currency = "BRL",
-                IsCrypto = validacao.IsCrypto,
-                IsActive = true,
+                Chave = ticker,
+                Sigla = ticker,
+                Nome = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
+                Classe = classe,
+                Mercado = validacao.IsCrypto ? "Binance" : "B3",
+                Moeda = "BRL",
+                EhCripto = validacao.IsCrypto,
+                Ativo = true,
                 UsuarioInclusao = "financas-manual"
             };
             await _uow.Financas.AdicionarAtivoAsync(ativo, cancellationToken);
@@ -1073,6 +1108,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Transação manual {tipo} de {input.Quantidade} {ticker} a {input.PrecoUnitario}",
             LogTipo.Sucesso, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação registrada.", transacao.Id);
     }
 
@@ -1100,6 +1136,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Transação #{transacao.Id} editada ({tipo} {input.Quantidade})",
             LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação atualizada.", transacao.Id);
     }
 
@@ -1115,6 +1152,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Transação #{transacao.Id} excluída ({transacao.OperationType} {transacao.Quantity})",
             LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Transação excluída.");
     }
 
@@ -1144,14 +1182,14 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             var classe = Enum.TryParse<ClasseAtivo>(validacao.Classe, true, out var c) ? c : ClasseAtivo.Outro;
             ativo = new AtivoFinanceiro
             {
-                AssetKey = ticker,
-                Ticker = ticker,
-                Name = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
-                AssetClass = classe,
-                Market = validacao.IsCrypto ? "Binance" : "B3",
-                Currency = "BRL",
-                IsCrypto = validacao.IsCrypto,
-                IsActive = true,
+                Chave = ticker,
+                Sigla = ticker,
+                Nome = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
+                Classe = classe,
+                Mercado = validacao.IsCrypto ? "Binance" : "B3",
+                Moeda = "BRL",
+                EhCripto = validacao.IsCrypto,
+                Ativo = true,
                 UsuarioInclusao = "financas-manual"
             };
             await _uow.Financas.AdicionarAtivoAsync(ativo, cancellationToken);
@@ -1178,6 +1216,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Evento {tipo} de {ticker} em {input.Data:yyyy-MM-dd} fator {input.Fator}",
             LogTipo.Sucesso, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Evento corporativo registrado.", evento.Id);
     }
 
@@ -1201,6 +1240,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Evento #{evento.Id} editado ({tipo} fator {input.Fator})",
             LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Evento corporativo atualizado.", evento.Id);
     }
 
@@ -1216,14 +1256,15 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             $"Evento #{evento.Id} excluído ({evento.Tipo} fator {evento.Fator})",
             LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
+        await _projection.RecalcularAsync(cancellationToken);
         return new ResultadoOperacao(true, "Evento corporativo excluído.");
     }
 
     private static EventoCorporativoDto MapEventoCorporativo(EventoCorporativo e)
         => new(
             e.Id,
-            e.AtivoFinanceiro?.Ticker ?? e.AtivoFinanceiro?.AssetKey ?? string.Empty,
-            e.AtivoFinanceiro?.Name ?? string.Empty,
+            e.AtivoFinanceiro?.Sigla ?? e.AtivoFinanceiro?.Chave ?? string.Empty,
+            e.AtivoFinanceiro?.Nome ?? string.Empty,
             e.Tipo.ToString(),
             e.Data,
             e.Fator,
@@ -1281,13 +1322,13 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         => new(conteudo.Id, conteudo.ContentType.ToString(), conteudo.PageNumber, conteudo.SheetName, conteudo.RowNumber, conteudo.RawText, conteudo.RawJson);
 
     private static OperacaoB3Dto MapOperacaoB3(OperacaoB3 op)
-        => new(op.Id, op.TradeDate, op.OperationType.ToString(), op.Asset?.Name ?? op.OriginalAssetName, op.Asset?.AssetClass.ToString() ?? string.Empty, op.Quantity, op.UnitPrice, op.GrossAmount, op.Market, op.SourceFile, op.PageNumber, op.IsCanonical, op.ConfidenceLevel.ToString());
+        => new(op.Id, op.TradeDate, op.OperationType.ToString(), op.Asset?.Nome ?? op.OriginalAssetName, op.Asset?.Classe.ToString() ?? string.Empty, op.Quantity, op.UnitPrice, op.GrossAmount, op.Market, op.SourceFile, op.PageNumber, op.IsCanonical, op.ConfidenceLevel.ToString());
 
     private static TransacaoCriptoDto MapTransacaoCripto(TransacaoCripto tx)
         => new(tx.Id, tx.TransactionDate, tx.OperationType.ToString(), tx.AssetSymbol, tx.Pair, tx.Amount, tx.Price, tx.Total, tx.SourceFile, tx.RawType);
 
     private static PosicaoFinanceiraDto MapPosicao(EstimativaPosicaoCarteira posicao)
-        => new(posicao.Id, posicao.Asset?.Name ?? string.Empty, posicao.Asset?.AssetClass.ToString() ?? string.Empty, posicao.Quantity, posicao.AveragePrice, posicao.TotalInvested, posicao.TotalSold, posicao.RealizedResult, posicao.Status.ToString(), posicao.ConfidenceLevel.ToString(), posicao.LastOperationDate);
+        => new(posicao.Id, posicao.AtivoFinanceiro?.Nome ?? string.Empty, posicao.AtivoFinanceiro?.Classe.ToString() ?? string.Empty, posicao.Quantidade, posicao.PrecoMedio, posicao.TotalInvestido, posicao.TotalVendido, posicao.ResultadoRealizado, posicao.Status.ToString(), posicao.NivelConfianca.ToString(), posicao.UltimaOperacaoEm);
 
     private static AlertaConfiabilidadeDto MapAlerta(AlertaConfiabilidade alerta)
         => new(alerta.Id, alerta.EntityType, alerta.Severity.ToString(), alerta.Code, alerta.Message, alerta.Details, alerta.CreatedAt);
@@ -1297,9 +1338,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             t.Id,
             t.Origem.ToString(),
             string.IsNullOrWhiteSpace(t.Fonte) ? t.Origem.ToString() : t.Fonte,
-            t.Asset?.Name ?? t.Asset?.Ticker ?? string.Empty,
-            t.Asset?.Ticker ?? t.Asset?.AssetKey ?? string.Empty,
-            t.Asset?.AssetClass.ToString() ?? string.Empty,
+            t.Asset?.Nome ?? t.Asset?.Sigla ?? string.Empty,
+            t.Asset?.Sigla ?? t.Asset?.Chave ?? string.Empty,
+            t.Asset?.Classe.ToString() ?? string.Empty,
             t.Date,
             t.OperationType.ToString(),
             t.Quantity,
@@ -1354,6 +1395,48 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         _ => "Cotação"
     };
 
+    private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAtivo> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
+    {
+        var cotacaoPorAtivo = cotacoes
+            .GroupBy(x => x.AtivoFinanceiroId)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.PrecoBRL > 0m).ThenByDescending(c => c.ConsultadoEm).First());
+
+        return posicoes
+            .Where(pos => pos.AtivoFinanceiro is not null && pos.Quantidade > QuantidadeAbertaMinima)
+            .Select(pos =>
+            {
+                var ativo = pos.AtivoFinanceiro!;
+                cotacaoPorAtivo.TryGetValue(ativo.Id, out var cotacao);
+                var precoAtual = cotacao is { PrecoBRL: > 0m } ? cotacao.PrecoBRL : (decimal?)null;
+                var custo = pos.CustoTotal;
+                var valorMercado = precoAtual.HasValue ? pos.Quantidade * precoAtual.Value : custo;
+                var resultado = valorMercado - custo;
+                var percentual = custo == 0m ? 0m : resultado / custo * 100m;
+                var status = precoAtual.HasValue ? (cotacao?.Status.ToString() ?? "SemCotacao") : "SemCotacao";
+                var fontePreco = !precoAtual.HasValue ? "Custo" : RotuloFontePreco(cotacao!.Provedor);
+
+                return new CotacaoAtivoDto(
+                    ativo.Id,
+                    ativo.Sigla ?? ativo.Chave ?? ativo.Nome ?? string.Empty,
+                    ativo.Classe.ToString(),
+                    cotacao?.Simbolo ?? ativo.Sigla ?? ativo.Chave ?? string.Empty,
+                    pos.Quantidade,
+                    pos.PrecoMedio,
+                    precoAtual,
+                    valorMercado,
+                    custo,
+                    resultado,
+                    percentual,
+                    precoAtual.HasValue ? cotacao?.VariacaoPercentual : null,
+                    cotacao?.ConsultadoEm,
+                    status,
+                    pos.Status.ToString(),
+                    fontePreco);
+            })
+            .OrderByDescending(x => x.ValorMercado)
+            .ToList();
+    }
+
     private static IReadOnlyList<CotacaoAtivoDto> CriarAtivosCotadosDaTabela(IReadOnlyList<PosicaoAcumulada> posicoes, IReadOnlyList<CotacaoAtivoFinanceiro> cotacoes)
     {
         // Prefere uma cotação utilizável (PriceBRL > 0) e SÓ DEPOIS a mais recente. Sem isso, uma
@@ -1361,7 +1444,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         // custódia B3 (Preço de Fechamento), zerando de novo o "Resultado" das ações/FII.
         var cotacaoPorAtivo = cotacoes
             .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.PriceBRL > 0m).ThenByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.PrecoBRL > 0m).ThenByDescending(c => c.ConsultadoEm).First());
 
         return posicoes
             .Select(pos =>
@@ -1369,7 +1452,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                 var asset = pos.Asset;
                 cotacaoPorAtivo.TryGetValue(asset.Id, out var cotacao);
                 var precoMedio = pos.Quantidade > 0m ? pos.Custo / pos.Quantidade : 0m;
-                var precoAtual = cotacao is { PriceBRL: > 0m } ? cotacao.PriceBRL : (decimal?)null;
+                var precoAtual = cotacao is { PrecoBRL: > 0m } ? cotacao.PrecoBRL : (decimal?)null;
                 var custo = pos.Custo;
                 // F-D/F-J: sem cotação utilizável (ação B3 sem token Brapi, cripto sem preço) o valor de
                 // mercado cai no CUSTO (preço médio) — piso consistente, nunca 0 para ativo detido. Sem
@@ -1386,9 +1469,9 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
 
                 return new CotacaoAtivoDto(
                     asset.Id,
-                    asset.Ticker ?? asset.AssetKey ?? asset.Name ?? string.Empty,
-                    asset.AssetClass.ToString(),
-                    cotacao?.Symbol ?? asset.Ticker ?? asset.AssetKey ?? string.Empty,
+                    asset.Sigla ?? asset.Chave ?? asset.Nome ?? string.Empty,
+                    asset.Classe.ToString(),
+                    cotacao?.Simbolo ?? asset.Sigla ?? asset.Chave ?? string.Empty,
                     pos.Quantidade,
                     precoMedio,
                     precoAtual,
@@ -1396,8 +1479,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     custo,
                     resultado,
                     percentual,
-                    precoAtual.HasValue ? cotacao?.ChangePercent : null,
-                    cotacao?.RetrievedAt,
+                    precoAtual.HasValue ? cotacao?.VariacaoPercentual : null,
+                    cotacao?.ConsultadoEm,
                     status,
                     "Calculada",
                     fontePreco);
@@ -1410,35 +1493,35 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     {
         var cotacaoPorAtivo = cotacoes
             .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.ConsultadoEm).First());
 
         return posicoes
-            .Where(x => x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.Asset is not null)
+            .Where(x => x.Status == StatusEstimativaPosicao.AbertaOuResidual && x.AtivoFinanceiro is not null)
             .Select(posicao =>
             {
-                cotacaoPorAtivo.TryGetValue(posicao.AssetId, out var cotacao);
-                var precoAtual = cotacao?.PriceBRL;
-                var custo = posicao.Quantity * posicao.AveragePrice;
-                var valorMercado = precoAtual.HasValue ? posicao.Quantity * precoAtual.Value : posicao.EstimatedCurrentPosition;
+                cotacaoPorAtivo.TryGetValue(posicao.AtivoFinanceiroId, out var cotacao);
+                var precoAtual = cotacao?.PrecoBRL;
+                var custo = posicao.Quantidade * posicao.PrecoMedio;
+                var valorMercado = precoAtual.HasValue ? posicao.Quantidade * precoAtual.Value : posicao.PosicaoAtualEstimada;
                 var resultado = valorMercado - custo;
                 var percentual = custo == 0 ? 0 : resultado / custo * 100m;
 
                 return new CotacaoAtivoDto(
-                    posicao.AssetId,
-                    posicao.Asset?.Ticker ?? posicao.Asset?.AssetKey ?? posicao.Asset?.Name ?? string.Empty,
-                    posicao.Asset?.AssetClass.ToString() ?? string.Empty,
-                    cotacao?.Symbol ?? posicao.Asset?.Ticker ?? posicao.Asset?.AssetKey ?? string.Empty,
-                    posicao.Quantity,
-                    posicao.AveragePrice,
+                    posicao.AtivoFinanceiroId,
+                    posicao.AtivoFinanceiro?.Sigla ?? posicao.AtivoFinanceiro?.Chave ?? posicao.AtivoFinanceiro?.Nome ?? string.Empty,
+                    posicao.AtivoFinanceiro?.Classe.ToString() ?? string.Empty,
+                    cotacao?.Simbolo ?? posicao.AtivoFinanceiro?.Sigla ?? posicao.AtivoFinanceiro?.Chave ?? string.Empty,
+                    posicao.Quantidade,
+                    posicao.PrecoMedio,
                     precoAtual,
                     valorMercado,
                     custo,
                     resultado,
                     percentual,
-                    cotacao?.ChangePercent,
-                    cotacao?.RetrievedAt,
+                    cotacao?.VariacaoPercentual,
+                    cotacao?.ConsultadoEm,
                     cotacao?.Status.ToString() ?? "SemCotacao",
-                    posicao.ConfidenceLevel.ToString());
+                    posicao.NivelConfianca.ToString());
             })
             .OrderByDescending(x => x.ValorMercado)
             .ToList();
@@ -1451,8 +1534,8 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     {
         var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
         var filhasPorPai = carteiras
-            .Where(c => c.ParentId.HasValue)
-            .GroupBy(c => c.ParentId!.Value)
+            .Where(c => c.CarteiraPaiId.HasValue)
+            .GroupBy(c => c.CarteiraPaiId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Ordem).ThenBy(c => c.Nome).ToList());
 
         // Constrói o resumo de UMA carteira: seus ativos diretos + (recursivo) suas subcarteiras.
@@ -1510,7 +1593,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         // Só os topos (ParentId nulo) entram no nível raiz; as filhas vêm aninhadas. Carteiras antigas
         // flat (sem ParentId, sem filhas) também são "topos" e continuam aparecendo.
         return carteiras
-            .Where(c => !c.ParentId.HasValue)
+            .Where(c => !c.CarteiraPaiId.HasValue)
             .OrderBy(c => c.Ordem)
             .ThenBy(c => c.Nome)
             .Select(Montar)

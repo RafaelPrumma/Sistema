@@ -29,6 +29,8 @@ public interface IFinancasRepository
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AtivoFinanceiro>> BuscarAtivosComPosicaoAbertaAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CotacaoAtivoFinanceiro>> BuscarCotacoesAtuaisAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PosicaoAtivo>> BuscarPosicoesAtivosAsync(CancellationToken cancellationToken = default);
+    Task SubstituirPosicoesAtivosAsync(IReadOnlyList<PosicaoAtivo> posicoes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CarteiraFinanceira>> BuscarCarteirasComAtivosAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default);

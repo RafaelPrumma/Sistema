@@ -340,14 +340,14 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         // no resync (sem reimport). Se o base não existir, mantém o próprio ativo.
         var ativosPorIdB3 = await _context.AtivosFinanceiros.ToDictionaryAsync(a => a.Id, cancellationToken);
         var ativosPorKeyB3 = ativosPorIdB3.Values
-            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(a => a.Chave, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         int ResolverAtivoBaseB3(int assetId)
         {
             if (!ativosPorIdB3.TryGetValue(assetId, out var a))
                 return assetId;
-            var baseKey = ExtratoB3Materializador.NormalizarTicker(a.Ticker ?? a.AssetKey);
-            return !string.Equals(baseKey, a.AssetKey, StringComparison.OrdinalIgnoreCase)
+            var baseKey = ExtratoB3Materializador.NormalizarTicker(a.Sigla ?? a.Chave);
+            return !string.Equals(baseKey, a.Chave, StringComparison.OrdinalIgnoreCase)
                    && ativosPorKeyB3.TryGetValue(baseKey, out var ativoBase)
                 ? ativoBase.Id
                 : assetId;
@@ -501,9 +501,9 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             return;
 
         var assetIdPorChave = (await _context.AtivosFinanceiros
-                .Where(a => a.IsCrypto)
+                .Where(a => a.EhCripto)
                 .ToListAsync(cancellationToken))
-            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(a => a.Chave, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
 
         // Lógica pura: classifica e neta as pernas. Mantém a ordem (timestamp, id) para o PM corrente.
@@ -744,7 +744,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     private async Task<Dictionary<string, AtivoFinanceiro>> CarregarAtivosAsync(CancellationToken cancellationToken)
     {
         var ativos = await _context.AtivosFinanceiros.ToListAsync(cancellationToken);
-        return ativos.ToDictionary(x => x.AssetKey, StringComparer.OrdinalIgnoreCase);
+        return ativos.ToDictionary(x => x.Chave, StringComparer.OrdinalIgnoreCase);
     }
 
     private void ImportarB3(JsonElement root, CargaFinanceira carga, Dictionary<string, DocumentoFinanceiro> documentos, Dictionary<string, AtivoFinanceiro> ativos)
@@ -809,16 +809,16 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 _context.EstimativasPosicaoCarteira.Add(new EstimativaPosicaoCarteira
                 {
                     CargaFinanceira = carga,
-                    Asset = ativo,
-                    Quantity = GetDecimal(item, "netQuantity") ?? 0m,
-                    AveragePrice = GetDecimal(item, "averageBuyPriceGross") ?? 0m,
-                    TotalInvested = GetDecimal(item, "buyGrossValue") ?? 0m,
-                    TotalSold = GetDecimal(item, "sellGrossValue") ?? 0m,
-                    RealizedResult = (GetDecimal(item, "sellGrossValue") ?? 0m) - (GetDecimal(item, "buyGrossValue") ?? 0m),
-                    EstimatedCurrentPosition = GetDecimal(item, "netInvestedGross") ?? 0m,
+                    AtivoFinanceiro = ativo,
+                    Quantidade = GetDecimal(item, "netQuantity") ?? 0m,
+                    PrecoMedio = GetDecimal(item, "averageBuyPriceGross") ?? 0m,
+                    TotalInvestido = GetDecimal(item, "buyGrossValue") ?? 0m,
+                    TotalVendido = GetDecimal(item, "sellGrossValue") ?? 0m,
+                    ResultadoRealizado = (GetDecimal(item, "sellGrossValue") ?? 0m) - (GetDecimal(item, "buyGrossValue") ?? 0m),
+                    PosicaoAtualEstimada = GetDecimal(item, "netInvestedGross") ?? 0m,
                     Status = MapStatusPosicao(GetString(item, "statusEstimate")),
-                    ConfidenceLevel = NivelConfianca.PendenteValidacao,
-                    LastOperationDate = TryParseDate(GetString(item, "lastDate")),
+                    NivelConfianca = NivelConfianca.PendenteValidacao,
+                    UltimaOperacaoEm = TryParseDate(GetString(item, "lastDate")),
                     RawJson = item.GetRawText(),
                     UsuarioInclusao = "financas-importador"
                 });
@@ -871,7 +871,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 TransactionDate = TryParseDateTime(GetString(row, "Tempo") ?? GetString(row, "UTC_Time")),
                 Exchange = "Binance",
                 OperationType = MapOperacaoCripto(tipo, GetString(row, "Operação") ?? GetString(row, "Operation") ?? GetString(row, "Lado")),
-                AssetSymbol = ativo.AssetKey,
+                AssetSymbol = ativo.Chave,
                 Pair = GetString(row, "Par"),
                 Amount = amount,
                 Price = ParseDecimal(GetString(row, "Preço")),
@@ -1426,7 +1426,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             TransactionDate = TryParseDateTime(GetValue(row, "Tempo") ?? GetValue(row, "UTC_Time")),
             Exchange = "Binance",
             OperationType = MapOperacaoCripto(tipo, GetValue(row, "Operação") ?? GetValue(row, "Operation") ?? GetValue(row, "Lado")),
-            AssetSymbol = ativo.AssetKey,
+            AssetSymbol = ativo.Chave,
             Pair = GetValue(row, "Par"),
             Amount = amount,
             Price = ParseDecimal(GetValue(row, "Preço")),
@@ -1447,25 +1447,25 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         assetKey = string.IsNullOrWhiteSpace(assetKey) ? "SEM_ATIVO" : assetKey.Trim();
         if (ativos.TryGetValue(assetKey, out var ativo))
         {
-            if (string.IsNullOrWhiteSpace(ativo.Ticker))
-                ativo.Ticker = tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name);
-            if (ativo.AssetClass == ClasseAtivo.Outro && classe != ClasseAtivo.Outro)
-                ativo.AssetClass = classe;
-            if (string.IsNullOrWhiteSpace(ativo.Market))
-                ativo.Market = isCrypto ? "Binance" : "B3";
+            if (string.IsNullOrWhiteSpace(ativo.Sigla))
+                ativo.Sigla = tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name);
+            if (ativo.Classe == ClasseAtivo.Outro && classe != ClasseAtivo.Outro)
+                ativo.Classe = classe;
+            if (string.IsNullOrWhiteSpace(ativo.Mercado))
+                ativo.Mercado = isCrypto ? "Binance" : "B3";
             return ativo;
         }
 
         ativo = new AtivoFinanceiro
         {
-            AssetKey = assetKey,
-            Ticker = isCrypto ? assetKey.ToUpperInvariant() : tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name),
-            Name = string.IsNullOrWhiteSpace(name) ? assetKey : name.Trim(),
-            AssetClass = classe,
-            Market = isCrypto ? "Binance" : "B3",
-            Currency = isCrypto ? "USD/BRL" : "BRL",
-            IsCrypto = isCrypto,
-            ConceptRole = isCrypto ? MapPapelCripto(assetKey) : null,
+            Chave = assetKey,
+            Sigla = isCrypto ? assetKey.ToUpperInvariant() : tickerHint ?? ExtrairTicker(assetKey) ?? ExtrairTicker(name),
+            Nome = string.IsNullOrWhiteSpace(name) ? assetKey : name.Trim(),
+            Classe = classe,
+            Mercado = isCrypto ? "Binance" : "B3",
+            Moeda = isCrypto ? "USD/BRL" : "BRL",
+            EhCripto = isCrypto,
+            PapelConceitual = isCrypto ? MapPapelCripto(assetKey) : null,
             UsuarioInclusao = "financas-importador"
         };
 
@@ -1531,9 +1531,9 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             {
                 existente.Nome = nome;
                 existente.Ordem = ordem;
-                existente.ParentId = parentId;
+                existente.CarteiraPaiId = parentId;
                 existente.Tipo = tipo;
-                existente.IsSistema = true;
+                existente.EhSistema = true;
                 existente.Ativo = true;
                 return existente;
             }
@@ -1544,8 +1544,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
                 Slug = slug,
                 Tipo = tipo,
                 Ordem = ordem,
-                ParentId = parentId,
-                IsSistema = true,
+                CarteiraPaiId = parentId,
+                EhSistema = true,
                 Ativo = true,
                 UsuarioInclusao = UsuarioAutoCarteira
             };
@@ -1568,8 +1568,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         // 2) Desativa carteiras de SISTEMA de versões antigas que não fazem parte da nova árvore
         //    (preserva histórico — não apaga; não toca em CarteiraAtivoFinanceiro existente).
-        //    Carteiras criadas/editadas à mão pelo usuário (IsSistema = false) ficam intactas.
-        foreach (var carteira in carteiras.Where(c => c.IsSistema && c.Ativo && !slugsArvore.Contains(c.Slug)))
+        //    Carteiras criadas/editadas à mão pelo usuário (EhSistema = false) ficam intactas.
+        foreach (var carteira in carteiras.Where(c => c.EhSistema && c.Ativo && !slugsArvore.Contains(c.Slug)))
             carteira.Ativo = false;
 
         await _context.SaveChangesAsync(cancellationToken);

@@ -157,11 +157,11 @@ public class ClassificadorCarteiraTests
         var ativo = new AtivoFinanceiro
         {
             Id = 1,
-            AssetKey = "DOGE",
-            Ticker = "DOGE",
-            Name = "Dogecoin",
-            AssetClass = ClasseAtivo.Cripto,
-            IsCrypto = true
+            Chave = "DOGE",
+            Sigla = "DOGE",
+            Nome = "Dogecoin",
+            Classe = ClasseAtivo.Cripto,
+            EhCripto = true
         };
 
         var classificacao = ClassificadorCarteira.Classificar(ativo);
@@ -177,10 +177,10 @@ public class ClassificadorCarteiraTests
         var ativo = new AtivoFinanceiro
         {
             Id = 2,
-            AssetKey = "RANI3",
-            Ticker = "RANI3",
-            Name = "IRANI PAPEL ON",
-            AssetClass = ClasseAtivo.Acao
+            Chave = "RANI3",
+            Sigla = "RANI3",
+            Nome = "IRANI PAPEL ON",
+            Classe = ClasseAtivo.Acao
         };
 
         Assert.Null(ClassificadorCarteira.Classificar(ativo));

@@ -45,9 +45,9 @@ public class EventoCorporativoTests
 
         var ativo = new AtivoFinanceiro
         {
-            Id = 1, AssetKey = "BCFF11", Ticker = "BCFF11",
-            Name = "FII BC FFII CI", AssetClass = ClasseAtivo.FII,
-            Market = "B3", UsuarioInclusao = "test"
+            Id = 1, Chave = "BCFF11", Sigla = "BCFF11",
+            Nome = "FII BC FFII CI", Classe = ClasseAtivo.FII,
+            Mercado = "B3", UsuarioInclusao = "test"
         };
         ctx.AtivosFinanceiros.Add(ativo);
 
@@ -121,9 +121,9 @@ public class EventoCorporativoTests
 
         var ativo = new AtivoFinanceiro
         {
-            Id = 1, AssetKey = "GGRC11", Ticker = "GGRC11",
-            Name = "FII GGR COVEPI CI", AssetClass = ClasseAtivo.FII,
-            Market = "B3", UsuarioInclusao = "test"
+            Id = 1, Chave = "GGRC11", Sigla = "GGRC11",
+            Nome = "FII GGR COVEPI CI", Classe = ClasseAtivo.FII,
+            Mercado = "B3", UsuarioInclusao = "test"
         };
         ctx.AtivosFinanceiros.Add(ativo);
 
@@ -165,9 +165,9 @@ public class EventoCorporativoTests
 
         var ativo = new AtivoFinanceiro
         {
-            Id = 1, AssetKey = "TST11", Ticker = "TST11",
-            Name = "FII TESTE", AssetClass = ClasseAtivo.FII,
-            Market = "B3", UsuarioInclusao = "test"
+            Id = 1, Chave = "TST11", Sigla = "TST11",
+            Nome = "FII TESTE", Classe = ClasseAtivo.FII,
+            Mercado = "B3", UsuarioInclusao = "test"
         };
         ctx.AtivosFinanceiros.Add(ativo);
 
@@ -217,9 +217,9 @@ public class EventoCorporativoTests
 
         var ativo = new AtivoFinanceiro
         {
-            Id = 1, AssetKey = "ITUB4", Ticker = "ITUB4",
-            Name = "Itau PN", AssetClass = ClasseAtivo.Acao,
-            Market = "B3", UsuarioInclusao = "test"
+            Id = 1, Chave = "ITUB4", Sigla = "ITUB4",
+            Nome = "Itau PN", Classe = ClasseAtivo.Acao,
+            Mercado = "B3", UsuarioInclusao = "test"
         };
         ctx.AtivosFinanceiros.Add(ativo);
 

@@ -21,6 +21,7 @@ public static class ApplicationExtensions
         services.AddScoped<IMensagemAppService, MensagemAppService>();
         services.AddScoped<ILogAppService, LogAppService>();
         services.AddScoped<IFinancasAppService, FinancasAppService>();
+        services.AddScoped<IPosicaoAtivoProjectionService, PosicaoAtivoProjectionService>();
 
         services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
         services.AddAutoMapper(cfg => { }, typeof(MappingProfile).Assembly);
