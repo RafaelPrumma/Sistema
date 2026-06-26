@@ -142,6 +142,66 @@ public class CalculadoraIrTests
         Assert.Equal("PETR4", item.Ticker);
         Assert.Equal(100m, item.Quantidade);
         Assert.Equal(3000m, item.Custo);
+        Assert.Equal(string.Empty, item.Codigo); // B3 não tem código RFB do grupo 08
+    }
+
+    [Fact]
+    public void BensEDireitos_Cripto_AtribuiCodigoRfbPorTipo()
+    {
+        var btc = Ativo(10, "BTC", ClasseAtivo.Cripto, cripto: true);
+        var sol = Ativo(11, "SOL", ClasseAtivo.Cripto, cripto: true);   // altcoin
+        var usdt = Ativo(12, "USDT", ClasseAtivo.Cripto, cripto: true); // stablecoin
+        var wbeth = Ativo(13, "WBETH", ClasseAtivo.Cripto, cripto: true); // token de staking → outros
+        var txs = new[]
+        {
+            Tx(btc, "2025-03-01", TipoOperacaoFinanceira.Compra, 0.1m, 200000m),
+            Tx(sol, "2025-03-01", TipoOperacaoFinanceira.Compra, 10m, 500m),
+            Tx(usdt, "2025-03-01", TipoOperacaoFinanceira.Compra, 1000m, 5m),
+            Tx(wbeth, "2025-03-01", TipoOperacaoFinanceira.Compra, 1m, 15000m),
+        };
+
+        var bd = CalculadoraIr.Apurar(2025, txs, []).BensEDireitos;
+        Assert.Equal("08-01", bd.Single(b => b.Ticker == "BTC").Codigo);
+        Assert.Equal("08-02", bd.Single(b => b.Ticker == "SOL").Codigo);
+        Assert.Equal("08-03", bd.Single(b => b.Ticker == "USDT").Codigo);
+        Assert.Equal("08-99", bd.Single(b => b.Ticker == "WBETH").Codigo);
+    }
+
+    [Fact]
+    public void BensEDireitos_TrazCustoEQuantidadeDoAnoAnterior()
+    {
+        var btc = Ativo(10, "BTC", ClasseAtivo.Cripto, cripto: true);
+        var txs = new[]
+        {
+            Tx(btc, "2024-05-01", TipoOperacaoFinanceira.Compra, 0.2m, 100000m), // até 31/12/2024: 0.2 @ custo 20000
+            Tx(btc, "2025-05-01", TipoOperacaoFinanceira.Compra, 0.3m, 200000m), // até 31/12/2025: 0.5 @ custo 80000
+        };
+
+        var item = Assert.Single(CalculadoraIr.Apurar(2025, txs, []).BensEDireitos);
+        Assert.Equal(0.5m, item.Quantidade);
+        Assert.Equal(80000m, item.Custo);          // 20000 + 60000
+        Assert.Equal(0.2m, item.QuantidadeAnterior);
+        Assert.Equal(20000m, item.CustoAnterior);  // situação em 31/12 do ano anterior
+    }
+
+    [Fact]
+    public void IN1888_MarcaMesComAlienacaoCriptoAcimaDe30k()
+    {
+        var btc = Ativo(10, "BTC", ClasseAtivo.Cripto, cripto: true);
+        var txs = new[]
+        {
+            Tx(btc, "2025-01-05", TipoOperacaoFinanceira.Compra, 1m, 100000m),
+            Tx(btc, "2025-02-10", TipoOperacaoFinanceira.Venda, 0.1m, 250000m), // aliena 25000 (<=30k) → não marca
+            Tx(btc, "2025-03-10", TipoOperacaoFinanceira.Venda, 0.1m, 400000m), // aliena 40000 (>30k)  → marca
+        };
+
+        var meses = CalculadoraIr.Apurar(2025, txs, []).CriptoExterior.MesesIN1888;
+        var fev = meses.Single(m => m.Mes == 2);
+        var mar = meses.Single(m => m.Mes == 3);
+        Assert.Equal(25000m, fev.TotalAlienacoes);
+        Assert.False(fev.UltrapassaLimite);
+        Assert.Equal(40000m, mar.TotalAlienacoes);
+        Assert.True(mar.UltrapassaLimite);
     }
 
     [Fact]

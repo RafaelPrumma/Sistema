@@ -15,9 +15,10 @@ public static class ExcelApuracaoIr
         {
             GanhosCapital("Ganhos B3", ap.GanhosMensais.Where(g => g.Natureza != "Cripto")),
             GanhosCapital("Cripto", ap.GanhosMensais.Where(g => g.Natureza == "Cripto")),
-            BensEDireitos(ap.BensEDireitos),
+            BensEDireitos(ap.Ano, ap.BensEDireitos),
             Rendimentos("Rendimentos isentos", ap.RendimentosIsentos),
             Rendimentos("Tributacao exclusiva (JCP)", ap.TributacaoExclusiva),
+            IN1888(ap.CriptoExterior.MesesIN1888),
         };
         return EscritorXlsx.Gerar(abas);
     }
@@ -39,15 +40,36 @@ public static class ExcelApuracaoIr
         return new AbaXlsx(nome, rows);
     }
 
-    private static AbaXlsx BensEDireitos(IReadOnlyList<BemDireitoIrDto> bens)
+    private static AbaXlsx BensEDireitos(int ano, IReadOnlyList<BemDireitoIrDto> bens)
     {
         var rows = new List<IReadOnlyList<object?>>
         {
-            new object?[] { "Ticker", "Classe", "Quantidade", "Custo (R$)" }
+            new object?[]
+            {
+                "Ticker", "Classe", "Codigo RFB",
+                $"Qtd 31/12/{ano - 1}", $"Custo 31/12/{ano - 1} (R$)",
+                $"Qtd 31/12/{ano}", $"Custo 31/12/{ano} (R$)"
+            }
         };
         foreach (var b in bens)
-            rows.Add(new object?[] { b.Ticker, b.Classe, b.Quantidade, b.Custo });
+            rows.Add(new object?[]
+            {
+                b.Ticker, b.Classe, b.Codigo,
+                b.QuantidadeAnterior, b.CustoAnterior,
+                b.Quantidade, b.Custo
+            });
         return new AbaXlsx("Bens e Direitos", rows);
+    }
+
+    private static AbaXlsx IN1888(IReadOnlyList<MesIN1888Dto> meses)
+    {
+        var rows = new List<IReadOnlyList<object?>>
+        {
+            new object?[] { "Mes", "Total alienacoes cripto (R$)", "Passou de R$30k (IN 1888)?" }
+        };
+        foreach (var m in meses)
+            rows.Add(new object?[] { m.Mes, m.TotalAlienacoes, m.UltrapassaLimite ? "Sim" : "Nao" });
+        return new AbaXlsx("IN 1888", rows);
     }
 
     private static AbaXlsx Rendimentos(string nome, IReadOnlyList<RendimentoIrDto> itens)

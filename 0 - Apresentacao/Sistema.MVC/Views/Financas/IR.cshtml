@@ -86,27 +86,46 @@
             <div class="card-header">Ganho de capital - Cripto (mensal)</div>
             <div class="card-body table-responsive p-0">
                 @GanhosTabela(ganhosCripto)
+                @{
+                    var mesesIN1888 = Model.CriptoExterior.MesesIN1888.Where(m => m.UltrapassaLimite).ToList();
+                }
+                @if (mesesIN1888.Count > 0)
+                {
+                    <div class="alert alert-info py-2 small mb-0 rounded-0 border-0 border-top">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>IN 1888:</strong> alienacoes de cripto passaram de R$ 30.000 em:
+                        @string.Join(", ", mesesIN1888.Select(m => $"{m.Mes:00} ({m.TotalAlienacoes.ToString("C2", br)})")).
+                        Obriga declarar a RFB no mes (independe de imposto devido).
+                    </div>
+                }
             </div>
         </div>
     </div>
 
     <div class="col-12 col-xl-6">
         <div class="card h-100">
-            <div class="card-header">Bens e Direitos (posicao em 31/12/@ano, ao custo)</div>
+            <div class="card-header">Bens e Direitos (posicao em 31/12, ao custo)</div>
             <div class="card-body table-responsive p-0">
                 <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>Ticker</th><th>Classe</th><th class="text-end">Qtd</th><th class="text-end">Custo</th></tr></thead>
+                    <thead><tr>
+                        <th>Ticker</th><th>Classe</th><th>Cod. RFB</th>
+                        <th class="text-end">Qtd 31/12/@ano</th>
+                        <th class="text-end">Custo 31/12/@(ano - 1)</th>
+                        <th class="text-end">Custo 31/12/@ano</th>
+                    </tr></thead>
                     <tbody>
                     @if (Model.BensEDireitos.Count == 0)
                     {
-                        <tr><td colspan="4" class="text-muted text-center py-3">Sem posicao em 31/12.</td></tr>
+                        <tr><td colspan="6" class="text-muted text-center py-3">Sem posicao em 31/12.</td></tr>
                     }
                     @foreach (var b in Model.BensEDireitos)
                     {
                         <tr>
                             <td>@b.Ticker</td>
                             <td>@b.Classe</td>
+                            <td>@(string.IsNullOrEmpty(b.Codigo) ? "-" : b.Codigo)</td>
                             <td class="text-end">@b.Quantidade.ToString("0.########", br)</td>
+                            <td class="text-end">@b.CustoAnterior.ToString("C2", br)</td>
                             <td class="text-end">@b.Custo.ToString("C2", br)</td>
                         </tr>
                     }

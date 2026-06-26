@@ -18,14 +18,17 @@ namespace Sistema.APP.Services;
 ///  - cripto exterior: ganho líquido anual × 15% (sem compensação cronológica entre anos; perda anual → imposto 0);
 ///  - proventos classificados pelo IncomeType (texto).
 ///
-/// TODO (próximo subagente — FORA deste escopo): Bens e Direitos com código RFB (08-01/02/03/99) + custo
-/// em 31/12 do ano e do anterior; flag IN 1888 (mês de cripto > R$30k); enquadramento nacional como opção;
-/// export espelhando as 9 abas do consolidado real.
+/// F3b (jun/2026): Bens e Direitos de cripto com código RFB (08-01/02/03/99) + custo/quantidade em 31/12
+/// do ano apurado E do anterior; flag IN 1888 (mês de cripto > R$30k de alienações).
+/// TODO (FORA deste escopo): enquadramento nacional como opção; export espelhando as 9 abas do consolidado real.
 /// </summary>
 public static class CalculadoraIr
 {
     // Alíquota do ganho de capital de aplicação financeira no exterior — cripto (Lei 14.754/2023).
     private const decimal AliquotaCriptoExterior = 0.15m;
+
+    // IN 1888/2019: obrigação de declarar à RFB as operações de cripto do mês quando o total > R$ 30.000.
+    private const decimal LimiteIN1888 = 30000m;
 
     public static ApuracaoIrDto Apurar(
         int ano,
@@ -132,11 +135,47 @@ public static class CalculadoraIr
         return vendas;
     }
 
-    // --- Bens e Direitos: posição em 31/12 do ano, ao custo médio acumulado ---
+    // --- Bens e Direitos: posição em 31/12 do ano (e do anterior), ao custo médio acumulado ---
+    // A ficha de B&D pede a situação em 31/12 do ano apurado E do anterior; para cripto, além disso,
+    // o código RFB do grupo 08 (08-01 Bitcoin, 08-02 altcoins, 08-03 stablecoin, 08-99 outros).
 
     private static List<BemDireitoIrDto> MontarBensEDireitos(int ano, IReadOnlyList<TransacaoFinanceira> transacoes)
     {
-        var corte = new DateTime(ano, 12, 31);
+        var atual = PosicaoAteCorte(transacoes, new DateTime(ano, 12, 31));
+        var anterior = PosicaoAteCorte(transacoes, new DateTime(ano - 1, 12, 31));
+
+        // União dos ativos detidos em qualquer dos dois 31/12 (custo > 0 num ano e zerado no outro = variação).
+        var ids = atual.Keys.Union(anterior.Keys);
+        var itens = new List<BemDireitoIrDto>();
+
+        foreach (var id in ids)
+        {
+            var temAtual = atual.TryGetValue(id, out var a);
+            var temAnt = anterior.TryGetValue(id, out var p);
+            var asset = temAtual ? a.Asset : p.Asset;
+
+            // Só declara o que ainda é detido em 31/12 do ano apurado (qtd > 0). Posição zerada no ano
+            // atual mas detida no anterior é informada via a baixa na declaração, não como B&D vigente.
+            if (!temAtual || a.Qtd <= 0.000001m)
+                continue;
+
+            itens.Add(new BemDireitoIrDto(
+                asset.Sigla ?? asset.Chave ?? asset.Nome ?? "?",
+                asset.Classe.ToString(),
+                Math.Round(a.Qtd, 8),
+                Math.Round(a.Custo, 2),
+                EhCripto(asset) ? CodigoRfbCripto(asset) : string.Empty,
+                temAnt ? Math.Round(p.Custo, 2) : 0m,
+                temAnt ? Math.Round(p.Qtd, 8) : 0m));
+        }
+
+        return itens.OrderBy(b => b.Classe).ThenBy(b => b.Ticker).ToList();
+    }
+
+    // Caminha as transações até a data de corte (inclusive) e devolve a posição (qtd/custo médio) por ativo.
+    private static Dictionary<int, (decimal Qtd, decimal Custo, AtivoFinanceiro Asset)> PosicaoAteCorte(
+        IReadOnlyList<TransacaoFinanceira> transacoes, DateTime corte)
+    {
         var estado = new Dictionary<int, (decimal Qtd, decimal Custo, AtivoFinanceiro Asset)>();
 
         foreach (var t in transacoes.Where(t => t.Asset is not null && t.Date.Date <= corte).OrderBy(t => t.Date).ThenBy(t => t.Id))
@@ -160,16 +199,31 @@ public static class CalculadoraIr
             estado[t.AssetId] = st;
         }
 
-        return estado.Values
-            .Where(v => v.Qtd > 0.000001m)
-            .Select(v => new BemDireitoIrDto(
-                v.Asset.Sigla ?? v.Asset.Chave ?? v.Asset.Nome ?? "?",
-                v.Asset.Classe.ToString(),
-                Math.Round(v.Qtd, 8),
-                Math.Round(v.Custo, 2)))
-            .OrderBy(b => b.Classe).ThenBy(b => b.Ticker)
-            .ToList();
+        return estado;
     }
+
+    // Código RFB do grupo 08 (Criptoativos), conforme o ativo (ver specs/ir.spec.md):
+    //  08-01 Bitcoin (BTC) · 08-03 stablecoins (USDT/USDC/FDUSD) · 08-02 demais criptomoedas (altcoins)
+    //  08-99 outros criptoativos/tokens (ex.: tokens de staking WBETH/BNSOL, NFTs, utility tokens).
+    private static string CodigoRfbCripto(AtivoFinanceiro a)
+    {
+        var ticker = (a.Sigla ?? a.Chave ?? a.Nome ?? string.Empty).Trim().ToUpperInvariant();
+        if (ticker is "BTC" or "XBT")
+            return "08-01";
+        if (EhStablecoin(ticker))
+            return "08-03";
+        if (EhAltcoin(ticker))
+            return "08-02";
+        return "08-99"; // demais tokens/criptoativos (staking, utility, NFT…).
+    }
+
+    private static bool EhStablecoin(string ticker) =>
+        ticker is "USDT" or "USDC" or "FDUSD" or "BUSD" or "DAI" or "TUSD" or "USDP" or "BRLUSD";
+
+    // Altcoins = moedas de protocolo "principais" (08-02). O que não for BTC, stablecoin nem aqui cai em 08-99.
+    private static bool EhAltcoin(string ticker) =>
+        ticker is "ETH" or "SOL" or "XRP" or "DOGE" or "BNB" or "ADA" or "LTC" or "DOT" or "AVAX"
+            or "MATIC" or "POL" or "TRX" or "LINK" or "BCH" or "XLM" or "ATOM" or "ETC" or "NEAR";
 
     // --- Proventos: isentos (dividendos + FII) vs tributação exclusiva (JCP) ---
 
@@ -269,10 +323,21 @@ public static class CalculadoraIr
         var imposto = ganhoLiquido > 0m ? Math.Round(ganhoLiquido * AliquotaCriptoExterior, 2) : 0m;
         var totalRewards = Math.Round(rewards.Sum(r => r.ValorBRL), 2);
 
+        // IN 1888/2019: total de ALIENAÇÕES de cripto por mês; marca os meses > R$ 30.000 (obriga declarar).
+        var mesesIN1888 = alienacoes
+            .GroupBy(a => a.Mes)
+            .Select(g =>
+            {
+                var total = Math.Round(g.Sum(a => a.ValorAlienacao), 2);
+                return new MesIN1888Dto(g.Key, total, total > LimiteIN1888);
+            })
+            .OrderBy(m => m.Mes)
+            .ToList();
+
         return new CriptoExteriorIrDto(
             alienacoes.OrderBy(a => a.Data).ThenBy(a => a.Ativo).ToList(),
             rewards.OrderBy(r => r.Data).ThenBy(r => r.Ativo).ToList(),
-            ganhoLiquido, AliquotaCriptoExterior, imposto, totalRewards);
+            ganhoLiquido, AliquotaCriptoExterior, imposto, totalRewards, mesesIN1888);
     }
 
     // --- Helpers ---

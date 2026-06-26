@@ -24,7 +24,17 @@ public record ApuracaoMensalIrDto(
     decimal Imposto,            // imposto devido (DARF) do mês
     bool Isento);
 
-public record BemDireitoIrDto(string Ticker, string Classe, decimal Quantidade, decimal Custo);
+// Um item de Bens e Direitos em 31/12 ao custo. Para cripto traz o código RFB do grupo 08
+// (08-01 Bitcoin, 08-02 altcoins, 08-03 stablecoin, 08-99 outros tokens/criptoativos) e o
+// custo no 31/12 do ano APURADO e do ANTERIOR (a ficha de B&D pede situação atual e anterior).
+public record BemDireitoIrDto(
+    string Ticker,
+    string Classe,
+    decimal Quantidade,
+    decimal Custo,                  // custo de aquisição acumulado em 31/12 do ano apurado
+    string Codigo = "",             // código RFB (grupo 08 p/ cripto; vazio p/ B3 — CNPJ vem de outra fonte)
+    decimal CustoAnterior = 0m,     // custo de aquisição acumulado em 31/12 do ano ANTERIOR
+    decimal QuantidadeAnterior = 0m); // quantidade detida em 31/12 do ano anterior
 
 public record RendimentoIrDto(string Tipo, decimal Valor);
 
@@ -37,7 +47,16 @@ public record CriptoExteriorIrDto(
     decimal GanhoCapitalLiquido,                      // soma de ganhos/perdas das alienações no ano
     decimal Aliquota,                                 // 15% (Lei 14.754/2023)
     decimal ImpostoGanhoCapital,                      // imposto sobre o ganho líquido (0 se perda)
-    decimal TotalRewards);                            // soma dos rewards do ano (rendimento tributável)
+    decimal TotalRewards,                             // soma dos rewards do ano (rendimento tributável)
+    // IN 1888/2019: obrigação de DECLARAR (≠ imposto) os meses cujo total de ALIENAÇÕES de cripto
+    // ultrapassa R$ 30.000. Cada item traz o mês, o total alienado e a flag de superação.
+    IReadOnlyList<MesIN1888Dto> MesesIN1888);
+
+// Total de alienações de cripto em um mês, com a flag da IN 1888 (> R$ 30.000 obriga declarar).
+public record MesIN1888Dto(
+    int Mes,
+    decimal TotalAlienacoes, // soma das alienações (venda + permuta) de cripto no mês, em BRL
+    bool UltrapassaLimite);  // true quando > R$ 30.000 (limite IN 1888/2019)
 
 // Uma alienação de cripto (venda por fiat OU permuta cripto-cripto), valorada em BRL.
 public record AlienacaoCriptoIrDto(
