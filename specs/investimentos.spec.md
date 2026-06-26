@@ -16,6 +16,35 @@ Importação (notas/Binance), posição/preço médio (`CalcularPosicoes`), prov
 - `Slug` fica em ingles por ser identificador tecnico estavel para URL/chave interna.
 - O card Carteiras depende de `FinanceiroPosicaoAtivo`; hotfixes de dados devem preservar `FinanceiroTransacao` como fonte auditavel e depois recalcular ou ajustar explicitamente a projecao.
 
+### Modelo de cotacoes e historico (jun/2026)
+Decisao arquitetural: **nao criar uma terceira tabela de cotacoes**. A tabela central para serie temporal de precos e `FinanceiroPrecoHistoricoAtivo`; `FinanceiroCotacaoAtivo` nao e historico, e apenas cache/status da ultima cotacao conhecida por ativo/provedor.
+
+- `FinanceiroPrecoHistoricoAtivo` deve guardar tanto snapshots intradiarios quanto fechamento diario:
+  - `Interval = "30m"` para snapshots do job recorrente;
+  - `Interval = "1d"` para fechamento diario permanente;
+  - `Date` em UTC: inicio do bucket para `30m`; data do fechamento para `1d`.
+- O indice unico existente por `AtivoFinanceiroId + Provedor + Interval + Date` deve ser preservado e usado para upsert idempotente.
+- Ao buscar cotacao por API, o fluxo correto e:
+  1. atualizar `FinanceiroCotacaoAtivo` com a ultima cotacao/status;
+  2. gravar ou atualizar o bucket `30m` em `FinanceiroPrecoHistoricoAtivo`;
+  3. nunca chamar API diretamente a partir do dashboard para obter preco historico.
+- Upsert do bucket `30m`:
+  - se o bucket nao existir: `Open = High = Low = Close = preco atual`, `CloseBRL = preco atual BRL`;
+  - se ja existir: preservar `Open`, atualizar `High/Low` com maxima/minima, atualizar `Close/CloseBRL` com a cotacao mais recente do bucket.
+- Consolidacao diaria:
+  - gerar `Interval = "1d"` a partir dos buckets `30m`;
+  - `Open` = primeiro preco do dia, `High/Low` = maxima/minima, `Close/CloseBRL` = ultimo preco valido antes do fechamento;
+  - preferir candle diario oficial da API quando disponivel; usar buckets `30m` como fallback e para auditoria da coleta local.
+- Retencao:
+  - manter `1d` indefinidamente;
+  - apagar buckets `30m` com mais de 24h somente quando o `1d` daquele ativo/provedor/dia ja existir.
+- Agenda:
+  - `financas-cotacoes` deve ter default de 30 minutos;
+  - B3 roda apenas em janela configuravel de pregao e dias uteis;
+  - cripto roda 24/7;
+  - fechamento diario de cripto deve considerar `23:59 UTC`, equivalente a `20:59 America/Sao_Paulo`.
+- Proventos/dividendos nao entram nessa tabela: continuam em `FinanceiroRendimento`. Perguntas como "quanto pagou de dividendo 6 meses atras" devem consultar `FinanceiroRendimento`; perguntas como "qual era a cotacao 6 meses atras" devem consultar `FinanceiroPrecoHistoricoAtivo`.
+
 ## Features
 
 ### F-A · Eventos corporativos (split/grupamento) — #2
@@ -43,6 +72,25 @@ Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para 
 
 ### F-H · Alertas de preço/provento — #7
 Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
+
+### F-P · Historico de cotacoes intradiario/diario — jun/2026
+Implementar a decisao do **Modelo de cotacoes e historico** acima. Objetivo: dashboard e graficos sempre leem do banco; APIs ficam restritas a jobs/acoes explicitas; consultas historicas nao batem na API.
+
+- Nao criar `FinanceiroCotacaoIntradiaria` nem outra tabela paralela.
+- Usar `FinanceiroPrecoHistoricoAtivo` com `Interval = "30m"` e `Interval = "1d"`.
+- Manter `FinanceiroCotacaoAtivo` somente como cache da ultima cotacao/status para leitura rapida do dashboard.
+- Ajustar/expandir Hangfire:
+  - `financas-cotacoes`: default 30 minutos;
+  - job de consolidacao diaria apos fechamento;
+  - job de limpeza de intradiario apos fechamento persistido.
+- B3:
+  - coletar apenas em janela configuravel de pregao e dias uteis;
+  - manter `B3Custodia` como fonte de fechamento importada da custodia quando nao houver cotacao Brapi utilizavel.
+- Cripto:
+  - coletar 24/7;
+  - considerar fechamento diario em `23:59 UTC` (`20:59 America/Sao_Paulo`);
+  - preservar fechamento diario de Binance em `FinanceiroPrecoHistoricoAtivo` para valoracao de permutas, earn e IR.
+- Testes obrigatorios: upsert idempotente por bucket, OHLC correto no mesmo bucket, consolidacao diaria B3/cripto, limpeza segura de `30m`, e consulta historica usando apenas `FinanceiroPrecoHistoricoAtivo`.
 
 ### F-I · Carteiras hierárquicas (rework) — jun/2026 (✅ FEITO)
 Reorganizar os grupos com **subcarteiras** (hierarquia via `CarteiraPaiId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
