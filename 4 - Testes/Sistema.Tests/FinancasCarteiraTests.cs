@@ -212,7 +212,7 @@ public class FinancasCarteiraTests
         Assert.All(context.RendimentosInvestimento.IgnoreQueryFilters(), x => Assert.Equal(1, x.AssetId));
         Assert.Equal(12m, context.CotacoesAtivosFinanceiros.Single(x => x.AtivoFinanceiroId == 1 && x.DataExclusao == null).PrecoBRL);
         Assert.Contains(context.PrecosHistoricosAtivosFinanceiros, x => x.AtivoFinanceiroId == 1 && x.Date == new DateTime(2026, 1, 2));
-        Assert.Equal("4", context.Configuracoes.Single(x => x.Chave == "ReparoAtivosVersao").Valor);
+        Assert.Equal("5", context.Configuracoes.Single(x => x.Chave == "ReparoAtivosVersao").Valor);
     }
 
     [Fact]
@@ -235,6 +235,29 @@ public class FinancasCarteiraTests
         Assert.Equal(TipoDocumentoFinanceiro.CsvBinance, context.DocumentosFinanceiros.Single(x => x.Id == 2).DocumentKind);
         // Documento que já tinha kind definido não é alterado.
         Assert.Equal(TipoDocumentoFinanceiro.BinanceSpotOrders, context.DocumentosFinanceiros.Single(x => x.Id == 3).DocumentKind);
+    }
+
+    [Fact]
+    public async Task ReparoDeveReclassificarFiiGravadoComoEtf()
+    {
+        await using var context = CriarContexto();
+        // FIIs gravados erroneamente como ETF (causa do IR a 15% em vez de 20%).
+        context.AtivosFinanceiros.AddRange(
+            new AtivoFinanceiro { Id = 1, Chave = "AFHI11", Sigla = "AFHI11", Nome = "FII AFHI CRI CI", Classe = ClasseAtivo.ETF, Mercado = "B3", UsuarioInclusao = "teste" },
+            new AtivoFinanceiro { Id = 2, Chave = "CPTS11", Sigla = "CPTS11", Nome = "FII CAPITANIA CI", Classe = ClasseAtivo.ETF, Mercado = "B3", UsuarioInclusao = "teste" },
+            // GOLD11 é ETF de verdade (TREND OURO) → permanece ETF.
+            new AtivoFinanceiro { Id = 3, Chave = "GOLD11", Sigla = "GOLD11", Nome = "TREND OURO CI", Classe = ClasseAtivo.ETF, Mercado = "B3", UsuarioInclusao = "teste" },
+            // Cripto não pode ser tocado pelo reparo B3.
+            new AtivoFinanceiro { Id = 4, Chave = "BTC", Sigla = "BTC", Nome = "Bitcoin", Classe = ClasseAtivo.Cripto, EhCripto = true, Mercado = "Binance", UsuarioInclusao = "teste" });
+        await context.SaveChangesAsync();
+
+        var repair = new FinancasDataRepairService(context, NullLogger<FinancasDataRepairService>.Instance);
+        await repair.RepararAsync();
+
+        Assert.Equal(ClasseAtivo.FII, context.AtivosFinanceiros.Single(x => x.Id == 1).Classe);
+        Assert.Equal(ClasseAtivo.FII, context.AtivosFinanceiros.Single(x => x.Id == 2).Classe);
+        Assert.Equal(ClasseAtivo.ETF, context.AtivosFinanceiros.Single(x => x.Id == 3).Classe);
+        Assert.Equal(ClasseAtivo.Cripto, context.AtivosFinanceiros.IgnoreQueryFilters().Single(x => x.Id == 4).Classe);
     }
 
     [Fact]

@@ -595,7 +595,7 @@ public class FinancasMarketDataService(
         return null;
     }
 
-    private static ClasseAtivo ClassificarB3(string ticker, string? nome)
+    internal static ClasseAtivo ClassificarB3(string ticker, string? nome)
     {
         var t = (ticker ?? string.Empty).ToUpperInvariant();
         var n = (nome ?? string.Empty).ToUpperInvariant();

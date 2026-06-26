@@ -9,7 +9,7 @@ namespace Sistema.INFRA.Importers;
 
 public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDataRepairService> logger)
 {
-    private const int RepairVersion = 4;
+    private const int RepairVersion = 5;
     private const string Agrupamento = "Financas";
     private const string ChaveVersao = "ReparoAtivosVersao";
     private const string UsuarioSistema = "financas-repair";
@@ -28,6 +28,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         var alteracoes = await RepararAtivosAsync(cancellationToken);
         await RepararChavesProventosAsync(cancellationToken);
         await RepararDocumentKindAsync(cancellationToken);
+        await ReclassificarAtivosB3Async(cancellationToken);
         await RegistrarVersaoAsync(config, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -155,6 +156,45 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         catch (Exception ex)
         {
             FinancasRepairLogMessages.ReparoDocumentKindFalhou(_logger, ex);
+        }
+    }
+
+    // Reclassifica a Classe dos ativos B3 (não-cripto) recalculando ClassificarB3(Sigla, Nome).
+    // Causa-raiz: FIIs foram gravados com Classe=ETF (ex.: AFHI11/CPTS11/DEVA11...), o que jogava a
+    // alíquota de IR para 15% (ETF) em vez de 20% (FII). Reaproveita a lógica única de
+    // FinancasMarketDataService.ClassificarB3 (nome/sigla decidem). Idempotente (só toca quando a
+    // classe calculada difere) e à PROVA DE FALHA (não pode derrubar o load do dashboard).
+    private async Task ReclassificarAtivosB3Async(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ativos = await _context.AtivosFinanceiros
+                .IgnoreQueryFilters()
+                .Where(a => !a.EhCripto && a.Classe != ClasseAtivo.Cripto && a.Mercado != "Binance")
+                .ToListAsync(cancellationToken);
+
+            var reclassificados = 0;
+            foreach (var ativo in ativos)
+            {
+                var ticker = ativo.Sigla ?? ativo.Chave;
+                if (string.IsNullOrWhiteSpace(ticker))
+                    continue;
+
+                var classe = FinancasMarketDataService.ClassificarB3(ticker, ativo.Nome);
+                if (classe == ClasseAtivo.Cripto || classe == ativo.Classe)
+                    continue;
+
+                ativo.Classe = classe;
+                ativo.UsuarioAlteracao = UsuarioSistema;
+                reclassificados++;
+            }
+
+            if (reclassificados > 0)
+                FinancasRepairLogMessages.ClasseB3Reclassificada(_logger, reclassificados);
+        }
+        catch (Exception ex)
+        {
+            FinancasRepairLogMessages.ReparoClasseB3Falhou(_logger, ex);
         }
     }
 
@@ -466,4 +506,10 @@ internal static partial class FinancasRepairLogMessages
 
     [LoggerMessage(EventId = 55, Level = LogLevel.Warning, Message = "Falha no reparo de DocumentKind (ignorada para nao derrubar o load).")]
     public static partial void ReparoDocumentKindFalhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 56, Level = LogLevel.Information, Message = "Reparo de classe B3: {Reclassificados} ativos reclassificados (ex.: FII gravado como ETF).")]
+    public static partial void ClasseB3Reclassificada(ILogger logger, int reclassificados);
+
+    [LoggerMessage(EventId = 57, Level = LogLevel.Warning, Message = "Falha no reparo de classe B3 (ignorada para nao derrubar o load).")]
+    public static partial void ReparoClasseB3Falhou(ILogger logger, Exception exception);
 }
