@@ -139,6 +139,13 @@ using (var scope = app.Services.CreateScope())
                 "financas-eventos-corporativos",
                 s => s.AtualizarEventosCorporativosAsync(false, CancellationToken.None),
                 Cron.Daily());
+
+            // F-H: alertas de preço/provento. Roda junto da coleta de cotações (mesmo cron) para reagir
+            // logo após o preço atualizar; à prova de falha (try-catch por regra), notifica via Mensagens.
+            RecurringJob.AddOrUpdate<IFinancasAlertaService>(
+                "financas-alertas",
+                s => s.ProcessarAlertasAsync(CancellationToken.None),
+                cron);
         }
         else
         {
@@ -146,6 +153,7 @@ using (var scope = app.Services.CreateScope())
             RecurringJob.RemoveIfExists("financas-historico-consolidacao");
             RecurringJob.RemoveIfExists("financas-proventos");
             RecurringJob.RemoveIfExists("financas-eventos-corporativos");
+            RecurringJob.RemoveIfExists("financas-alertas");
         }
     }
 }
