@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Sistema.APP.DTOs;
+using Sistema.APP.Services;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.INFRA.Data;
@@ -686,6 +687,8 @@ public class FinancasMarketDataService(
                 var price = GetDecimal(result, "regularMarketPrice") ?? 0m;
                 var marketTime = TryParseDateTime(GetString(result, "regularMarketTime"));
                 UpsertCotacao(ativo.Id, ProvedorCotacao.Brapi, symbol, GetString(result, "currency") ?? "BRL", price, price, GetDecimal(result, "regularMarketChange"), GetDecimal(result, "regularMarketChangePercent"), marketTime, StatusCotacao.Atual, null, result.GetRawText(), TimeSpan.FromMinutes(5));
+                if (price > 0m)
+                    await UpsertBucket30mAsync(ativo.Id, ProvedorCotacao.Brapi, symbol, price, price, cancellationToken);
                 await ImportarHistoricoBrapiAsync(ativo.Id, symbol, result, cancellationToken);
             }
         }
@@ -735,6 +738,8 @@ public class FinancasMarketDataService(
             }
 
             UpsertCotacao(ativo.Id, ProvedorCotacao.Binance, quoteSymbol, currency, ticker.Price, priceBrl, ticker.Change, ticker.ChangePercent, ticker.MarketTime, StatusCotacao.Atual, null, ticker.RawJson, TimeSpan.FromSeconds(45));
+            if (ticker.Price > 0m)
+                await UpsertBucket30mAsync(ativo.Id, ProvedorCotacao.Binance, quoteSymbol, ticker.Price, priceBrl, cancellationToken);
             await ImportarHistoricoBinanceAsync(ativo.Id, quoteSymbol, currency, brlRate, cancellationToken);
         }
     }
@@ -930,6 +935,163 @@ public class FinancasMarketDataService(
         historico.CloseBRL = candle.CloseBrl;
         historico.Volume = candle.Volume;
         historico.RawJson = candle.RawJson;
+    }
+
+    // Upsert idempotente do bucket intradiário de 30 min em FinanceiroPrecoHistoricoAtivo, reusando
+    // o índice único (AtivoFinanceiroId+Provedor+Interval+Date). Bucket novo: O=H=L=C=preço; bucket
+    // existente: preserva Open, estende High/Low e atualiza Close/CloseBRL (lógica pura no calculator).
+    // Não chama SaveChanges (o chamador faz o flush em lote).
+    private async Task UpsertBucket30mAsync(int ativoId, ProvedorCotacao provedor, string symbol, decimal preco, decimal precoBrl, CancellationToken cancellationToken)
+    {
+        var dateBucket = HistoricoCotacaoCalculator.InicioBucket30m(DateTime.UtcNow);
+        const string interval = HistoricoCotacaoCalculator.Intervalo30m;
+
+        var bucket = _context.PrecosHistoricosAtivosFinanceiros.Local
+                .FirstOrDefault(x => x.AtivoFinanceiroId == ativoId && x.Provedor == provedor && x.Interval == interval && x.Date == dateBucket)
+            ?? await _context.PrecosHistoricosAtivosFinanceiros
+                .FirstOrDefaultAsync(x => x.AtivoFinanceiroId == ativoId && x.Provedor == provedor && x.Interval == interval && x.Date == dateBucket, cancellationToken);
+
+        if (bucket is null)
+        {
+            var novo = HistoricoCotacaoCalculator.NovoBucket30m(dateBucket, preco, precoBrl);
+            _context.PrecosHistoricosAtivosFinanceiros.Add(new PrecoHistoricoAtivoFinanceiro
+            {
+                AtivoFinanceiroId = ativoId,
+                Provedor = provedor,
+                Symbol = symbol,
+                Interval = interval,
+                Date = novo.Date,
+                Open = novo.Open,
+                High = novo.High,
+                Low = novo.Low,
+                Close = novo.Close,
+                CloseBRL = novo.CloseBRL,
+                RawJson = "{}",
+                UsuarioInclusao = UsuarioSistema
+            });
+            return;
+        }
+
+        var atual = new CandleOhlc(bucket.Date, bucket.Open, bucket.High, bucket.Low, bucket.Close, bucket.CloseBRL);
+        var merged = HistoricoCotacaoCalculator.Merge30m(atual, preco, precoBrl);
+        bucket.Symbol = symbol;
+        bucket.High = merged.High;
+        bucket.Low = merged.Low;
+        bucket.Close = merged.Close;
+        bucket.CloseBRL = merged.CloseBRL;
+    }
+
+    // Consolidação diária (1d) a partir dos buckets 30m do dia + retenção do intradiário.
+    // À PROVA DE FALHA: roda em job recorrente; um ativo que falhe não pode derrubar os demais.
+    // Prefere o candle 1d oficial da API quando ele já existe (importado por ImportarHistorico*); só
+    // gera/atualiza o 1d a partir dos 30m quando não há fechamento oficial daquele dia.
+    public async Task ConsolidarHistoricoDiarioAsync(CancellationToken cancellationToken = default)
+    {
+        var agora = DateTime.UtcNow;
+
+        // Janela de consolidação: hoje + ontem (UTC) cobre o fechamento de cripto às 23:59 UTC e o
+        // pregão B3 do dia anterior. Buckets antigos já foram consolidados em execuções passadas.
+        var inicioJanela = agora.Date.AddDays(-1);
+
+        var buckets = await _context.PrecosHistoricosAtivosFinanceiros
+            .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo30m && x.Date >= inicioJanela)
+            .ToListAsync(cancellationToken);
+
+        var algum = false;
+        foreach (var grupo in buckets.GroupBy(x => new { x.AtivoFinanceiroId, x.Provedor, Dia = x.Date.Date }))
+        {
+            try
+            {
+                var ohlc = grupo
+                    .Select(b => new CandleOhlc(b.Date, b.Open, b.High, b.Low, b.Close, b.CloseBRL))
+                    .ToList();
+                var consolidado = HistoricoCotacaoCalculator.ConsolidarDiario(ohlc);
+                if (consolidado is null)
+                    continue;
+
+                var symbol = grupo.OrderByDescending(b => b.Date).First().Symbol;
+                var existente = await _context.PrecosHistoricosAtivosFinanceiros
+                    .FirstOrDefaultAsync(x =>
+                        x.AtivoFinanceiroId == grupo.Key.AtivoFinanceiroId &&
+                        x.Provedor == grupo.Key.Provedor &&
+                        x.Interval == HistoricoCotacaoCalculator.Intervalo1d &&
+                        x.Date == grupo.Key.Dia, cancellationToken);
+
+                if (existente is null)
+                {
+                    _context.PrecosHistoricosAtivosFinanceiros.Add(new PrecoHistoricoAtivoFinanceiro
+                    {
+                        AtivoFinanceiroId = grupo.Key.AtivoFinanceiroId,
+                        Provedor = grupo.Key.Provedor,
+                        Symbol = symbol,
+                        Interval = HistoricoCotacaoCalculator.Intervalo1d,
+                        Date = consolidado.Value.Date,
+                        Open = consolidado.Value.Open,
+                        High = consolidado.Value.High,
+                        Low = consolidado.Value.Low,
+                        Close = consolidado.Value.Close,
+                        CloseBRL = consolidado.Value.CloseBRL,
+                        RawJson = "{}",
+                        UsuarioInclusao = UsuarioSistema
+                    });
+                    algum = true;
+                }
+                else if (string.Equals(existente.RawJson, "{}", StringComparison.Ordinal))
+                {
+                    // 1d gerado por consolidação local (não-oficial): atualiza com os 30m mais recentes.
+                    // Um 1d oficial da API (RawJson com payload) tem precedência e não é sobrescrito.
+                    existente.Open = consolidado.Value.Open;
+                    existente.High = consolidado.Value.High;
+                    existente.Low = consolidado.Value.Low;
+                    existente.Close = consolidado.Value.Close;
+                    existente.CloseBRL = consolidado.Value.CloseBRL;
+                    algum = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "consolidação-1d", ex.Message);
+            }
+        }
+
+        if (algum)
+            await _context.SaveChangesAsync(cancellationToken);
+
+        await PurgarIntradiarioAsync(agora, cancellationToken);
+    }
+
+    // Retenção: apaga buckets 30m com mais de 24h após o fim do dia, SOMENTE quando o 1d daquele
+    // ativo/provedor/dia já existe (fechamento persistido). Pura no calculator; aqui só consulta/apaga.
+    private async Task PurgarIntradiarioAsync(DateTime agora, CancellationToken cancellationToken)
+    {
+        // Só buckets que já passaram da janela de retenção (24h após o fim do dia).
+        var corte = agora.Date.AddDays(-1);
+        var antigos = await _context.PrecosHistoricosAtivosFinanceiros
+            .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo30m && x.Date < corte)
+            .Select(x => new { x.Id, x.AtivoFinanceiroId, x.Provedor, x.Date })
+            .ToListAsync(cancellationToken);
+        if (antigos.Count == 0)
+            return;
+
+        // Dias (ativo/provedor) que já têm fechamento 1d persistido.
+        var diasComFechamento = (await _context.PrecosHistoricosAtivosFinanceiros
+                .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo1d && x.Date < corte)
+                .Select(x => new { x.AtivoFinanceiroId, x.Provedor, x.Date })
+                .ToListAsync(cancellationToken))
+            .Select(x => (x.AtivoFinanceiroId, x.Provedor, x.Date.Date))
+            .ToHashSet();
+
+        var apagar = antigos
+            .Where(b => HistoricoCotacaoCalculator.PodeApagarBucket30m(b.Date, agora,
+                diasComFechamento.Contains((b.AtivoFinanceiroId, b.Provedor, b.Date.Date))))
+            .Select(b => b.Id)
+            .ToHashSet();
+        if (apagar.Count == 0)
+            return;
+
+        await _context.PrecosHistoricosAtivosFinanceiros
+            .Where(x => apagar.Contains(x.Id))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     private async Task MarcarSemTokenAsync(IReadOnlyList<AtivoFinanceiro> ativos, ProvedorCotacao provedor, IReadOnlyList<string> symbols, CancellationToken cancellationToken)
