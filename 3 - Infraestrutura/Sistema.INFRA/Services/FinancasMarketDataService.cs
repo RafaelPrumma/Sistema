@@ -1062,13 +1062,13 @@ public class FinancasMarketDataService(
 
     // Retenção: apaga buckets 30m com mais de 24h após o fim do dia, SOMENTE quando o 1d daquele
     // ativo/provedor/dia já existe (fechamento persistido). Pura no calculator; aqui só consulta/apaga.
+    // RemoveRange (não ExecuteDelete) para ser agnóstico de provider e respeitar o soft-delete/auditoria.
     private async Task PurgarIntradiarioAsync(DateTime agora, CancellationToken cancellationToken)
     {
         // Só buckets que já passaram da janela de retenção (24h após o fim do dia).
         var corte = agora.Date.AddDays(-1);
         var antigos = await _context.PrecosHistoricosAtivosFinanceiros
             .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo30m && x.Date < corte)
-            .Select(x => new { x.Id, x.AtivoFinanceiroId, x.Provedor, x.Date })
             .ToListAsync(cancellationToken);
         if (antigos.Count == 0)
             return;
@@ -1084,14 +1084,12 @@ public class FinancasMarketDataService(
         var apagar = antigos
             .Where(b => HistoricoCotacaoCalculator.PodeApagarBucket30m(b.Date, agora,
                 diasComFechamento.Contains((b.AtivoFinanceiroId, b.Provedor, b.Date.Date))))
-            .Select(b => b.Id)
-            .ToHashSet();
+            .ToList();
         if (apagar.Count == 0)
             return;
 
-        await _context.PrecosHistoricosAtivosFinanceiros
-            .Where(x => apagar.Contains(x.Id))
-            .ExecuteDeleteAsync(cancellationToken);
+        _context.PrecosHistoricosAtivosFinanceiros.RemoveRange(apagar);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     private async Task MarcarSemTokenAsync(IReadOnlyList<AtivoFinanceiro> ativos, ProvedorCotacao provedor, IReadOnlyList<string> symbols, CancellationToken cancellationToken)
