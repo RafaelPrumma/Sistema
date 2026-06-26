@@ -8,6 +8,7 @@ public interface IFinancasAppService
     Task PrepararDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasMetasDto> ObterMetasDashboardAsync(decimal aporteHipotetico = 0m, CancellationToken cancellationToken = default);
     Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);

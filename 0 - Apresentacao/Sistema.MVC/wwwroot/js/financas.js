@@ -14,6 +14,7 @@
   const islands = {
     patrimonio: document.getElementById('financePatrimonioIsland'),
     carteiras: document.getElementById('financeCarteirasIsland'),
+    metas: document.getElementById('financeMetasIsland'),
     importacao: document.getElementById('financeImportacaoIsland'),
     posicoes: document.getElementById('financePosicoesIsland'),
     alertas: document.getElementById('financeAlertasIsland'),
@@ -374,6 +375,7 @@
     await Promise.allSettled([
       loadPatrimonio(),
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
+      loadPartial(islands.metas, dashboard.dataset.metasUrl),
       loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),

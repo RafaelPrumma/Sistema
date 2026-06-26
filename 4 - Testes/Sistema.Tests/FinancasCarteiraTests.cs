@@ -317,6 +317,80 @@ public class FinancasCarteiraTests
     }
 
     [Fact]
+    public async Task MetasDashboardDeveAgregarPesoAlvoPorTopoECalcularDesvio()
+    {
+        // Patrimônio 10.000. Topo Bancos = 6.000 (60%), alvo 50% (ativo único PesoAlvo=50) → +10 p.p.
+        // Topo FIIs (com subcarteira) = 4.000 (40%), alvo 50% (subcarteira ativo PesoAlvo=50) → −10 p.p.
+        var banco = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var fii = new AtivoFinanceiro { Id = 2, Chave = "DEVA11", Sigla = "DEVA11", Nome = "FII DEVANT", Classe = ClasseAtivo.FII, Mercado = "B3" };
+
+        var transacoes = new List<TransacaoFinanceira>
+        {
+            Compra(banco, 100m, 60m, new DateTime(2026, 1, 10)), // 6.000
+            Compra(fii, 40m, 100m, new DateTime(2026, 1, 10))    // 4.000
+        };
+        var carteiras = new List<CarteiraFinanceira>
+        {
+            new()
+            {
+                Id = 10, Nome = "Bancos", Slug = "bancos", Ordem = 1,
+                Ativos = [ new CarteiraAtivoFinanceiro { CarteiraFinanceiraId = 10, AtivoFinanceiroId = banco.Id, AtivoFinanceiro = banco, PesoAlvo = 50m } ]
+            },
+            // FIIs (topo, sem ativo direto) → subcarteira Papel carrega o alvo do ativo.
+            new() { Id = 20, Nome = "FIIs", Slug = "fiis", Ordem = 2 },
+            new()
+            {
+                Id = 21, Nome = "Papel", Slug = "papel", Ordem = 1, CarteiraPaiId = 20,
+                Ativos = [ new CarteiraAtivoFinanceiro { CarteiraFinanceiraId = 21, AtivoFinanceiroId = fii.Id, AtivoFinanceiro = fii, PesoAlvo = 50m } ]
+            }
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCarteirasComAtivosAsync(It.IsAny<CancellationToken>())).ReturnsAsync(carteiras);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterMetasDashboardAsync(aporteHipotetico: 1000m);
+
+        Assert.False(dto.SemMetas);
+        Assert.Equal(10000m, dto.PatrimonioTotal);
+        Assert.False(dto.AlvoForaDeCem); // 50 (Bancos) + 50 (FIIs via subcarteira) = 100
+
+        var bancos = dto.Carteiras.Single(c => c.Nome == "Bancos");
+        Assert.Equal(60m, bancos.PesoAtual);
+        Assert.Equal(50m, bancos.PesoAlvo);
+        Assert.Equal(10m, bancos.DesvioPontos);
+        Assert.Equal(0m, bancos.AporteSugerido); // acima do alvo não recebe aporte
+
+        var fiis = dto.Carteiras.Single(c => c.Nome == "FIIs");
+        Assert.Equal(40m, fiis.PesoAtual);
+        Assert.Equal(50m, fiis.PesoAlvo); // alvo agregado da subcarteira Papel
+        Assert.Equal(-10m, fiis.DesvioPontos);
+        Assert.Equal(1000m, fiis.FaltaParaAlvo);
+        Assert.Equal(1000m, fiis.AporteSugerido); // todo o aporte vai para a carteira abaixo do alvo
+    }
+
+    [Fact]
+    public async Task MetasDashboardSemPesoAlvoDevolveSemMetas()
+    {
+        var banco = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "BB", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var transacoes = new List<TransacaoFinanceira> { Compra(banco, 100m, 60m, new DateTime(2026, 1, 10)) };
+        var carteiras = new List<CarteiraFinanceira> { Carteira(10, "Bancos", "Setor", banco) }; // sem PesoAlvo
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarTodasTransacoesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transacoes);
+        repo.Setup(r => r.BuscarCotacoesAtuaisAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repo.Setup(r => r.BuscarCarteirasComAtivosAsync(It.IsAny<CancellationToken>())).ReturnsAsync(carteiras);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterMetasDashboardAsync();
+
+        Assert.True(dto.SemMetas);
+        Assert.Empty(dto.Carteiras);
+    }
+
+    [Fact]
     public async Task ReconciliacaoDashboardDeveResumirAjustesEValorNaVariacao()
     {
         var bbas = new AtivoFinanceiro { Id = 1, Chave = "BBAS3", Sigla = "BBAS3", Nome = "Banco do Brasil", Classe = ClasseAtivo.Acao, Mercado = "B3" };

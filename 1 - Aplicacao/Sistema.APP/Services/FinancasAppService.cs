@@ -64,6 +64,83 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return new FinancasCarteirasDto(CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal), criptoParcial);
     }
 
+    // F-G: metas + rebalanceamento. Reusa a mesma valoração do card de Carteiras (projeção + cotações),
+    // soma o PesoAlvo por carteira-topo (ativos diretos + subcarteiras) e delega o desvio/sugestão à
+    // CalculadoraMetasCarteira (pura). À prova de falha: qualquer erro devolve DTO "sem metas" (ilha some).
+    public async Task<FinancasMetasDto> ObterMetasDashboardAsync(decimal aporteHipotetico = 0m, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+            var valorMercadoTotal = ativos.Sum(x => x.ValorMercado);
+
+            // Valor de mercado por carteira-topo (já agrega subcarteiras para cima).
+            var resumo = CriarResumoCarteiras(carteiras, ativos, valorMercadoTotal);
+
+            // Peso-alvo por carteira-topo = soma dos PesoAlvo dos ativos da topo + de todas as filhas.
+            var filhasPorPai = carteiras
+                .Where(c => c.CarteiraPaiId.HasValue)
+                .GroupBy(c => c.CarteiraPaiId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var carteirasPorId = carteiras.ToDictionary(c => c.Id);
+
+            var entradas = resumo
+                .Select(r => new CalculadoraMetasCarteira.EntradaMeta(
+                    r.Id,
+                    r.Nome,
+                    r.ValorMercado,
+                    SomarPesoAlvo(r.Id, carteirasPorId, filhasPorPai)))
+                .ToList();
+
+            return CalculadoraMetasCarteira.Calcular(entradas, aporteHipotetico);
+        }
+        catch
+        {
+            return new FinancasMetasDto([], 0m, 0m, 0m, SemMetas: true, AlvoForaDeCem: false);
+        }
+    }
+
+    // Soma recursiva do PesoAlvo de uma carteira: seus ativos diretos + os das subcarteiras. Devolve null
+    // quando nenhum ativo na árvore tem alvo (carteira sem meta), para a calculadora ignorá-la.
+    private static decimal? SomarPesoAlvo(
+        int carteiraId,
+        IReadOnlyDictionary<int, CarteiraFinanceira> carteirasPorId,
+        IReadOnlyDictionary<int, List<CarteiraFinanceira>> filhasPorPai)
+    {
+        if (!carteirasPorId.TryGetValue(carteiraId, out var carteira))
+            return null;
+
+        decimal soma = 0m;
+        var temAlvo = false;
+
+        foreach (var ativo in carteira.Ativos)
+        {
+            if (ativo.PesoAlvo is { } peso)
+            {
+                soma += peso;
+                temAlvo = true;
+            }
+        }
+
+        if (filhasPorPai.TryGetValue(carteiraId, out var filhas))
+        {
+            foreach (var filha in filhas)
+            {
+                var subPeso = SomarPesoAlvo(filha.Id, carteirasPorId, filhasPorPai);
+                if (subPeso.HasValue)
+                {
+                    soma += subPeso.Value;
+                    temAlvo = true;
+                }
+            }
+        }
+
+        return temAlvo ? soma : null;
+    }
+
     public async Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default)
     {
         var carga = await _uow.Financas.ObterCargaMaisRecenteAsync(cancellationToken);

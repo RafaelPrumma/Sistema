@@ -34,6 +34,10 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardCarteiras(CancellationToken cancellationToken)
         => PartialView("_DashboardCarteiras", await _service.ObterCarteirasDashboardAsync(cancellationToken));
 
+    [HttpGet("/Financas/Dashboard/Metas")]
+    public async Task<IActionResult> DashboardMetas(decimal? aporte, CancellationToken cancellationToken)
+        => PartialView("_DashboardMetas", await _service.ObterMetasDashboardAsync(aporte ?? 0m, cancellationToken));
+
     [HttpGet("/Financas/Dashboard/Importacao")]
     public async Task<IActionResult> DashboardImportacao(CancellationToken cancellationToken)
         => PartialView("_DashboardImportacao", await _service.ObterImportacaoDashboardAsync(cancellationToken));

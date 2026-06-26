@@ -318,6 +318,35 @@ public record FinancasCarteirasDto(
     // Quando há posição cripto, sinalizamos "parcialmente reconciliado" — honestidade > número cego.
     bool CriptoParcialmenteReconciliada = false);
 
+// F-G: acompanhamento de metas (peso-alvo) por carteira-topo.
+//  - PesoAtual  = participação no patrimônio hoje (%).
+//  - PesoAlvo   = soma dos PesoAlvo dos ativos da carteira (e subcarteiras), em % do patrimônio.
+//  - Desvio*    = atual − alvo, em pontos percentuais (p.p.) e relativo (%).
+//  - FaltaParaAlvo / SobraSobreAlvo = quanto em R$ falta aportar (ou está acima) para bater o alvo,
+//    no patrimônio atual. AporteSugerido = fatia de um aporte hipotético direcionada a esta carteira
+//    para reduzir o desvio (>= 0; carteira acima do alvo não recebe aporte).
+public record MetaCarteiraDto(
+    int CarteiraId,
+    string Nome,
+    decimal ValorMercado,
+    decimal PesoAtual,
+    decimal PesoAlvo,
+    decimal DesvioPontos,
+    decimal DesvioPercentual,
+    decimal FaltaParaAlvo,
+    decimal SobraSobreAlvo,
+    decimal AporteSugerido);
+
+public record FinancasMetasDto(
+    IReadOnlyList<MetaCarteiraDto> Carteiras,
+    decimal PatrimonioTotal,
+    // Soma dos pesos-alvo definidos (sanidade: idealmente ~100%). SemMetas = nenhuma carteira tem alvo
+    // → a ilha não aparece. AlvoForaDeCem sinaliza soma de alvos ≠ 100 (avisa, mas não trava).
+    decimal SomaPesoAlvo,
+    decimal AporteHipotetico,
+    bool SemMetas,
+    bool AlvoForaDeCem);
+
 public record FinancasImportacaoDto(
     IReadOnlyList<FinanceiroKpiDto> Kpis,
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,

@@ -1,0 +1,96 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasMetasDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C2", br);
+    string Pp(decimal value) => (value >= 0 ? "+" : "") + value.ToString("N2", br);
+    string Pct(decimal value) => value.ToString("N2", br);
+}
+
+@* F-G: metas + rebalanceamento. Só aparece quando há peso-alvo definido em alguma carteira. *@
+@if (!Model.SemMetas && Model.Carteiras.Count > 0)
+{
+    <div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h6 class="mb-0"><i class="bi bi-bullseye me-1"></i>Metas e rebalanceamento</h6>
+                <span class="small text-secondary">Patrimônio: <strong>@Money(Model.PatrimonioTotal)</strong></span>
+            </div>
+
+            <p class="small text-secondary mb-3">
+                Comparação do <strong>peso atual</strong> de cada carteira no patrimônio com o
+                <strong>peso-alvo</strong> definido. O desvio é a diferença em pontos percentuais (p.p.);
+                "Falta aportar" é quanto colocar para a carteira atingir o alvo no patrimônio de hoje.
+            </p>
+
+            @if (Model.AlvoForaDeCem)
+            {
+                <div class="alert alert-warning py-2 px-3 small mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    A soma dos pesos-alvo é <strong>@Pct(Model.SomaPesoAlvo)%</strong> (idealmente 100%).
+                    Ajuste os alvos para uma leitura mais precisa.
+                </div>
+            }
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Carteira</th>
+                            <th class="text-end">Atual</th>
+                            <th class="text-end">Alvo</th>
+                            <th class="text-end">Desvio</th>
+                            <th class="text-end">Falta aportar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var c in Model.Carteiras)
+                    {
+                        // Acima do alvo (desvio > 0) → "sobrepeso"; abaixo → falta aporte.
+                        var acima = c.DesvioPontos > 0m;
+                        var corDesvio = Math.Abs(c.DesvioPontos) < 0.01m ? "text-secondary" : (acima ? "text-warning" : "text-info");
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@c.Nome</div>
+                                <div class="small text-secondary">@Money(c.ValorMercado)</div>
+                            </td>
+                            <td class="text-end">@Pct(c.PesoAtual)%</td>
+                            <td class="text-end">@Pct(c.PesoAlvo)%</td>
+                            <td class="text-end @corDesvio">
+                                @Pp(c.DesvioPontos) p.p.
+                                <div class="small text-secondary">@Pp(c.DesvioPercentual)%</div>
+                            </td>
+                            <td class="text-end">
+                                @if (c.FaltaParaAlvo > 0m)
+                                {
+                                    <span class="text-info fw-semibold">@Money(c.FaltaParaAlvo)</span>
+                                    @if (c.AporteSugerido > 0m)
+                                    {
+                                        <div class="small text-secondary">aporte: @Money(c.AporteSugerido)</div>
+                                    }
+                                }
+                                else if (c.SobraSobreAlvo > 0m)
+                                {
+                                    <span class="text-warning">+@Money(c.SobraSobreAlvo)</span>
+                                    <div class="small text-secondary">acima do alvo</div>
+                                }
+                                else
+                                {
+                                    <span class="text-secondary">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="small text-secondary mt-2">
+                <i class="bi bi-info-circle me-1"></i>
+                O peso-alvo é a soma do alvo dos ativos de cada carteira (e subcarteiras).
+                Edição do alvo por ativo ainda é manual (ver Observação na tabela de carteiras).
+            </div>
+        </div>
+    </div>
+}
