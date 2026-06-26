@@ -5,6 +5,10 @@
 ## Objetivo
 Na época do IR, gerar um Excel/relatório com tudo organizado por ficha da declaração, para usar como cola — sem precisar montar na mão.
 
+## Estado (jun/2026)
+✅ **Feito:** motor `CalculadoraIr` (puro) — ganho de capital B3 mensal (isenções/alíquotas Ações/FII/ETF/BDR), proventos isentos/JCP, Bens e Direitos; **cripto como EXTERIOR** (Lei 14.754, 15% anual sobre o ganho líquido, **sem** isenção R$35k) com Operações de Ganho (alienações valoradas em BRL pela F2 da cripto), Rewards, **B&D com código RFB** (08-01 BTC / 08-02 altcoin / 08-03 stablecoin / 08-99 token) + situação 31/12 anterior, e flag **IN 1888** (mês de cripto > R$30k). Tela `/Financas/IR` + **export Excel espelhando 8 abas** (Resumo · Como_Usar · Bens_Direitos · Aplic_Fin_Exterior · Operacoes_Ganho · Rendimentos_Rewards · Resumo_Mensal · Regras_Fontes). Reparo de classe (FII gravado como ETF) corrige a alíquota de FII para 20%.
+🔲 **Falta:** **aceite real** contra os informes de `arquivos/ir/` e o consolidado do usuário (só rodando o app); aba **Compras_BRL** (expor os aportes em reais no DTO); **exchange nacional como opção** (config, p/ corretora nacional); day-trade.
+
 ## Regras (confirmar a cada ano-calendário)
 ### Ações / FIIs / ETFs (B3)
 - **Bens e Direitos**: posição em 31/12 (qtd × preço médio) por ativo, com CNPJ.
