@@ -1554,6 +1554,122 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
             e.Fator,
             e.Fonte);
 
+    // ===== Alertas de preço (F-H) — CRUD manual =====
+
+    public async Task<PagedResult<AlertaPrecoDto>> BuscarAlertasPrecoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var result = await _uow.Financas.BuscarAlertasPrecoAsync(page, pageSize, termo, cancellationToken);
+        return new PagedResult<AlertaPrecoDto>(result.Items.Select(MapAlertaPreco).ToList(), result.TotalCount, result.Page, result.PageSize);
+    }
+
+    public async Task<ResultadoOperacao> RegistrarAlertaPrecoAsync(NovoAlertaPrecoInput input, CancellationToken cancellationToken = default)
+    {
+        if (input is null || string.IsNullOrWhiteSpace(input.Ticker))
+            return new ResultadoOperacao(false, "Informe o ticker do ativo.");
+        if (input.Limiar <= 0m)
+            return new ResultadoOperacao(false, "Limiar deve ser maior que zero.");
+        if (!Enum.TryParse<DirecaoAlertaPreco>(input.Direcao, true, out var direcao))
+            return new ResultadoOperacao(false, "Direção inválida.");
+
+        var ticker = input.Ticker.Trim().ToUpperInvariant();
+        var ativo = await _uow.Financas.ObterAtivoPorChaveOuTickerAsync(ticker, cancellationToken);
+        if (ativo is null)
+        {
+            var validacao = await _marketData.ValidarAtivoAsync(ticker, cancellationToken);
+            if (!validacao.Valido)
+                return new ResultadoOperacao(false, validacao.Mensagem ?? "Ativo inválido.");
+
+            var classe = Enum.TryParse<ClasseAtivo>(validacao.Classe, true, out var c) ? c : ClasseAtivo.Outro;
+            ativo = new AtivoFinanceiro
+            {
+                Chave = ticker,
+                Sigla = ticker,
+                Nome = string.IsNullOrWhiteSpace(validacao.Nome) ? ticker : validacao.Nome,
+                Classe = classe,
+                Mercado = validacao.IsCrypto ? "Binance" : "B3",
+                Moeda = "BRL",
+                EhCripto = validacao.IsCrypto,
+                Ativo = true,
+                UsuarioInclusao = "financas-manual"
+            };
+            await _uow.Financas.AdicionarAtivoAsync(ativo, cancellationToken);
+            await _uow.ConfirmarAsync(cancellationToken);
+        }
+
+        var alerta = new AlertaPreco
+        {
+            AtivoFinanceiroId = ativo.Id,
+            Limiar = input.Limiar,
+            Direcao = direcao,
+            Ativo = input.Ativo,
+            Observacao = string.IsNullOrWhiteSpace(input.Observacao) ? null : input.Observacao!.Trim(),
+            UsuarioInclusao = UsuarioAtual
+        };
+        await _uow.Financas.AdicionarAlertaPrecoAsync(alerta, cancellationToken);
+        await _log.RegistrarFinanceiroAsync(
+            "AlertaPreco", "CriarManual", true,
+            $"Alerta {direcao} de {ticker} em {input.Limiar}",
+            LogTipo.Sucesso, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Alerta de preço registrado.", alerta.Id);
+    }
+
+    public async Task<ResultadoOperacao> EditarAlertaPrecoAsync(int id, NovoAlertaPrecoInput input, CancellationToken cancellationToken = default)
+    {
+        var alerta = await _uow.Financas.ObterAlertaPrecoAsync(id, cancellationToken);
+        if (alerta is null)
+            return new ResultadoOperacao(false, "Alerta de preço não encontrado.");
+        if (input.Limiar <= 0m)
+            return new ResultadoOperacao(false, "Limiar deve ser maior que zero.");
+        if (!Enum.TryParse<DirecaoAlertaPreco>(input.Direcao, true, out var direcao))
+            return new ResultadoOperacao(false, "Direção inválida.");
+
+        // Mudou o gatilho (limiar/direção) → re-arma para o novo gatilho poder disparar.
+        if (alerta.Limiar != input.Limiar || alerta.Direcao != direcao)
+        {
+            alerta.DispararadoEm = null;
+            alerta.UltimoPreco = null;
+        }
+        alerta.Limiar = input.Limiar;
+        alerta.Direcao = direcao;
+        alerta.Ativo = input.Ativo;
+        alerta.Observacao = string.IsNullOrWhiteSpace(input.Observacao) ? null : input.Observacao!.Trim();
+        _uow.Financas.AtualizarAlertaPreco(alerta);
+        await _log.RegistrarFinanceiroAsync(
+            "AlertaPreco", "Editar", true,
+            $"Alerta #{alerta.Id} editado ({direcao} {input.Limiar})",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Alerta de preço atualizado.", alerta.Id);
+    }
+
+    public async Task<ResultadoOperacao> ExcluirAlertaPrecoAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var alerta = await _uow.Financas.ObterAlertaPrecoAsync(id, cancellationToken);
+        if (alerta is null)
+            return new ResultadoOperacao(false, "Alerta de preço não encontrado.");
+
+        _uow.Financas.RemoverAlertaPreco(alerta);
+        await _log.RegistrarFinanceiroAsync(
+            "AlertaPreco", "Excluir", true,
+            $"Alerta #{alerta.Id} excluído",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, "Alerta de preço excluído.");
+    }
+
+    private static AlertaPrecoDto MapAlertaPreco(AlertaPreco a)
+        => new(
+            a.Id,
+            a.AtivoFinanceiro?.Sigla ?? a.AtivoFinanceiro?.Chave ?? string.Empty,
+            a.AtivoFinanceiro?.Nome ?? string.Empty,
+            a.Limiar,
+            a.Direcao.ToString(),
+            a.Ativo,
+            a.DispararadoEm,
+            a.UltimoPreco,
+            a.Observacao);
+
     private static IReadOnlyList<FinanceiroKpiDto> CriarKpis(CargaFinanceira? carga)
     {
         var summary = TryParseObject(carga?.DashboardJson, "summary") ?? TryParseObject(carga?.SummaryJson);

@@ -238,6 +238,25 @@ public record NovoEventoCorporativoInput(
     decimal Fator,
     string? Fonte = null);
 
+// F-H — alerta de preço (listagem). DispararadoEm != null = já disparou (armado), aguardando re-arme.
+public record AlertaPrecoDto(
+    int Id,
+    string Ticker,
+    string AtivoNome,
+    decimal Limiar,
+    string Direcao,
+    bool Ativo,
+    DateTime? DispararadoEm,
+    decimal? UltimoPreco,
+    string? Observacao);
+
+public record NovoAlertaPrecoInput(
+    string Ticker,
+    decimal Limiar,
+    string Direcao,
+    bool Ativo = true,
+    string? Observacao = null);
+
 // Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
 // VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
 public record SerieEvolucaoDto(

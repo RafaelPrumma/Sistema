@@ -283,6 +283,51 @@ public class FinancasController(IFinancasAppService service) : Controller
         return RedirectToAction(nameof(Eventos));
     }
 
+    // ===== Alertas de preço (F-H) — CRUD manual =====
+
+    [HttpGet]
+    public async Task<IActionResult> AlertasPreco(string? termo, int page = 1, CancellationToken cancellationToken = default)
+    {
+        ViewBag.Termo = termo;
+        return View(await _service.BuscarAlertasPrecoAsync(page, 25, termo, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AlertasPreco(NovoAlertaPrecoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.RegistrarAlertaPrecoAsync(input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(AlertasPreco));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditarAlertaPreco(int id, NovoAlertaPrecoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.EditarAlertaPrecoAsync(id, input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(AlertasPreco));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExcluirAlertaPreco(int id, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.ExcluirAlertaPrecoAsync(id, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(AlertasPreco));
+    }
+
     [HttpGet("/Financas/IR")]
     public async Task<IActionResult> IR(int? ano, CancellationToken cancellationToken)
     {

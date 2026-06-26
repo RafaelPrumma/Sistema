@@ -46,4 +46,10 @@ public interface IFinancasAppService
     Task<ResultadoOperacao> RegistrarEventoCorporativoManualAsync(NovoEventoCorporativoInput input, CancellationToken cancellationToken = default);
     Task<ResultadoOperacao> EditarEventoCorporativoAsync(int id, NovoEventoCorporativoInput input, CancellationToken cancellationToken = default);
     Task<ResultadoOperacao> ExcluirEventoCorporativoAsync(int id, CancellationToken cancellationToken = default);
+
+    // Alertas de preço (F-H) — CRUD manual.
+    Task<PagedResult<AlertaPrecoDto>> BuscarAlertasPrecoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> RegistrarAlertaPrecoAsync(NovoAlertaPrecoInput input, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> EditarAlertaPrecoAsync(int id, NovoAlertaPrecoInput input, CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> ExcluirAlertaPrecoAsync(int id, CancellationToken cancellationToken = default);
 }
