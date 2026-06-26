@@ -75,26 +75,36 @@ public class CalculadoraIrTests
     }
 
     [Fact]
-    public void Cripto_AlienacaoAteTrintaECincoMil_Isenta_AcimaTributa()
+    public void Cripto_Exterior_TributaGanhoAnual15pct_SemIsencaoNacional()
     {
+        // Cripto (Binance) = aplicação no EXTERIOR (Lei 14.754/2023): NÃO entra no ganho de capital
+        // mensal nacional nem usa a isenção de R$35k/mês; é 15% sobre o ganho líquido ANUAL.
         var btc = Ativo(3, "BTC", ClasseAtivo.Cripto, cripto: true);
 
-        var isenta = new[]
+        // Alienação de R$20.000 — seria isenta no modelo nacional (<=35k), mas no exterior tributa.
+        var pequena = new[]
         {
             Tx(btc, "2025-01-05", TipoOperacaoFinanceira.Compra, 1m, 100000m),
-            Tx(btc, "2025-02-10", TipoOperacaoFinanceira.Venda, 0.05m, 400000m), // vendas 20000 (<=35k) → isento
+            Tx(btc, "2025-02-10", TipoOperacaoFinanceira.Venda, 0.05m, 400000m), // aliena 20000; custo 5000; ganho 15000
         };
-        Assert.True(Assert.Single(CalculadoraIr.Apurar(2025, isenta, []).GanhosMensais).Isento);
+        var apurP = CalculadoraIr.Apurar(2025, pequena, []);
+        Assert.Empty(apurP.GanhosMensais);                              // cripto não entra no ganho mensal nacional
+        Assert.Equal(15000m, apurP.CriptoExterior.GanhoCapitalLiquido);
+        Assert.Equal(0.15m, apurP.CriptoExterior.Aliquota);
+        Assert.Equal(2250m, apurP.CriptoExterior.ImpostoGanhoCapital);  // 15% de 15000 — sem isenção
 
-        var tributa = new[]
+        // Lucro 30000 → 15% = 4500; uma linha de alienação valorada em BRL.
+        var maior = new[]
         {
             Tx(btc, "2025-01-05", TipoOperacaoFinanceira.Compra, 1m, 100000m),  // PM 100000
-            Tx(btc, "2025-02-10", TipoOperacaoFinanceira.Venda, 0.1m, 400000m), // vendas 40000 (>35k), lucro 40000-10000=30000
+            Tx(btc, "2025-02-10", TipoOperacaoFinanceira.Venda, 0.1m, 400000m), // aliena 40000; custo 10000; ganho 30000
         };
-        var mes = Assert.Single(CalculadoraIr.Apurar(2025, tributa, []).GanhosMensais);
-        Assert.False(mes.Isento);
-        Assert.Equal(0.15m, mes.Aliquota);     // base < R$5M → 15%
-        Assert.Equal(4500m, mes.Imposto);      // 15% de 30000
+        var apur = CalculadoraIr.Apurar(2025, maior, []);
+        var alienacao = Assert.Single(apur.CriptoExterior.Alienacoes);
+        Assert.Equal(40000m, alienacao.ValorAlienacao);
+        Assert.Equal(10000m, alienacao.Custo);
+        Assert.Equal(30000m, alienacao.Ganho);
+        Assert.Equal(4500m, apur.CriptoExterior.ImpostoGanhoCapital);   // 15% de 30000
     }
 
     [Fact]

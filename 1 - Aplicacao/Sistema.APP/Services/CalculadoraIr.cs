@@ -8,14 +8,25 @@ namespace Sistema.APP.Services;
 /// Bens e Direitos em 31/12 e proventos (isentos/JCP). Apoio/"cola" — NÃO substitui contador.
 /// Regras: ver specs/ir.spec.md (regra cripto VIGENTE em 2026 — a MP 1.303/2025 foi rejeitada).
 ///
-/// Simplificações de F1 (documentadas):
+/// Cripto = aplicação no EXTERIOR (Lei 14.754/2023): ganho de capital ANUAL (15% sobre o ganho líquido do
+/// ano), NÃO usa a isenção nacional de R$35k/mês; rewards/earn = rendimento tributável (valor BRL na data).
+/// Ver specs/ir.spec.md ("Enquadramento — Binance = EXTERIOR") e specs/cripto.spec.md §7 (ponte IR).
+///
+/// Simplificações (documentadas):
 ///  - não separa day-trade (tudo tratado como swing);
-///  - cripto assume exchange NACIONAL (isenção R$35k/mês); exterior 15% anual (Lei 14.754/2023) não tratado;
-///  - compensação de prejuízo é cronológica por natureza e atravessa anos (prejuízo de mês isento não é usado);
+///  - compensação de prejuízo B3 é cronológica por natureza e atravessa anos (prejuízo de mês isento não é usado);
+///  - cripto exterior: ganho líquido anual × 15% (sem compensação cronológica entre anos; perda anual → imposto 0);
 ///  - proventos classificados pelo IncomeType (texto).
+///
+/// TODO (próximo subagente — FORA deste escopo): Bens e Direitos com código RFB (08-01/02/03/99) + custo
+/// em 31/12 do ano e do anterior; flag IN 1888 (mês de cripto > R$30k); enquadramento nacional como opção;
+/// export espelhando as 9 abas do consolidado real.
 /// </summary>
 public static class CalculadoraIr
 {
+    // Alíquota do ganho de capital de aplicação financeira no exterior — cripto (Lei 14.754/2023).
+    private const decimal AliquotaCriptoExterior = 0.15m;
+
     public static ApuracaoIrDto Apurar(
         int ano,
         IReadOnlyList<TransacaoFinanceira> transacoes,
@@ -24,8 +35,9 @@ public static class CalculadoraIr
         var ganhos = ApurarGanhosMensais(ano, transacoes);
         var bensDireitos = MontarBensEDireitos(ano, transacoes);
         var (isentos, exclusiva) = ClassificarProventos(ano, proventos);
+        var criptoExterior = ApurarCriptoExterior(ano, transacoes);
         var totalImposto = ganhos.Sum(g => g.Imposto);
-        return new ApuracaoIrDto(ano, ganhos, bensDireitos, isentos, exclusiva, totalImposto);
+        return new ApuracaoIrDto(ano, ganhos, bensDireitos, isentos, exclusiva, totalImposto, criptoExterior);
     }
 
     // --- Ganho de capital mensal por natureza, com isenção por volume e compensação de prejuízo ---
@@ -198,13 +210,74 @@ public static class CalculadoraIr
         return (CategoriaProvento.Isento, "Rendimentos de FII / isentos");
     }
 
+    // --- Cripto como aplicação no EXTERIOR (Lei 14.754/2023) ---
+    // Ganho de capital ANUAL (15% sobre o ganho líquido do ano); NÃO usa a isenção nacional de R$35k/mês.
+    // Rewards/earn = rendimento tributável (valor BRL na data). As alienações cripto já chegam valoradas em
+    // BRL (F2): pernas Venda com UnitPrice/GrossAmount em BRL; earn como Rendimento com UnitPrice em BRL.
+
+    private static CriptoExteriorIrDto ApurarCriptoExterior(int ano, IReadOnlyList<TransacaoFinanceira> transacoes)
+    {
+        var alienacoes = new List<AlienacaoCriptoIrDto>();
+        var rewards = new List<RewardCriptoIrDto>();
+        var estado = new Dictionary<int, (decimal Qtd, decimal Custo)>(); // custo médio móvel por ativo cripto.
+
+        // Cronológico (inclui anos anteriores) para o custo médio ficar correto na alienação do ano apurado.
+        foreach (var t in transacoes.Where(t => t.Asset is not null && EhCripto(t.Asset!)).OrderBy(t => t.Date).ThenBy(t => t.Id))
+        {
+            var st = estado.TryGetValue(t.AssetId, out var s) ? s : (Qtd: 0m, Custo: 0m);
+            var doAno = t.Date.Year == ano;
+            var rotulo = t.Asset!.Sigla ?? t.Asset!.Chave ?? t.Asset!.Nome ?? "?";
+
+            if (t.OperationType == TipoOperacaoFinanceira.Rendimento)
+            {
+                // Earn/staking-reward/airdrop: entra na posição com custo = valor de mercado BRL na data;
+                // esse MESMO valor é o rendimento tributável do exterior.
+                var valor = t.Quantity * t.UnitPrice;
+                st.Custo += valor;
+                st.Qtd += t.Quantity;
+                if (doAno && valor > 0m)
+                    rewards.Add(new RewardCriptoIrDto(t.Date.Month, t.Date.Date, rotulo, t.Quantity, Math.Round(valor, 2)));
+            }
+            else
+            {
+                var delta = Delta(t);
+                if (delta > 0m) // Compra (com fiat) ou perna-entrada de permuta: aumenta posição/custo.
+                {
+                    st.Custo += t.Quantity * t.UnitPrice + t.Fees;
+                    st.Qtd += t.Quantity;
+                }
+                else if (delta < 0m) // Venda por fiat OU permuta-saída: é alienação tributável (exterior).
+                {
+                    var pm = st.Qtd > 0m ? st.Custo / st.Qtd : 0m;
+                    var reduz = Math.Min(t.Quantity, st.Qtd);
+                    var valorAlienacao = t.Quantity * t.UnitPrice;
+                    var custo = reduz * pm;
+                    var ganho = valorAlienacao - t.Fees - custo;
+                    if (doAno)
+                        alienacoes.Add(new AlienacaoCriptoIrDto(
+                            t.Date.Month, t.Date.Date, rotulo, t.Quantity,
+                            Math.Round(valorAlienacao, 2), Math.Round(custo, 2), Math.Round(ganho, 2)));
+                    st.Custo -= custo;
+                    st.Qtd -= t.Quantity;
+                    if (st.Qtd <= 0.000000000001m) { st.Qtd = 0m; st.Custo = 0m; }
+                }
+            }
+            estado[t.AssetId] = st;
+        }
+
+        var ganhoLiquido = Math.Round(alienacoes.Sum(a => a.Ganho), 2);
+        var imposto = ganhoLiquido > 0m ? Math.Round(ganhoLiquido * AliquotaCriptoExterior, 2) : 0m;
+        var totalRewards = Math.Round(rewards.Sum(r => r.ValorBRL), 2);
+
+        return new CriptoExteriorIrDto(
+            alienacoes.OrderBy(a => a.Data).ThenBy(a => a.Ativo).ToList(),
+            rewards.OrderBy(r => r.Data).ThenBy(r => r.Ativo).ToList(),
+            ganhoLiquido, AliquotaCriptoExterior, imposto, totalRewards);
+    }
+
     // --- Helpers ---
 
-    // Tabela progressiva de ganho de capital (Lei 13.259/2016), usada para cripto acima da isenção.
-    private static decimal AliquotaGanhoCapital(decimal ganho) =>
-        ganho <= 5_000_000m ? 0.15m :
-        ganho <= 10_000_000m ? 0.175m :
-        ganho <= 30_000_000m ? 0.20m : 0.225m;
+    private static bool EhCripto(AtivoFinanceiro a) => a.EhCripto || a.Classe == ClasseAtivo.Cripto;
 
     private static decimal Delta(TransacaoFinanceira t) => t.OperationType switch
     {
@@ -217,8 +290,10 @@ public static class CalculadoraIr
 
     private static RegraNatureza? Regra(AtivoFinanceiro a)
     {
-        if (a.EhCripto || a.Classe == ClasseAtivo.Cripto)
-            return new RegraNatureza("Cripto", 35000m, AliquotaGanhoCapital);
+        // Cripto NÃO entra no ganho de capital mensal nacional: é apurado como exterior (Lei 14.754/2023)
+        // em ApurarCriptoExterior. Retornar null aqui evita que a venda cripto consuma a isenção R$35k.
+        if (EhCripto(a))
+            return null;
 
         return a.Classe switch
         {
