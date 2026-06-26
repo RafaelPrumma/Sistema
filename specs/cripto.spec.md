@@ -49,3 +49,14 @@ Reconciliação automática com saldo ao vivo da Binance via API (sem chave); pr
 ## 10. Critério de aceite
 - Posição de cripto bate com a corretora: **só ativos realmente detidos** (sem stablecoin/BRL/token fantasma; **sem saldo negativo**). Referência do usuário (31/12/2025, do consolidado): BTC, WBETH, BNSOL, XRP, DOGE, BNB (ETH/SOL/USDT zerados).
 - Cada permuta vira uma alienação valorada; earn vira rendimento. `dotnet build` + `dotnet test` verdes (testes do netting de permuta, do earn e do BRL-como-caixa, com dados sintéticos).
+
+## 11. Ajuste de idempotencia do ledger Binance (USDT, jun/2026)
+
+Achado em producao local: o arquivo **Historico de Transacoes** da Binance pode ter linhas legitimas iguais no mesmo timestamp, mesma moeda, mesma operacao e mesma quantidade. No caso USDT, o ledger bruto fecha em zero, mas a materializacao antiga descartou duplicatas legitimas por `ChaveNatural` e deixou saldo fantasma em `FinanceiroPosicaoAtivo`.
+
+- Para cripto, nao deduplicar por chave natural baseada apenas em ativo/data/operacao/quantidade/preco.
+- A chave segura do ledger cripto e a linha de staging: `DuplicateGroupKey = TransacaoCripto#{StagingId}` e, quando precisar preencher `ChaveNatural`, usar uma chave que inclua o staging, como `BinanceLedger|TransacaoCripto|{StagingId}`.
+- `USDT`, `USDC` e `FDUSD` continuam sendo cripto, nao fiat; elas so devem desaparecer da carteira quando a posicao liquida for zero.
+- `WBETH2.0 - Staking` e `SOL Staking - Purchase` sao conversoes/permutas de staking: abatem ETH/SOL e aumentam WBETH/BNSOL. Nao tratar como rendimento.
+- `Simple Earn Flexible Subscription` e `Simple Earn Flexible Redemption` sao transferencia interna entre carteiras/produtos Earn; nao mudam a posicao detida.
+- Rendimento real de cripto fica restrito a eventos como `Interest`, `Rewards`, `Airdrop`, `Crypto Box`, `Launchpool`, `Voucher`, `Distribution` e equivalentes positivos.

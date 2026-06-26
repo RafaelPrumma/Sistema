@@ -1,0 +1,278 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@using Sistema.CORE.Common
+@model PagedResult<AlertaPrecoDto>
+@{
+    ViewData["Title"] = "Alertas de Preço";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Alertas de Preço",
+    Description = "Regras que notificam quando a cotação de um ativo cruza um limiar. O job recorrente avalia as cotações e envia um aviso interno quando o preço cruza na direção configurada (dispara uma vez; re-arma quando o preço volta do outro lado)."
+})
+
+@await Html.PartialAsync("_FlashMessages")
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex gap-2">
+        <input class="form-control form-control-sm" name="termo" value="@ViewBag.Termo" placeholder="Buscar por ticker" style="max-width:220px" />
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Buscar</button>
+        @if (!string.IsNullOrWhiteSpace(ViewBag.Termo as string))
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-action="AlertasPreco">Limpar</a>
+        }
+    </form>
+    <button class="btn btn-primary" type="button" data-abrir-modal="novoAlertaModal">
+        <i class="bi bi-plus-circle me-1"></i>Adicionar alerta
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Ativo</th>
+                    <th>Direção</th>
+                    <th class="text-end">Limiar</th>
+                    <th>Status</th>
+                    <th>Situação</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var al in Model.Items)
+                {
+                    <tr>
+                        <td class="fw-semibold">@al.Ticker</td>
+                        <td class="small text-secondary">@al.AtivoNome</td>
+                        <td>
+                            <span class="badge @(al.Direcao == "Acima" ? "text-bg-success" : "text-bg-danger")">
+                                @(al.Direcao == "Acima" ? "Acima" : "Abaixo")
+                            </span>
+                        </td>
+                        <td class="text-end">@al.Limiar.ToString("N2", br)</td>
+                        <td>
+                            <span class="badge @(al.Ativo ? "text-bg-primary" : "text-bg-secondary")">@(al.Ativo ? "Ativo" : "Inativo")</span>
+                        </td>
+                        <td class="small">
+                            @if (al.DispararadoEm.HasValue)
+                            {
+                                <span class="text-warning">Disparado @al.DispararadoEm.Value.ToLocalTime().ToString("dd/MM HH:mm", br)</span>
+                            }
+                            else
+                            {
+                                <span class="text-secondary">Armado</span>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary js-editar-alerta"
+                                    data-id="@al.Id"
+                                    data-ticker="@al.Ticker"
+                                    data-direcao="@al.Direcao"
+                                    data-limiar="@al.Limiar.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                    data-ativo="@(al.Ativo ? "true" : "false")"
+                                    data-observacao="@al.Observacao"
+                                    title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger js-excluir-alerta"
+                                    data-id="@al.Id"
+                                    data-ticker="@al.Ticker"
+                                    title="Excluir">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Items.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-secondary py-4">Nenhum alerta de preço cadastrado.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="small text-secondary">@Model.TotalCount alerta(s)</span>
+        <div class="btn-group">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : "")"
+               asp-route-page="@(Model.Page - 1)" asp-route-termo="@ViewBag.Termo">Anterior</a>
+            <a class="btn btn-sm btn-outline-secondary @((Model.Page * Model.PageSize) >= Model.TotalCount ? "disabled" : "")"
+               asp-route-page="@(Model.Page + 1)" asp-route-termo="@ViewBag.Termo">Proxima</a>
+        </div>
+    </div>
+</div>
+
+@* Modal — novo alerta *@
+<div id="novoAlertaModal" data-titulo="Adicionar alerta de preço" data-icone="bi bi-bell" data-largura="560" style="display:none">
+    <form method="post" asp-action="AlertasPreco" id="formNovoAlerta" class="p-3">
+        @Html.AntiForgeryToken()
+        <div class="mb-3">
+            <label class="form-label">Ativo (ticker)</label>
+            <div class="input-group">
+                <input class="form-control text-uppercase" name="Ticker" id="alTicker" placeholder="Ex.: BBAS3, HGLG11, BTC" autocomplete="off" required />
+                <button class="btn btn-outline-secondary" type="button" id="alValidar">Validar</button>
+            </div>
+            <div class="form-text" id="alFeedback">Digite o ticker do ativo e clique em Validar.</div>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Direção</label>
+                <select class="form-select" name="Direcao" required>
+                    <option value="Acima">Acima do limiar</option>
+                    <option value="Abaixo">Abaixo do limiar</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Limiar (R$)</label>
+                <input class="form-control" type="number" step="any" min="0.0001" name="Limiar" id="alLimiar" placeholder="Ex.: 32.50" required />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observação (opcional)</label>
+                <input class="form-control" name="Observacao" placeholder="Ex.: preço-alvo de venda" />
+            </div>
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="Ativo" value="true" id="alAtivo" checked />
+                    <label class="form-check-label" for="alAtivo">Ativo</label>
+                </div>
+            </div>
+        </div>
+        <div class="form-text text-secondary mt-2">
+            "Acima" dispara quando o preço atinge ou ultrapassa o limiar; "Abaixo", quando cai até ele. Dispara uma vez e re-arma quando o preço volta para o outro lado.
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="alCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="alSalvar" disabled>Salvar alerta</button>
+        </div>
+    </form>
+</div>
+
+@* Modal — editar alerta *@
+<div id="editarAlertaModal" data-titulo="Editar alerta de preço" data-icone="bi bi-pencil" data-largura="560" style="display:none">
+    <form method="post" asp-action="EditarAlertaPreco" id="formEditarAlerta" class="p-3">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="edAlId" />
+        <div class="mb-2">
+            <label class="form-label">Ticker</label>
+            <input class="form-control" id="edAlTicker" readonly />
+            <input type="hidden" name="Ticker" id="edAlTickerHidden" />
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Direção</label>
+                <select class="form-select" name="Direcao" id="edAlDirecao">
+                    <option value="Acima">Acima do limiar</option>
+                    <option value="Abaixo">Abaixo do limiar</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label">Limiar (R$)</label>
+                <input class="form-control" type="number" step="any" min="0.0001" name="Limiar" id="edAlLimiar" required />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observação (opcional)</label>
+                <input class="form-control" name="Observacao" id="edAlObservacao" />
+            </div>
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="Ativo" value="true" id="edAlAtivo" />
+                    <label class="form-check-label" for="edAlAtivo">Ativo</label>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="edAlCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar alterações</button>
+        </div>
+    </form>
+</div>
+
+@* Form oculto para exclusão *@
+<form method="post" asp-action="ExcluirAlertaPreco" id="formExcluirAlerta" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" id="exAlId" />
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    // --- Novo alerta: validação do ticker ---
+    var ticker = document.getElementById('alTicker');
+    var validar = document.getElementById('alValidar');
+    var feedback = document.getElementById('alFeedback');
+    var salvar = document.getElementById('alSalvar');
+    var cancelar = document.getElementById('alCancelar');
+    var validado = '';
+
+    function bloquear() {
+        salvar.disabled = true;
+        if (ticker.value.trim().toUpperCase() !== validado) {
+            feedback.className = 'form-text';
+        }
+    }
+
+    async function validarTicker() {
+        var valor = ticker.value.trim().toUpperCase();
+        if (!valor) return;
+        feedback.className = 'form-text text-secondary';
+        feedback.textContent = 'Validando ' + valor + '...';
+        salvar.disabled = true;
+        try {
+            var resp = await fetch('@Url.Action("ValidarAtivo", "Financas")?ticker=' + encodeURIComponent(valor));
+            var data = await resp.json();
+            if (data.valido) {
+                validado = (data.ticker || valor).toUpperCase();
+                ticker.value = validado;
+                feedback.className = 'form-text text-success';
+                feedback.textContent = '✓ ' + (data.nome || validado) + ' · ' + data.classe;
+                salvar.disabled = false;
+            } else {
+                feedback.className = 'form-text text-danger';
+                feedback.textContent = '✕ ' + (data.mensagem || 'Ativo nao encontrado.');
+                salvar.disabled = true;
+            }
+        } catch (e) {
+            feedback.className = 'form-text text-danger';
+            feedback.textContent = 'Nao foi possivel validar. Tente novamente.';
+        }
+    }
+
+    if (validar) validar.addEventListener('click', validarTicker);
+    if (ticker) {
+        ticker.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); validarTicker(); } });
+        ticker.addEventListener('input', bloquear);
+    }
+    if (cancelar) cancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('novoAlertaModal'); });
+
+    // --- Editar ---
+    document.querySelectorAll('.js-editar-alerta').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('edAlId').value = btn.dataset.id;
+            document.getElementById('edAlTicker').value = btn.dataset.ticker;
+            document.getElementById('edAlTickerHidden').value = btn.dataset.ticker;
+            document.getElementById('edAlDirecao').value = btn.dataset.direcao;
+            document.getElementById('edAlLimiar').value = btn.dataset.limiar;
+            document.getElementById('edAlObservacao').value = btn.dataset.observacao || '';
+            document.getElementById('edAlAtivo').checked = btn.dataset.ativo === 'true';
+            if (window.abrirModal) window.abrirModal('editarAlertaModal');
+        });
+    });
+
+    var edCancelar = document.getElementById('edAlCancelar');
+    if (edCancelar) edCancelar.addEventListener('click', function () { if (window.fecharModal) window.fecharModal('editarAlertaModal'); });
+
+    // --- Excluir ---
+    document.querySelectorAll('.js-excluir-alerta').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm('Excluir o alerta de ' + btn.dataset.ticker + '?')) return;
+            document.getElementById('exAlId').value = btn.dataset.id;
+            document.getElementById('formExcluirAlerta').submit();
+        });
+    });
+})();
+</script>
+}

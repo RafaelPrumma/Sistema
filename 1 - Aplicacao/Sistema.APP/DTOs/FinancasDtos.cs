@@ -238,6 +238,25 @@ public record NovoEventoCorporativoInput(
     decimal Fator,
     string? Fonte = null);
 
+// F-H — alerta de preço (listagem). DispararadoEm != null = já disparou (armado), aguardando re-arme.
+public record AlertaPrecoDto(
+    int Id,
+    string Ticker,
+    string AtivoNome,
+    decimal Limiar,
+    string Direcao,
+    bool Ativo,
+    DateTime? DispararadoEm,
+    decimal? UltimoPreco,
+    string? Observacao);
+
+public record NovoAlertaPrecoInput(
+    string Ticker,
+    decimal Limiar,
+    string Direcao,
+    bool Ativo = true,
+    string? Observacao = null);
+
 // Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
 // VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
 public record SerieEvolucaoDto(
@@ -250,6 +269,9 @@ public record SerieEvolucaoDto(
 public record EvolucaoPatrimonioDto(
     IReadOnlyList<string> Datas,
     IReadOnlyList<decimal> Total,
+    // Custo acumulado (aportes líquidos = compras − vendas, acumulado por data) alinhado a Datas;
+    // sobreposto ao patrimônio no gráfico para comparar mercado × quanto foi aportado.
+    IReadOnlyList<decimal> CustoAcumulado,
     decimal VariacaoDiaTotal,
     decimal ValorAtualTotal,
     IReadOnlyList<SerieEvolucaoDto> Setores,
@@ -315,10 +337,74 @@ public record FinancasCarteirasDto(
     // Quando há posição cripto, sinalizamos "parcialmente reconciliado" — honestidade > número cego.
     bool CriptoParcialmenteReconciliada = false);
 
+// F-G: acompanhamento de metas (peso-alvo) por carteira-topo.
+//  - PesoAtual  = participação no patrimônio hoje (%).
+//  - PesoAlvo   = soma dos PesoAlvo dos ativos da carteira (e subcarteiras), em % do patrimônio.
+//  - Desvio*    = atual − alvo, em pontos percentuais (p.p.) e relativo (%).
+//  - FaltaParaAlvo / SobraSobreAlvo = quanto em R$ falta aportar (ou está acima) para bater o alvo,
+//    no patrimônio atual. AporteSugerido = fatia de um aporte hipotético direcionada a esta carteira
+//    para reduzir o desvio (>= 0; carteira acima do alvo não recebe aporte).
+public record MetaCarteiraDto(
+    int CarteiraId,
+    string Nome,
+    decimal ValorMercado,
+    decimal PesoAtual,
+    decimal PesoAlvo,
+    decimal DesvioPontos,
+    decimal DesvioPercentual,
+    decimal FaltaParaAlvo,
+    decimal SobraSobreAlvo,
+    decimal AporteSugerido);
+
+public record FinancasMetasDto(
+    IReadOnlyList<MetaCarteiraDto> Carteiras,
+    decimal PatrimonioTotal,
+    // Soma dos pesos-alvo definidos (sanidade: idealmente ~100%). SemMetas = nenhuma carteira tem alvo
+    // → a ilha não aparece. AlvoForaDeCem sinaliza soma de alvos ≠ 100 (avisa, mas não trava).
+    decimal SomaPesoAlvo,
+    decimal AporteHipotetico,
+    bool SemMetas,
+    bool AlvoForaDeCem);
+
 public record FinancasImportacaoDto(
     IReadOnlyList<FinanceiroKpiDto> Kpis,
     ImportacaoFinanceiraResumoDto ImportacaoArquivos,
-    DateTime? CotacoesAtualizadasEm);
+    DateTime? CotacoesAtualizadasEm,
+    // F-L(b): rastreabilidade dos arquivos por fonte/status + saúde da custódia B3.
+    IReadOnlyList<RastreabilidadeFonteDto> RastreabilidadeFontes = null!,
+    RastreabilidadeB3Dto? RastreabilidadeB3 = null);
+
+// F-L(b): um documento importado, com o que dá para rastrear dele (tipo, período, status, linhas/abas
+// lidas e nº de sinais de alerta/erro/duplicidade ligados ao documento).
+public record RastreabilidadeDocumentoDto(
+    string Arquivo,
+    string Tipo,            // rótulo do DocumentKind (ex.: "B3 Extrato", "Nota Nubank")
+    string? Periodo,        // referencePeriod (yyyy-MM) quando houver; senão o ano de referência
+    string StatusParse,     // rótulo amigável do ParseStatus
+    string Status,          // rótulo amigável do Status
+    int LinhasLidas,
+    int Abas,
+    int Alertas);
+
+// F-L(b): resumo de uma fonte (B3 / Nubank / Binance / IR / Outros) com a contagem por status de parse
+// e a lista de documentos. "Parciais"/"Falhos" sinalizam o que não entrou inteiro.
+public record RastreabilidadeFonteDto(
+    string Fonte,
+    int Documentos,
+    int Processados,
+    int Parciais,
+    int Falhos,
+    int LinhasLidas,
+    int Alertas,
+    IReadOnlyList<RastreabilidadeDocumentoDto> Itens);
+
+// F-L(b): saúde da custódia B3 — última Posição usada na reconciliação (período do snapshot) e meses
+// faltantes entre o primeiro e o último extrato consolidado (lacunas na série mensal).
+public record RastreabilidadeB3Dto(
+    string? UltimoPeriodoPosicao,        // maior referencePeriod entre os extratos B3 (yyyy-MM)
+    string? PrimeiroPeriodoExtrato,
+    int ExtratosImportados,
+    IReadOnlyList<string> MesesFaltantes);
 
 public record ProventoTopPagadorDto(
     string Ticker,

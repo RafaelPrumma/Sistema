@@ -74,13 +74,13 @@ public class AtivoFinanceiroMap : IEntityTypeConfiguration<AtivoFinanceiro>
     {
         builder.ToTable("FinanceiroAtivo");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.AssetKey).IsRequired().HasMaxLength(160);
-        builder.Property(x => x.Ticker).HasMaxLength(40);
-        builder.Property(x => x.Name).IsRequired().HasMaxLength(240);
-        builder.Property(x => x.Market).HasMaxLength(60);
-        builder.Property(x => x.Currency).HasMaxLength(10);
-        builder.Property(x => x.ConceptRole).HasMaxLength(80);
-        builder.HasIndex(x => x.AssetKey).IsUnique();
+        builder.Property(x => x.Chave).IsRequired().HasMaxLength(160);
+        builder.Property(x => x.Sigla).HasMaxLength(40);
+        builder.Property(x => x.Nome).IsRequired().HasMaxLength(240);
+        builder.Property(x => x.Mercado).HasMaxLength(60);
+        builder.Property(x => x.Moeda).HasMaxLength(10);
+        builder.Property(x => x.PapelConceitual).HasMaxLength(80);
+        builder.HasIndex(x => x.Chave).IsUnique();
     }
 }
 
@@ -95,12 +95,12 @@ public class CarteiraFinanceiraMap : IEntityTypeConfiguration<CarteiraFinanceira
         builder.Property(x => x.Descricao).HasMaxLength(500);
         builder.Property(x => x.Tipo).IsRequired().HasMaxLength(40);
         builder.HasIndex(x => x.Slug).IsUnique();
-        builder.HasIndex(x => x.ParentId);
+        builder.HasIndex(x => x.CarteiraPaiId);
         // Hierarquia (F-I): self-reference nullable. Restrict/NoAction p/ não cascatear o delete da topo
         // sobre as subcarteiras (SQL Server proíbe ciclos de cascade em self-FK de qualquer forma).
-        builder.HasOne(x => x.Parent)
+        builder.HasOne(x => x.CarteiraPai)
             .WithMany(x => x.Filhas)
-            .HasForeignKey(x => x.ParentId)
+            .HasForeignKey(x => x.CarteiraPaiId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -125,16 +125,16 @@ public class CotacaoAtivoFinanceiroMap : IEntityTypeConfiguration<CotacaoAtivoFi
     {
         builder.ToTable("FinanceiroCotacaoAtivo");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Symbol).IsRequired().HasMaxLength(40);
-        builder.Property(x => x.Currency).IsRequired().HasMaxLength(10);
-        builder.Property(x => x.Price).HasPrecision(28, 12);
-        builder.Property(x => x.PriceBRL).HasPrecision(28, 12);
-        builder.Property(x => x.Change).HasPrecision(28, 12);
-        builder.Property(x => x.ChangePercent).HasPrecision(18, 8);
-        builder.Property(x => x.ErrorMessage).HasMaxLength(1000);
+        builder.Property(x => x.Simbolo).IsRequired().HasMaxLength(40);
+        builder.Property(x => x.Moeda).IsRequired().HasMaxLength(10);
+        builder.Property(x => x.Preco).HasPrecision(28, 12);
+        builder.Property(x => x.PrecoBRL).HasPrecision(28, 12);
+        builder.Property(x => x.Variacao).HasPrecision(28, 12);
+        builder.Property(x => x.VariacaoPercentual).HasPrecision(18, 8);
+        builder.Property(x => x.MensagemErro).HasMaxLength(1000);
         builder.Property(x => x.RawJson).IsRequired();
         builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Provedor }).IsUnique();
-        builder.HasIndex(x => x.RetrievedAt);
+        builder.HasIndex(x => x.ConsultadoEm);
         builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Cascade);
     }
 }
@@ -270,16 +270,35 @@ public class EstimativaPosicaoCarteiraMap : IEntityTypeConfiguration<EstimativaP
     {
         builder.ToTable("FinanceiroPosicaoEstimativa");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Quantity).HasPrecision(24, 8);
-        builder.Property(x => x.AveragePrice).HasPrecision(24, 8);
-        builder.Property(x => x.TotalInvested).HasPrecision(24, 8);
-        builder.Property(x => x.TotalSold).HasPrecision(24, 8);
-        builder.Property(x => x.RealizedResult).HasPrecision(24, 8);
-        builder.Property(x => x.EstimatedCurrentPosition).HasPrecision(24, 8);
+        builder.Property(x => x.Quantidade).HasPrecision(24, 8);
+        builder.Property(x => x.PrecoMedio).HasPrecision(24, 8);
+        builder.Property(x => x.TotalInvestido).HasPrecision(24, 8);
+        builder.Property(x => x.TotalVendido).HasPrecision(24, 8);
+        builder.Property(x => x.ResultadoRealizado).HasPrecision(24, 8);
+        builder.Property(x => x.PosicaoAtualEstimada).HasPrecision(24, 8);
         builder.Property(x => x.RawJson).IsRequired();
         builder.HasIndex(x => new { x.CargaFinanceiraId, x.Status });
         builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class PosicaoAtivoMap : IEntityTypeConfiguration<PosicaoAtivo>
+{
+    public void Configure(EntityTypeBuilder<PosicaoAtivo> builder)
+    {
+        builder.ToTable("FinanceiroPosicaoAtivo");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Quantidade).HasPrecision(28, 12);
+        builder.Property(x => x.PrecoMedio).HasPrecision(28, 12);
+        builder.Property(x => x.CustoTotal).HasPrecision(28, 12);
+        builder.Property(x => x.TotalComprado).HasPrecision(28, 12);
+        builder.Property(x => x.TotalVendido).HasPrecision(28, 12);
+        builder.Property(x => x.ResultadoRealizado).HasPrecision(28, 12);
+        builder.Property(x => x.VersaoCalculo).IsRequired().HasMaxLength(40);
+        builder.HasIndex(x => x.AtivoFinanceiroId).IsUnique();
+        builder.HasIndex(x => x.Status);
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -354,6 +373,20 @@ public class EventoCorporativoMap : IEntityTypeConfiguration<EventoCorporativo>
         // Índice único filtrado: idempotência do seed/import (chave não-nula e não-excluída).
         builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
         builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Data });
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class AlertaPrecoMap : IEntityTypeConfiguration<AlertaPreco>
+{
+    public void Configure(EntityTypeBuilder<AlertaPreco> builder)
+    {
+        builder.ToTable("FinanceiroAlertaPreco");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Limiar).HasPrecision(28, 12);
+        builder.Property(x => x.UltimoPreco).HasPrecision(28, 12);
+        builder.Property(x => x.Observacao).HasMaxLength(400);
+        builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Ativo });
         builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
     }
 }

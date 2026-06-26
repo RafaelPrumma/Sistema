@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Sistema.APP.DTOs;
+using Sistema.APP.Services;
 using Sistema.APP.Services.Interfaces;
 using Sistema.CORE.Entities;
 using Sistema.INFRA.Data;
@@ -52,8 +53,8 @@ public class FinancasMarketDataService(
         if (ativos.Count == 0)
             return;
 
-        await AtualizarB3Async(ativos.Where(x => !x.IsCrypto).ToList(), force, cancellationToken);
-        await AtualizarCriptoAsync(ativos.Where(x => x.IsCrypto).ToList(), force, cancellationToken);
+        await AtualizarB3Async(ativos.Where(x => !x.EhCripto).ToList(), force, cancellationToken);
+        await AtualizarCriptoAsync(ativos.Where(x => x.EhCripto).ToList(), force, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
 
@@ -81,7 +82,7 @@ public class FinancasMarketDataService(
         }
 
         var assetIds = await _context.TransacoesFinanceiras
-            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.IsCrypto)
+            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.EhCripto)
             .Select(x => x.AssetId)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -89,7 +90,7 @@ public class FinancasMarketDataService(
             return;
 
         var assets = await _context.AtivosFinanceiros
-            .Where(a => assetIds.Contains(a.Id) && !a.IsCrypto)
+            .Where(a => assetIds.Contains(a.Id) && !a.EhCripto)
             .ToListAsync(cancellationToken);
 
         // Eventos já existentes (semeados/manuais): (ativo, data) p/ dedup por janela e chaves p/ exato.
@@ -174,7 +175,7 @@ public class FinancasMarketDataService(
         // Reconstrói a linha do tempo de quantidade por ativo (a partir da tabela única) para saber
         // quanto eu detinha na data-com de cada provento. Só renda variável B3 (Brapi paga proventos).
         var movimentos = await _context.TransacoesFinanceiras
-            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.IsCrypto)
+            .Where(x => x.IsCanonical && x.Asset != null && !x.Asset!.EhCripto)
             .Select(x => new { x.AssetId, x.OperationType, x.Quantity, x.Date, Asset = x.Asset! })
             .ToListAsync(cancellationToken);
         if (movimentos.Count == 0)
@@ -321,8 +322,8 @@ public class FinancasMarketDataService(
         if (earns.Count == 0)
             return false;
 
-        var ativos = (await _context.AtivosFinanceiros.Where(a => a.IsCrypto).ToListAsync(cancellationToken))
-            .GroupBy(a => a.AssetKey, StringComparer.OrdinalIgnoreCase)
+        var ativos = (await _context.AtivosFinanceiros.Where(a => a.EhCripto).ToListAsync(cancellationToken))
+            .GroupBy(a => a.Chave, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         if (ativos.Count == 0)
             return false;
@@ -345,11 +346,11 @@ public class FinancasMarketDataService(
             .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Date).Select(x => (x.Date, x.CloseBRL)).ToList());
 
         var cotacaoAtual = (await _context.CotacoesAtivosFinanceiros
-                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.PriceBRL > 0m && assetIds.Contains(x.AtivoFinanceiroId))
-                .Select(x => new { x.AtivoFinanceiroId, x.PriceBRL, x.RetrievedAt })
+                .Where(x => x.Provedor == ProvedorCotacao.Binance && x.PrecoBRL > 0m && assetIds.Contains(x.AtivoFinanceiroId))
+                .Select(x => new { x.AtivoFinanceiroId, x.PrecoBRL, x.ConsultadoEm })
                 .ToListAsync(cancellationToken))
             .GroupBy(x => x.AtivoFinanceiroId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.RetrievedAt).First().PriceBRL);
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ConsultadoEm).First().PrecoBRL);
 
         decimal? PrecoEm(int assetId, DateTime data)
         {
@@ -595,7 +596,7 @@ public class FinancasMarketDataService(
         return null;
     }
 
-    private static ClasseAtivo ClassificarB3(string ticker, string? nome)
+    internal static ClasseAtivo ClassificarB3(string ticker, string? nome)
     {
         var t = (ticker ?? string.Empty).ToUpperInvariant();
         var n = (nome ?? string.Empty).ToUpperInvariant();
@@ -625,7 +626,7 @@ public class FinancasMarketDataService(
         if (ativo is null)
             return;
 
-        if (ativo.IsCrypto)
+        if (ativo.EhCripto)
             await AtualizarCriptoAsync(new[] { ativo }, force: true, cancellationToken);
         else
             await AtualizarB3Async(new[] { ativo }, force: true, cancellationToken);
@@ -686,6 +687,8 @@ public class FinancasMarketDataService(
                 var price = GetDecimal(result, "regularMarketPrice") ?? 0m;
                 var marketTime = TryParseDateTime(GetString(result, "regularMarketTime"));
                 UpsertCotacao(ativo.Id, ProvedorCotacao.Brapi, symbol, GetString(result, "currency") ?? "BRL", price, price, GetDecimal(result, "regularMarketChange"), GetDecimal(result, "regularMarketChangePercent"), marketTime, StatusCotacao.Atual, null, result.GetRawText(), TimeSpan.FromMinutes(5));
+                if (price > 0m)
+                    await UpsertBucket30mAsync(ativo.Id, ProvedorCotacao.Brapi, symbol, price, price, cancellationToken);
                 await ImportarHistoricoBrapiAsync(ativo.Id, symbol, result, cancellationToken);
             }
         }
@@ -701,7 +704,7 @@ public class FinancasMarketDataService(
         if (ativos.Count == 0)
             return;
 
-        var symbols = ativos.Select(x => x.AssetKey.ToUpperInvariant()).Distinct().ToList();
+        var symbols = ativos.Select(x => x.Chave.ToUpperInvariant()).Distinct().ToList();
         var staleSymbols = await FiltrarSymbolsStaleAsync(symbols, ProvedorCotacao.Binance, TimeSpan.FromSeconds(45), force, cancellationToken);
         if (staleSymbols.Count == 0)
             return;
@@ -711,7 +714,7 @@ public class FinancasMarketDataService(
 
         foreach (var assetSymbol in staleSymbols)
         {
-            var ativo = ativos.FirstOrDefault(x => string.Equals(x.AssetKey, assetSymbol, StringComparison.OrdinalIgnoreCase));
+            var ativo = ativos.FirstOrDefault(x => string.Equals(x.Chave, assetSymbol, StringComparison.OrdinalIgnoreCase));
             if (ativo is null)
                 continue;
 
@@ -735,6 +738,8 @@ public class FinancasMarketDataService(
             }
 
             UpsertCotacao(ativo.Id, ProvedorCotacao.Binance, quoteSymbol, currency, ticker.Price, priceBrl, ticker.Change, ticker.ChangePercent, ticker.MarketTime, StatusCotacao.Atual, null, ticker.RawJson, TimeSpan.FromSeconds(45));
+            if (ticker.Price > 0m)
+                await UpsertBucket30mAsync(ativo.Id, ProvedorCotacao.Binance, quoteSymbol, ticker.Price, priceBrl, cancellationToken);
             await ImportarHistoricoBinanceAsync(ativo.Id, quoteSymbol, currency, brlRate, cancellationToken);
         }
     }
@@ -746,8 +751,8 @@ public class FinancasMarketDataService(
 
         var limite = DateTime.UtcNow.Subtract(freshness);
         var frescos = await _context.CotacoesAtivosFinanceiros
-            .Where(x => x.Provedor == provedor && x.RetrievedAt >= limite && symbols.Contains(x.Symbol))
-            .Select(x => x.Symbol)
+            .Where(x => x.Provedor == provedor && x.ConsultadoEm >= limite && symbols.Contains(x.Simbolo))
+            .Select(x => x.Simbolo)
             .ToListAsync(cancellationToken);
 
         return symbols.Except(frescos, StringComparer.OrdinalIgnoreCase).ToList();
@@ -855,17 +860,17 @@ public class FinancasMarketDataService(
             _context.CotacoesAtivosFinanceiros.Add(cotacao);
         }
 
-        cotacao.Symbol = symbol;
-        cotacao.Currency = currency;
-        cotacao.Price = price;
-        cotacao.PriceBRL = priceBrl;
-        cotacao.Change = change;
-        cotacao.ChangePercent = changePercent;
-        cotacao.MarketTime = marketTime;
-        cotacao.RetrievedAt = DateTime.UtcNow;
-        cotacao.ExpiresAt = DateTime.UtcNow.Add(ttl);
+        cotacao.Simbolo = symbol;
+        cotacao.Moeda = currency;
+        cotacao.Preco = price;
+        cotacao.PrecoBRL = priceBrl;
+        cotacao.Variacao = change;
+        cotacao.VariacaoPercentual = changePercent;
+        cotacao.HorarioMercado = marketTime;
+        cotacao.ConsultadoEm = DateTime.UtcNow;
+        cotacao.ExpiraEm = DateTime.UtcNow.Add(ttl);
         cotacao.Status = status;
-        cotacao.ErrorMessage = error;
+        cotacao.MensagemErro = error;
         cotacao.RawJson = rawJson;
     }
 
@@ -932,6 +937,161 @@ public class FinancasMarketDataService(
         historico.RawJson = candle.RawJson;
     }
 
+    // Upsert idempotente do bucket intradiário de 30 min em FinanceiroPrecoHistoricoAtivo, reusando
+    // o índice único (AtivoFinanceiroId+Provedor+Interval+Date). Bucket novo: O=H=L=C=preço; bucket
+    // existente: preserva Open, estende High/Low e atualiza Close/CloseBRL (lógica pura no calculator).
+    // Não chama SaveChanges (o chamador faz o flush em lote).
+    private async Task UpsertBucket30mAsync(int ativoId, ProvedorCotacao provedor, string symbol, decimal preco, decimal precoBrl, CancellationToken cancellationToken)
+    {
+        var dateBucket = HistoricoCotacaoCalculator.InicioBucket30m(DateTime.UtcNow);
+        const string interval = HistoricoCotacaoCalculator.Intervalo30m;
+
+        var bucket = _context.PrecosHistoricosAtivosFinanceiros.Local
+                .FirstOrDefault(x => x.AtivoFinanceiroId == ativoId && x.Provedor == provedor && x.Interval == interval && x.Date == dateBucket)
+            ?? await _context.PrecosHistoricosAtivosFinanceiros
+                .FirstOrDefaultAsync(x => x.AtivoFinanceiroId == ativoId && x.Provedor == provedor && x.Interval == interval && x.Date == dateBucket, cancellationToken);
+
+        if (bucket is null)
+        {
+            var novo = HistoricoCotacaoCalculator.NovoBucket30m(dateBucket, preco, precoBrl);
+            _context.PrecosHistoricosAtivosFinanceiros.Add(new PrecoHistoricoAtivoFinanceiro
+            {
+                AtivoFinanceiroId = ativoId,
+                Provedor = provedor,
+                Symbol = symbol,
+                Interval = interval,
+                Date = novo.Date,
+                Open = novo.Open,
+                High = novo.High,
+                Low = novo.Low,
+                Close = novo.Close,
+                CloseBRL = novo.CloseBRL,
+                RawJson = "{}",
+                UsuarioInclusao = UsuarioSistema
+            });
+            return;
+        }
+
+        var atual = new CandleOhlc(bucket.Date, bucket.Open, bucket.High, bucket.Low, bucket.Close, bucket.CloseBRL);
+        var merged = HistoricoCotacaoCalculator.Merge30m(atual, preco, precoBrl);
+        bucket.Symbol = symbol;
+        bucket.High = merged.High;
+        bucket.Low = merged.Low;
+        bucket.Close = merged.Close;
+        bucket.CloseBRL = merged.CloseBRL;
+    }
+
+    // Consolidação diária (1d) a partir dos buckets 30m do dia + retenção do intradiário.
+    // À PROVA DE FALHA: roda em job recorrente; um ativo que falhe não pode derrubar os demais.
+    // Prefere o candle 1d oficial da API quando ele já existe (importado por ImportarHistorico*); só
+    // gera/atualiza o 1d a partir dos 30m quando não há fechamento oficial daquele dia.
+    public async Task ConsolidarHistoricoDiarioAsync(CancellationToken cancellationToken = default)
+    {
+        var agora = DateTime.UtcNow;
+
+        // Janela de consolidação: hoje + ontem (UTC) cobre o fechamento de cripto às 23:59 UTC e o
+        // pregão B3 do dia anterior. Buckets antigos já foram consolidados em execuções passadas.
+        var inicioJanela = agora.Date.AddDays(-1);
+
+        var buckets = await _context.PrecosHistoricosAtivosFinanceiros
+            .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo30m && x.Date >= inicioJanela)
+            .ToListAsync(cancellationToken);
+
+        var algum = false;
+        foreach (var grupo in buckets.GroupBy(x => new { x.AtivoFinanceiroId, x.Provedor, Dia = x.Date.Date }))
+        {
+            try
+            {
+                var ohlc = grupo
+                    .Select(b => new CandleOhlc(b.Date, b.Open, b.High, b.Low, b.Close, b.CloseBRL))
+                    .ToList();
+                var consolidado = HistoricoCotacaoCalculator.ConsolidarDiario(ohlc);
+                if (consolidado is null)
+                    continue;
+
+                var symbol = grupo.OrderByDescending(b => b.Date).First().Symbol;
+                var existente = await _context.PrecosHistoricosAtivosFinanceiros
+                    .FirstOrDefaultAsync(x =>
+                        x.AtivoFinanceiroId == grupo.Key.AtivoFinanceiroId &&
+                        x.Provedor == grupo.Key.Provedor &&
+                        x.Interval == HistoricoCotacaoCalculator.Intervalo1d &&
+                        x.Date == grupo.Key.Dia, cancellationToken);
+
+                if (existente is null)
+                {
+                    _context.PrecosHistoricosAtivosFinanceiros.Add(new PrecoHistoricoAtivoFinanceiro
+                    {
+                        AtivoFinanceiroId = grupo.Key.AtivoFinanceiroId,
+                        Provedor = grupo.Key.Provedor,
+                        Symbol = symbol,
+                        Interval = HistoricoCotacaoCalculator.Intervalo1d,
+                        Date = consolidado.Value.Date,
+                        Open = consolidado.Value.Open,
+                        High = consolidado.Value.High,
+                        Low = consolidado.Value.Low,
+                        Close = consolidado.Value.Close,
+                        CloseBRL = consolidado.Value.CloseBRL,
+                        RawJson = "{}",
+                        UsuarioInclusao = UsuarioSistema
+                    });
+                    algum = true;
+                }
+                else if (string.Equals(existente.RawJson, "{}", StringComparison.Ordinal))
+                {
+                    // 1d gerado por consolidação local (não-oficial): atualiza com os 30m mais recentes.
+                    // Um 1d oficial da API (RawJson com payload) tem precedência e não é sobrescrito.
+                    existente.Open = consolidado.Value.Open;
+                    existente.High = consolidado.Value.High;
+                    existente.Low = consolidado.Value.Low;
+                    existente.Close = consolidado.Value.Close;
+                    existente.CloseBRL = consolidado.Value.CloseBRL;
+                    algum = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "consolidação-1d", ex.Message);
+            }
+        }
+
+        if (algum)
+            await _context.SaveChangesAsync(cancellationToken);
+
+        await PurgarIntradiarioAsync(agora, cancellationToken);
+    }
+
+    // Retenção: apaga buckets 30m com mais de 24h após o fim do dia, SOMENTE quando o 1d daquele
+    // ativo/provedor/dia já existe (fechamento persistido). Pura no calculator; aqui só consulta/apaga.
+    // RemoveRange (não ExecuteDelete) para ser agnóstico de provider e respeitar o soft-delete/auditoria.
+    private async Task PurgarIntradiarioAsync(DateTime agora, CancellationToken cancellationToken)
+    {
+        // Só buckets que já passaram da janela de retenção (24h após o fim do dia).
+        var corte = agora.Date.AddDays(-1);
+        var antigos = await _context.PrecosHistoricosAtivosFinanceiros
+            .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo30m && x.Date < corte)
+            .ToListAsync(cancellationToken);
+        if (antigos.Count == 0)
+            return;
+
+        // Dias (ativo/provedor) que já têm fechamento 1d persistido.
+        var diasComFechamento = (await _context.PrecosHistoricosAtivosFinanceiros
+                .Where(x => x.Interval == HistoricoCotacaoCalculator.Intervalo1d && x.Date < corte)
+                .Select(x => new { x.AtivoFinanceiroId, x.Provedor, x.Date })
+                .ToListAsync(cancellationToken))
+            .Select(x => (x.AtivoFinanceiroId, x.Provedor, x.Date.Date))
+            .ToHashSet();
+
+        var apagar = antigos
+            .Where(b => HistoricoCotacaoCalculator.PodeApagarBucket30m(b.Date, agora,
+                diasComFechamento.Contains((b.AtivoFinanceiroId, b.Provedor, b.Date.Date))))
+            .ToList();
+        if (apagar.Count == 0)
+            return;
+
+        _context.PrecosHistoricosAtivosFinanceiros.RemoveRange(apagar);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task MarcarSemTokenAsync(IReadOnlyList<AtivoFinanceiro> ativos, ProvedorCotacao provedor, IReadOnlyList<string> symbols, CancellationToken cancellationToken)
     {
         foreach (var ativo in ativos.Where(x => symbols.Contains(ResolverTickerB3(x), StringComparer.OrdinalIgnoreCase)))
@@ -949,7 +1109,7 @@ public class FinancasMarketDataService(
     }
 
     private static string ResolverTickerB3(AtivoFinanceiro ativo)
-        => !string.IsNullOrWhiteSpace(ativo.Ticker) ? ativo.Ticker.Trim().ToUpperInvariant() : ExtrairTicker(ativo.AssetKey) ?? ExtrairTicker(ativo.Name) ?? ativo.AssetKey.Trim().ToUpperInvariant();
+        => !string.IsNullOrWhiteSpace(ativo.Sigla) ? ativo.Sigla.Trim().ToUpperInvariant() : ExtrairTicker(ativo.Chave) ?? ExtrairTicker(ativo.Nome) ?? ativo.Chave.Trim().ToUpperInvariant();
 
     private static string? ExtrairTicker(string? value)
     {

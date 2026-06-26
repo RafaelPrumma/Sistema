@@ -9,7 +9,7 @@ namespace Sistema.INFRA.Importers;
 
 public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDataRepairService> logger)
 {
-    private const int RepairVersion = 4;
+    private const int RepairVersion = 5;
     private const string Agrupamento = "Financas";
     private const string ChaveVersao = "ReparoAtivosVersao";
     private const string UsuarioSistema = "financas-repair";
@@ -28,6 +28,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         var alteracoes = await RepararAtivosAsync(cancellationToken);
         await RepararChavesProventosAsync(cancellationToken);
         await RepararDocumentKindAsync(cancellationToken);
+        await ReclassificarAtivosB3Async(cancellationToken);
         await RegistrarVersaoAsync(config, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -158,6 +159,45 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         }
     }
 
+    // Reclassifica a Classe dos ativos B3 (não-cripto) recalculando ClassificarB3(Sigla, Nome).
+    // Causa-raiz: FIIs foram gravados com Classe=ETF (ex.: AFHI11/CPTS11/DEVA11...), o que jogava a
+    // alíquota de IR para 15% (ETF) em vez de 20% (FII). Reaproveita a lógica única de
+    // FinancasMarketDataService.ClassificarB3 (nome/sigla decidem). Idempotente (só toca quando a
+    // classe calculada difere) e à PROVA DE FALHA (não pode derrubar o load do dashboard).
+    private async Task ReclassificarAtivosB3Async(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ativos = await _context.AtivosFinanceiros
+                .IgnoreQueryFilters()
+                .Where(a => !a.EhCripto && a.Classe != ClasseAtivo.Cripto && a.Mercado != "Binance")
+                .ToListAsync(cancellationToken);
+
+            var reclassificados = 0;
+            foreach (var ativo in ativos)
+            {
+                var ticker = ativo.Sigla ?? ativo.Chave;
+                if (string.IsNullOrWhiteSpace(ticker))
+                    continue;
+
+                var classe = FinancasMarketDataService.ClassificarB3(ticker, ativo.Nome);
+                if (classe == ClasseAtivo.Cripto || classe == ativo.Classe)
+                    continue;
+
+                ativo.Classe = classe;
+                ativo.UsuarioAlteracao = UsuarioSistema;
+                reclassificados++;
+            }
+
+            if (reclassificados > 0)
+                FinancasRepairLogMessages.ClasseB3Reclassificada(_logger, reclassificados);
+        }
+        catch (Exception ex)
+        {
+            FinancasRepairLogMessages.ReparoClasseB3Falhou(_logger, ex);
+        }
+    }
+
     private static int PrioridadeFonteProvento(RendimentoInvestimento rendimento)
     {
         var fonte = $"{rendimento.Fonte} {rendimento.Source}".ToUpperInvariant();
@@ -183,19 +223,19 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
 
     private static AtivoCanonico? ResolverCanonico(AtivoFinanceiro ativo)
     {
-        if (ativo.IsCrypto || ativo.AssetClass == ClasseAtivo.Cripto || ativo.Market.Equals("Binance", StringComparison.OrdinalIgnoreCase))
+        if (ativo.EhCripto || ativo.Classe == ClasseAtivo.Cripto || ativo.Mercado.Equals("Binance", StringComparison.OrdinalIgnoreCase))
             return ResolverCripto(ativo);
 
-        var alias = NormalizadorAtivoB3.Normalizar(ativo.Ticker)
-            ?? NormalizadorAtivoB3.Normalizar(ativo.AssetKey)
-            ?? NormalizadorAtivoB3.Normalizar(ativo.Name);
+        var alias = NormalizadorAtivoB3.Normalizar(ativo.Sigla)
+            ?? NormalizadorAtivoB3.Normalizar(ativo.Chave)
+            ?? NormalizadorAtivoB3.Normalizar(ativo.Nome);
 
         return alias is null ? null : new AtivoCanonico(alias.Ticker, alias.Classe, "B3", "BRL");
     }
 
     private static AtivoCanonico? ResolverCripto(AtivoFinanceiro ativo)
     {
-        var symbol = (ativo.Ticker ?? ativo.AssetKey ?? ativo.Name ?? string.Empty).Trim().ToUpperInvariant();
+        var symbol = (ativo.Sigla ?? ativo.Chave ?? ativo.Nome ?? string.Empty).Trim().ToUpperInvariant();
         if (symbol.Length == 0)
             return null;
 
@@ -213,8 +253,8 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
     {
         var lista = ativos.ToList();
         return lista
-            .OrderByDescending(a => string.Equals(a.AssetKey, ticker, StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(a => string.Equals(a.Ticker, ticker, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(a => string.Equals(a.Chave, ticker, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(a => string.Equals(a.Sigla, ticker, StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(a => a.DataExclusao is null)
             .ThenBy(a => a.Id)
             .First();
@@ -223,40 +263,40 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
     private void AplicarIdentidadeCanonica(AtivoFinanceiro ativo, AtivoCanonico canonico, RepairStats stats)
     {
         var mudou = false;
-        if (!string.Equals(ativo.Ticker, canonico.Ticker, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(ativo.Sigla, canonico.Ticker, StringComparison.OrdinalIgnoreCase))
         {
-            ativo.Ticker = canonico.Ticker;
+            ativo.Sigla = canonico.Ticker;
             mudou = true;
         }
 
-        if (!string.Equals(ativo.AssetKey, canonico.Ticker, StringComparison.OrdinalIgnoreCase)
-            && !_context.AtivosFinanceiros.IgnoreQueryFilters().Any(x => x.Id != ativo.Id && x.AssetKey == canonico.Ticker))
+        if (!string.Equals(ativo.Chave, canonico.Ticker, StringComparison.OrdinalIgnoreCase)
+            && !_context.AtivosFinanceiros.IgnoreQueryFilters().Any(x => x.Id != ativo.Id && x.Chave == canonico.Ticker))
         {
-            ativo.AssetKey = canonico.Ticker;
+            ativo.Chave = canonico.Ticker;
             mudou = true;
         }
 
-        if (ativo.AssetClass != canonico.Classe)
+        if (ativo.Classe != canonico.Classe)
         {
-            ativo.AssetClass = canonico.Classe;
+            ativo.Classe = canonico.Classe;
             mudou = true;
         }
 
-        if (!string.Equals(ativo.Market, canonico.Market, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(ativo.Mercado, canonico.Market, StringComparison.OrdinalIgnoreCase))
         {
-            ativo.Market = canonico.Market;
+            ativo.Mercado = canonico.Market;
             mudou = true;
         }
 
-        if (!string.Equals(ativo.Currency, canonico.Currency, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(ativo.Moeda, canonico.Currency, StringComparison.OrdinalIgnoreCase))
         {
-            ativo.Currency = canonico.Currency;
+            ativo.Moeda = canonico.Currency;
             mudou = true;
         }
 
-        if (canonico.Classe == ClasseAtivo.Cripto && !ativo.IsCrypto)
+        if (canonico.Classe == ClasseAtivo.Cripto && !ativo.EhCripto)
         {
-            ativo.IsCrypto = true;
+            ativo.EhCripto = true;
             mudou = true;
         }
 
@@ -264,7 +304,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         {
             ativo.DataExclusao = null;
             ativo.UsuarioExclusao = null;
-            ativo.IsActive = true;
+            ativo.Ativo = true;
             mudou = true;
         }
 
@@ -284,8 +324,8 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         foreach (var tx in await _context.TransacoesFinanceiras.IgnoreQueryFilters().Where(x => x.AssetId == origemId).ToListAsync(cancellationToken))
             Reapontar(() => tx.AssetId = alvo.Id);
 
-        foreach (var pos in await _context.EstimativasPosicaoCarteira.IgnoreQueryFilters().Where(x => x.AssetId == origemId).ToListAsync(cancellationToken))
-            Reapontar(() => pos.AssetId = alvo.Id);
+        foreach (var pos in await _context.EstimativasPosicaoCarteira.IgnoreQueryFilters().Where(x => x.AtivoFinanceiroId == origemId).ToListAsync(cancellationToken))
+            Reapontar(() => pos.AtivoFinanceiroId = alvo.Id);
 
         foreach (var rendimento in await _context.RendimentosInvestimento.IgnoreQueryFilters().Where(x => x.AssetId == origemId).ToListAsync(cancellationToken))
             Reapontar(() => rendimento.AssetId = alvo.Id);
@@ -326,13 +366,13 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
         var destinoPorProvedor = cotacoes
             .Where(x => x.AtivoFinanceiroId == alvo.Id)
             .GroupBy(x => x.Provedor)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.RetrievedAt).First());
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(c => c.ConsultadoEm).First());
 
         foreach (var cotacao in cotacoes.Where(x => x.AtivoFinanceiroId == origemId))
         {
             if (destinoPorProvedor.TryGetValue(cotacao.Provedor, out var destino))
             {
-                if (cotacao.RetrievedAt > destino.RetrievedAt)
+                if (cotacao.ConsultadoEm > destino.ConsultadoEm)
                     CopiarCotacao(cotacao, destino, alvo);
                 _context.CotacoesAtivosFinanceiros.Remove(cotacao);
             }
@@ -341,7 +381,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
                 Reapontar(() =>
                 {
                     cotacao.AtivoFinanceiroId = alvo.Id;
-                    cotacao.Symbol = alvo.Ticker ?? alvo.AssetKey;
+                    cotacao.Simbolo = alvo.Sigla ?? alvo.Chave;
                 });
             }
         }
@@ -370,7 +410,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
                 Reapontar(() =>
                 {
                     historico.AtivoFinanceiroId = alvo.Id;
-                    historico.Symbol = alvo.Ticker ?? alvo.AssetKey;
+                    historico.Symbol = alvo.Sigla ?? alvo.Chave;
                 });
             }
         }
@@ -384,17 +424,17 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
 
     private static void CopiarCotacao(CotacaoAtivoFinanceiro origem, CotacaoAtivoFinanceiro destino, AtivoFinanceiro alvo)
     {
-        destino.Symbol = alvo.Ticker ?? alvo.AssetKey;
-        destino.Currency = origem.Currency;
-        destino.Price = origem.Price;
-        destino.PriceBRL = origem.PriceBRL;
-        destino.Change = origem.Change;
-        destino.ChangePercent = origem.ChangePercent;
-        destino.MarketTime = origem.MarketTime;
-        destino.RetrievedAt = origem.RetrievedAt;
-        destino.ExpiresAt = origem.ExpiresAt;
+        destino.Simbolo = alvo.Sigla ?? alvo.Chave;
+        destino.Moeda = origem.Moeda;
+        destino.Preco = origem.Preco;
+        destino.PrecoBRL = origem.PrecoBRL;
+        destino.Variacao = origem.Variacao;
+        destino.VariacaoPercentual = origem.VariacaoPercentual;
+        destino.HorarioMercado = origem.HorarioMercado;
+        destino.ConsultadoEm = origem.ConsultadoEm;
+        destino.ExpiraEm = origem.ExpiraEm;
         destino.Status = origem.Status;
-        destino.ErrorMessage = origem.ErrorMessage;
+        destino.MensagemErro = origem.MensagemErro;
         destino.RawJson = origem.RawJson;
     }
 
@@ -409,9 +449,9 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
 
         foreach (var ativo in ativos.Where(a =>
                      a.DataExclusao is null
-                     && !a.IsCrypto
-                     && (a.AssetClass is ClasseAtivo.FII or ClasseAtivo.BDR)
-                     && string.IsNullOrWhiteSpace(a.Ticker)
+                     && !a.EhCripto
+                     && (a.Classe is ClasseAtivo.FII or ClasseAtivo.BDR)
+                     && string.IsNullOrWhiteSpace(a.Sigla)
                      && ResolverCanonico(a) is null))
         {
             _context.AlertasConfiabilidade.Add(new AlertaConfiabilidade
@@ -421,7 +461,7 @@ public class FinancasDataRepairService(AppDbContext context, ILogger<FinancasDat
                 EntityId = ativo.Id,
                 Severity = SeveridadeAlerta.Atencao,
                 Code = "ATIVO_SEM_TICKER_CANONICO",
-                Message = $"Ativo B3 sem ticker canonico: {ativo.AssetKey} / {ativo.Name}.",
+                Message = $"Ativo B3 sem ticker canonico: {ativo.Chave} / {ativo.Nome}.",
                 UsuarioInclusao = UsuarioSistema
             });
         }
@@ -466,4 +506,10 @@ internal static partial class FinancasRepairLogMessages
 
     [LoggerMessage(EventId = 55, Level = LogLevel.Warning, Message = "Falha no reparo de DocumentKind (ignorada para nao derrubar o load).")]
     public static partial void ReparoDocumentKindFalhou(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 56, Level = LogLevel.Information, Message = "Reparo de classe B3: {Reclassificados} ativos reclassificados (ex.: FII gravado como ETF).")]
+    public static partial void ClasseB3Reclassificada(ILogger logger, int reclassificados);
+
+    [LoggerMessage(EventId = 57, Level = LogLevel.Warning, Message = "Falha no reparo de classe B3 (ignorada para nao derrubar o load).")]
+    public static partial void ReparoClasseB3Falhou(ILogger logger, Exception exception);
 }

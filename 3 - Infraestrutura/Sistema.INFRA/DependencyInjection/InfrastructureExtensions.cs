@@ -47,6 +47,7 @@ public static class InfrastructureExtensions
         services.AddScoped<FinancasDataRepairService>();
         services.AddScoped<IFinancasImportador, FinancasImportador>();
         services.AddScoped<IFinancasMarketDataService, FinancasMarketDataService>();
+        services.AddScoped<IFinancasAlertaService, FinancasAlertaService>();
         services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));
         services.AddHttpClient("Binance", client => client.BaseAddress = new Uri("https://api.binance.com/"));
         services.AddScoped<IEmailAppService, EmailService>();

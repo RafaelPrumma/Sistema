@@ -40,10 +40,12 @@ public class AppDbContext : DbContext
     public DbSet<TransacaoFinanceira> TransacoesFinanceiras => Set<TransacaoFinanceira>();
     public DbSet<NegociacaoMensalB3> NegociacoesMensaisB3 => Set<NegociacaoMensalB3>();
     public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();
+    public DbSet<PosicaoAtivo> PosicoesAtivos => Set<PosicaoAtivo>();
     public DbSet<RendimentoInvestimento> RendimentosInvestimento => Set<RendimentoInvestimento>();
     public DbSet<AgregadoFinanceiro> AgregadosFinanceiros => Set<AgregadoFinanceiro>();
     public DbSet<AlertaConfiabilidade> AlertasConfiabilidade => Set<AlertaConfiabilidade>();
     public DbSet<EventoCorporativo> EventosCorporativos => Set<EventoCorporativo>();
+    public DbSet<AlertaPreco> AlertasPreco => Set<AlertaPreco>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

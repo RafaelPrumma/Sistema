@@ -65,6 +65,13 @@ public enum StatusEstimativaPosicao
     PendenteValidacao = 4
 }
 
+public enum StatusPosicaoAtivo
+{
+    Aberta = 1,
+    Encerrada = 2,
+    Inconsistente = 3
+}
+
 public enum SeveridadeAlerta
 {
     Informacao = 1,
@@ -193,15 +200,15 @@ public class ConteudoBrutoFinanceiro : AuditableEntity
 public class AtivoFinanceiro : AuditableEntity
 {
     public int Id { get; set; }
-    public string AssetKey { get; set; } = string.Empty;
-    public string? Ticker { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public ClasseAtivo AssetClass { get; set; } = ClasseAtivo.Outro;
-    public string Market { get; set; } = string.Empty;
-    public string Currency { get; set; } = "BRL";
-    public bool IsCrypto { get; set; }
-    public bool IsActive { get; set; } = true;
-    public string? ConceptRole { get; set; }
+    public string Chave { get; set; } = string.Empty;
+    public string? Sigla { get; set; }
+    public string Nome { get; set; } = string.Empty;
+    public ClasseAtivo Classe { get; set; } = ClasseAtivo.Outro;
+    public string Mercado { get; set; } = string.Empty;
+    public string Moeda { get; set; } = "BRL";
+    public bool EhCripto { get; set; }
+    public bool Ativo { get; set; } = true;
+    public string? PapelConceitual { get; set; }
 }
 
 public class CarteiraFinanceira : AuditableEntity
@@ -211,14 +218,14 @@ public class CarteiraFinanceira : AuditableEntity
     public string Slug { get; set; } = string.Empty;
     public string? Descricao { get; set; }
     public string Tipo { get; set; } = "Carteira";
-    public bool IsSistema { get; set; }
+    public bool EhSistema { get; set; }
     public bool Ativo { get; set; } = true;
     public int Ordem { get; set; }
 
     // Hierarquia (F-I): carteira-topo tem ParentId nulo; subcarteira aponta para a topo.
     // Self-FK nullable, OnDelete restrict (ver CarteiraFinanceiraMap).
-    public int? ParentId { get; set; }
-    public CarteiraFinanceira? Parent { get; set; }
+    public int? CarteiraPaiId { get; set; }
+    public CarteiraFinanceira? CarteiraPai { get; set; }
     public ICollection<CarteiraFinanceira> Filhas { get; set; } = new List<CarteiraFinanceira>();
 
     public ICollection<CarteiraAtivoFinanceiro> Ativos { get; set; } = new List<CarteiraAtivoFinanceiro>();
@@ -242,17 +249,17 @@ public class CotacaoAtivoFinanceiro : AuditableEntity
     public int AtivoFinanceiroId { get; set; }
     public AtivoFinanceiro? AtivoFinanceiro { get; set; }
     public ProvedorCotacao Provedor { get; set; }
-    public string Symbol { get; set; } = string.Empty;
-    public string Currency { get; set; } = "BRL";
-    public decimal Price { get; set; }
-    public decimal PriceBRL { get; set; }
-    public decimal? Change { get; set; }
-    public decimal? ChangePercent { get; set; }
-    public DateTime? MarketTime { get; set; }
-    public DateTime RetrievedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? ExpiresAt { get; set; }
+    public string Simbolo { get; set; } = string.Empty;
+    public string Moeda { get; set; } = "BRL";
+    public decimal Preco { get; set; }
+    public decimal PrecoBRL { get; set; }
+    public decimal? Variacao { get; set; }
+    public decimal? VariacaoPercentual { get; set; }
+    public DateTime? HorarioMercado { get; set; }
+    public DateTime ConsultadoEm { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiraEm { get; set; }
     public StatusCotacao Status { get; set; } = StatusCotacao.Atual;
-    public string? ErrorMessage { get; set; }
+    public string? MensagemErro { get; set; }
     public string RawJson { get; set; } = "{}";
 }
 
@@ -393,18 +400,35 @@ public class EstimativaPosicaoCarteira : AuditableEntity
     public int Id { get; set; }
     public int CargaFinanceiraId { get; set; }
     public CargaFinanceira? CargaFinanceira { get; set; }
-    public int AssetId { get; set; }
-    public AtivoFinanceiro? Asset { get; set; }
-    public decimal Quantity { get; set; }
-    public decimal AveragePrice { get; set; }
-    public decimal TotalInvested { get; set; }
-    public decimal TotalSold { get; set; }
-    public decimal RealizedResult { get; set; }
-    public decimal EstimatedCurrentPosition { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public decimal Quantidade { get; set; }
+    public decimal PrecoMedio { get; set; }
+    public decimal TotalInvestido { get; set; }
+    public decimal TotalVendido { get; set; }
+    public decimal ResultadoRealizado { get; set; }
+    public decimal PosicaoAtualEstimada { get; set; }
     public StatusEstimativaPosicao Status { get; set; } = StatusEstimativaPosicao.PendenteValidacao;
-    public NivelConfianca ConfidenceLevel { get; set; } = NivelConfianca.PendenteValidacao;
-    public DateTime? LastOperationDate { get; set; }
+    public NivelConfianca NivelConfianca { get; set; } = NivelConfianca.PendenteValidacao;
+    public DateTime? UltimaOperacaoEm { get; set; }
     public string RawJson { get; set; } = "{}";
+}
+
+public class PosicaoAtivo : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public decimal Quantidade { get; set; }
+    public decimal PrecoMedio { get; set; }
+    public decimal CustoTotal { get; set; }
+    public decimal TotalComprado { get; set; }
+    public decimal TotalVendido { get; set; }
+    public decimal ResultadoRealizado { get; set; }
+    public DateTime? UltimaOperacaoEm { get; set; }
+    public StatusPosicaoAtivo Status { get; set; } = StatusPosicaoAtivo.Aberta;
+    public DateTime CalculadoEm { get; set; } = DateTime.UtcNow;
+    public string VersaoCalculo { get; set; } = string.Empty;
 }
 
 // Provento recebido (dividendo, JCP, rendimento de FII). Pode vir da importação (atrelado a uma
@@ -497,4 +521,34 @@ public class EventoCorporativo : AuditableEntity
     // chave para o mesmo evento) → o índice único deduplica entre fontes e evita aplicar o fator 2×.
     public static string GerarChaveNatural(string ticker, DateTime data, decimal fator)
         => $"{ticker.Trim().ToUpperInvariant()}|{data:yyyyMMdd}|{fator.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+}
+
+// Direção do gatilho de um alerta de preço.
+//  Acima  = dispara quando o preço atual fica >= Limiar (rompimento de alta / preço-alvo de venda).
+//  Abaixo = dispara quando o preço atual fica <= Limiar (queda / preço-alvo de compra).
+public enum DirecaoAlertaPreco
+{
+    Acima = 1,
+    Abaixo = 2
+}
+
+// Regra de alerta de preço (F-H): notifica internamente quando a cotação de um ativo cruza um limiar
+// na direção configurada. Para não notificar a cada execução do job, guarda o estado de re-disparo:
+// quando dispara, marca DispararadoEm + UltimoPreco; só re-arma quando o preço volta para o outro
+// lado do limiar (histerese simples). Esse desenho mantém o "cruzou?" como lógica pura e testável
+// (ver AvaliadorAlertaPreco).
+public class AlertaPreco : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public decimal Limiar { get; set; }
+    public DirecaoAlertaPreco Direcao { get; set; } = DirecaoAlertaPreco.Acima;
+    public bool Ativo { get; set; } = true;
+    public string? Observacao { get; set; }
+
+    // Controle de re-disparo: quando != null, o alerta já disparou e está "armado" (não notifica de novo
+    // até re-armar). UltimoPreco guarda o preço observado no disparo (para diagnóstico/UI).
+    public DateTime? DispararadoEm { get; set; }
+    public decimal? UltimoPreco { get; set; }
 }

@@ -53,7 +53,7 @@ public static class ClassificadorCarteira
     };
 
     // Mapa explícito ticker → caminho na árvore (custódia B3 2026-maio + cripto §10). Editável na tela depois.
-    private static readonly Dictionary<string, Classificacao> MapaPorTicker = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, Classificacao> MapaPorSigla = new(StringComparer.OrdinalIgnoreCase)
     {
         // Bancário e Seguridade → Bancos / Seguridade
         ["BBAS3"] = new(SlugBancario, SlugBancos),
@@ -123,7 +123,7 @@ public static class ClassificadorCarteira
     public static Classificacao? Classificar(AtivoFinanceiro ativo)
     {
         var ticker = ExtrairTicker(ativo);
-        return Classificar(ticker, ativo.Name, ativo.AssetClass, ativo.IsCrypto || ativo.AssetClass == ClasseAtivo.Cripto);
+        return Classificar(ticker, ativo.Nome, ativo.Classe, ativo.EhCripto || ativo.Classe == ClasseAtivo.Cripto);
     }
 
     /// <summary>Sobrecarga pura (sem entidade) — facilita os testes.</summary>
@@ -132,7 +132,7 @@ public static class ClassificadorCarteira
         var t = NormalizarTicker(ticker);
 
         // 1) Mapa explícito por ticker.
-        if (!string.IsNullOrEmpty(t) && MapaPorTicker.TryGetValue(t, out var mapeado))
+        if (!string.IsNullOrEmpty(t) && MapaPorSigla.TryGetValue(t, out var mapeado))
             return mapeado;
 
         // 2) Fallback cripto.
@@ -159,9 +159,9 @@ public static class ClassificadorCarteira
     }
 
     private static string ExtrairTicker(AtivoFinanceiro ativo)
-        => !string.IsNullOrWhiteSpace(ativo.Ticker) ? ativo.Ticker!
-            : !string.IsNullOrWhiteSpace(ativo.AssetKey) ? ativo.AssetKey
-            : ativo.Name ?? string.Empty;
+        => !string.IsNullOrWhiteSpace(ativo.Sigla) ? ativo.Sigla!
+            : !string.IsNullOrWhiteSpace(ativo.Chave) ? ativo.Chave
+            : ativo.Nome ?? string.Empty;
 
     private static string NormalizarTicker(string? ticker)
         => (ticker ?? string.Empty).Trim().ToUpperInvariant();

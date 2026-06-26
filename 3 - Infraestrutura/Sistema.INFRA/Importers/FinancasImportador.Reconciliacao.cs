@@ -46,7 +46,7 @@ public partial class FinancasImportador
             .AsNoTracking()
             .Where(x => x.IsCanonical)
             .Include(x => x.Asset)
-            .Where(x => x.Asset != null && !x.Asset!.IsCrypto)
+            .Where(x => x.Asset != null && !x.Asset!.EhCripto)
             .OrderBy(x => x.Date)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
@@ -61,7 +61,7 @@ public partial class FinancasImportador
         // 4) Universo de ativos a reconciliar = ativos B3 (não-cripto) que aparecem no cálculo OU na
         //    Posição (para zerar fantasmas e materializar quem só está na custódia).
         var ativosB3 = await _context.AtivosFinanceiros
-            .Where(a => !a.IsCrypto)
+            .Where(a => !a.EhCripto)
             .ToListAsync(cancellationToken);
 
         var assetKeyPorId = new Dictionary<int, string>();
@@ -69,17 +69,17 @@ public partial class FinancasImportador
         var reconciliaveis = new List<AtivoReconciliavel>();
         foreach (var a in ativosB3)
         {
-            var tickerNorm = ExtratoB3Materializador.NormalizarTicker(a.Ticker ?? a.AssetKey);
+            var tickerNorm = ExtratoB3Materializador.NormalizarTicker(a.Sigla ?? a.Chave);
             if (string.IsNullOrWhiteSpace(tickerNorm))
                 continue;
 
             // Mais de um ativo pode mapear no mesmo ticker (ITUB4 + ITUB4F); o resync já unifica em
             // ITUB4, então só reconciliamos o ativo cujo AssetKey É o ticker normalizado (o ativo-base).
             // Os demais (fracionário órfão) não têm posição própria e ficam de fora.
-            if (!string.Equals(a.AssetKey, tickerNorm, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(a.Chave, tickerNorm, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            assetKeyPorId[a.Id] = a.AssetKey;
+            assetKeyPorId[a.Id] = a.Chave;
             ativoPorTicker[tickerNorm] = a;
             reconciliaveis.Add(new AtivoReconciliavel(a.Id, tickerNorm));
         }
@@ -193,17 +193,17 @@ public partial class FinancasImportador
                     _context.CotacoesAtivosFinanceiros.Add(cotacao);
                 }
 
-                cotacao.Symbol = ticker;
-                cotacao.Currency = "BRL";
-                cotacao.Price = preco;
-                cotacao.PriceBRL = preco;
-                cotacao.Change = null;
-                cotacao.ChangePercent = null;
-                cotacao.MarketTime = null;
-                cotacao.RetrievedAt = agora;
-                cotacao.ExpiresAt = null;
+                cotacao.Simbolo = ticker;
+                cotacao.Moeda = "BRL";
+                cotacao.Preco = preco;
+                cotacao.PrecoBRL = preco;
+                cotacao.Variacao = null;
+                cotacao.VariacaoPercentual = null;
+                cotacao.HorarioMercado = null;
+                cotacao.ConsultadoEm = agora;
+                cotacao.ExpiraEm = null;
                 cotacao.Status = StatusCotacao.Atual;
-                cotacao.ErrorMessage = null;
+                cotacao.MensagemErro = null;
                 cotacao.RawJson = "{}";
                 alterou = true;
             }
@@ -391,20 +391,20 @@ public partial class FinancasImportador
     private async Task<AtivoFinanceiro> ObterOuCriarAtivoVariacaoAsync(CancellationToken cancellationToken)
     {
         var variacao = await _context.AtivosFinanceiros
-            .FirstOrDefaultAsync(a => a.AssetKey == ReconciliadorPosicaoB3.AssetKeyVariacao, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Chave == ReconciliadorPosicaoB3.AssetKeyVariacao, cancellationToken);
         if (variacao is not null)
             return variacao;
 
         variacao = new AtivoFinanceiro
         {
-            AssetKey = ReconciliadorPosicaoB3.AssetKeyVariacao,
-            Ticker = ReconciliadorPosicaoB3.AssetKeyVariacao,
-            Name = ReconciliadorPosicaoB3.NomeVariacao,
-            AssetClass = ClasseAtivo.Outro,
-            Market = "B3",
-            Currency = "BRL",
-            IsCrypto = false,
-            IsActive = true,
+            Chave = ReconciliadorPosicaoB3.AssetKeyVariacao,
+            Sigla = ReconciliadorPosicaoB3.AssetKeyVariacao,
+            Nome = ReconciliadorPosicaoB3.NomeVariacao,
+            Classe = ClasseAtivo.Outro,
+            Mercado = "B3",
+            Moeda = "BRL",
+            EhCripto = false,
+            Ativo = true,
             UsuarioInclusao = "financas-reconciliacao"
         };
         _context.AtivosFinanceiros.Add(variacao);

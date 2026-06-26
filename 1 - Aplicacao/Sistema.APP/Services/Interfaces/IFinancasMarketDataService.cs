@@ -20,4 +20,8 @@ public interface IFinancasMarketDataService
 
     // Cota e importa o histórico de um ativo específico (recém-criado no lançamento manual).
     Task GarantirCotacaoAtivoAsync(int ativoId, CancellationToken cancellationToken = default);
+
+    // Consolida o fechamento diário (1d) a partir dos buckets 30m do dia e aplica a retenção do
+    // intradiário (apaga 30m > 24h quando o 1d já existe). Roda após o fechamento (job recorrente).
+    Task ConsolidarHistoricoDiarioAsync(CancellationToken cancellationToken = default);
 }

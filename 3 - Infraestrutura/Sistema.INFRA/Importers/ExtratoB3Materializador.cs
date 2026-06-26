@@ -28,7 +28,7 @@ public static class ExtratoB3Materializador
     /// <summary>Ano-mês no formato yyyyMM (ex.: 2022/9 → 202209).</summary>
     public static int AnoMes(int ano, int mes) => ano * 100 + mes;
 
-    /// <summary>Ticker = prefixo antes de " - " no campo Produto (ex.: "BBAS3 - BANCO DO BRASIL S/A").</summary>
+    /// <summary>Sigla = prefixo antes de " - " no campo Produto (ex.: "BBAS3 - BANCO DO BRASIL S/A").</summary>
     public static string? ExtrairTickerProduto(string? produto)
     {
         if (string.IsNullOrWhiteSpace(produto))

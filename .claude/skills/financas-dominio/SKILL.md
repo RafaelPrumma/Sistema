@@ -44,5 +44,25 @@ Acompanhador de carteira (estilo Google Finance), 1 usuário. Renda variável B3
 ## Roadmap (origem da análise inicial vs concorrentes)
 Feito: proventos (Brapi+earn+IR), normalização/consolidação de ticker B3, seção Carteiras, dedup econômico, fix do earn, gráfico de proventos. **Em aberto**: #2 eventos corporativos (split — em spec), TWR vs benchmark (CDI/Ibov), helper de IR/DARF, alertas de preço, metas/rebalanceamento, importador recorrente de Informe de Rendimentos, baldes Trade/Rendimentos no saldo cripto.
 
+## Fluxo com subagentes (nosso padrão de trabalho)
+O Rafael prefere **delegar a implementação a subagentes** (economiza tokens do thread principal; ele revisa depois). Padrão:
+- O **thread principal** faz diagnóstico + decisões de design, atualiza specs/skills e **escreve um brief auto-suficiente** (o subagente parte do zero, frio). O brief SEMPRE manda: ler esta skill + o spec do item; seguir as convenções.
+- **Todo brief deve incluir estas constraints:**
+  - **À PROVA DE FALHA:** `GarantirCargaInicialAsync` e tudo que ele chama (auto-sugestão de carteiras, reconciliação, recálculo da projeção) rodam no load do dashboard — exceção derruba o dashboard (já houve regressões). try-catch que loga e segue; método de ilha devolve DTO vazio/zerado, nunca estoura.
+  - **Validar** com `dotnet test "4 - Testes/Sistema.Tests/Sistema.Tests.csproj"` (NÃO a solução: a app costuma estar rodando e trava a DLL da MVC; se travar o build, parar `Sistema.MVC`). Build **0 warnings** — há `.editorconfig` na raiz configurando CA1707/CA1861/CA1859; não alterá-lo.
+  - **Commits focados por subtrabalho**, mensagem terminando em `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. `git add` **só dos arquivos alterados** (NUNCA `git add -A` — o working tree pode ter trabalho de outras frentes/Codex). **Sem push** (só com pedido explícito; `arquivos/` tem CPF).
+  - **Migration:** `dotnet ef migrations add <Nome> -p "3 - Infraestrutura/Sistema.INFRA" -s "0 - Apresentacao/Sistema.MVC" -o Data/Migrations` e incluir o `AppDbContextModelSnapshot.cs` (fica em `Sistema.INFRA/Migrations/`, não em Data/Migrations) **no MESMO commit**. NÃO rodar `dotnet ef database update` (o app aplica no startup).
+- **Coordenação:** só UM subagente por vez em arquivos que se sobrepõem (`FinancasAppService`, views do dashboard) — senão conflitam. Sequencie ou dê escopos disjuntos. `run_in_background` quando quiser offload sem bloquear.
+
+## Aprendizados recentes (jun/2026) — arquitetura atual
+- **Read model `FinanceiroPosicaoAtivo`** (`PosicaoAtivo`, campos PT-BR): projeção **recalculável** da posição (não é fonte — reconstrói das transações canônicas com eventos aplicados). Dashboard deve LER dela via `IPosicaoAtivoProjectionService`; **recalcular** após import/resync/CRUD de transação/CRUD de evento. (Migração ainda parcial: `FinancasAppService` ainda usa `CalcularPosicoes` no resumo analítico e na variação do dia.)
+- **B3 = fonte de verdade** (precedência **INVERTIDA**: B3 manda por ticker×mês; Nubank só complementa). Reconciliação pela aba **Posição** + ativo virtual `VARIACAO` (à prova de falha) zera fantasmas e deixa a diferença visível.
+- **Cotação B3 sem token Brapi:** usa o **Preço de Fechamento** da aba Posição como `ProvedorCotacao.B3Custodia` (`AtualizarCotacoesCustodiaB3Async`); a valoração prefere cotação com `PrecoBRL>0` à mais recente → "Resultado" deixa de ser 0 em ação/FII.
+- **Carteiras hierárquicas:** `ClassificadorCarteira` (puro, mapa por ticker + fallback) + `CarteiraPaiId` self-FK; `GarantirCarteirasPadraoAsync` idempotente e à prova de falha, roda **DEPOIS** do resync/reconciliação (posição final). Topo: Bancário e Seguridade · FIIs · Minério e energia · Criptomoedas (com subcarteiras).
+- **Ilhas do dashboard:** ação `Dashboard{X}` → `_service.Obter{X}DashboardAsync` → parcial `_Dashboard{X}` + loader em `wwwroot/js/financas.js` + `<section>` em `Views/Financas/Index.cshtml`. **Gráfico monta no JS** (script dentro de parcial injetada via innerHTML NÃO executa); passar dados por `data-*`.
+- **Earn cripto como provento:** só conta `Rendimento` real (`CriptoNetting.Classificar`), NÃO o principal de staking (WBETH2.0-Staking/SOL Staking-Purchase). `AtualizarProventosCriptoEarnAsync` é self-healing (purga + regenera). Netting usa **fonte única** do ledger (`.xlsx` `BinanceTransactions`; `.csv`/`CsvBinance` só fallback); `FinancasDataRepairService` reclassifica `DocumentKind` antigo `Desconhecido`.
+
 ## Validação
-`dotnet build Sistema.sln` + `dotnet test Sistema.sln`. Aceite de carteira (posição correta) = lista real do usuário no §3 do spec de eventos corporativos.
+- `dotnet test "4 - Testes/Sistema.Tests/Sistema.Tests.csproj"` (não a solução — a app rodando trava a DLL da MVC). Build **0 warnings**.
+- Migration aplica no **startup** (não rodar `database update`).
+- Aceite de carteira (posição correta) = lista real do usuário no §3 do `eventos-corporativos.spec.md`.

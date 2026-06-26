@@ -29,9 +29,14 @@ public interface IFinancasRepository
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AtivoFinanceiro>> BuscarAtivosComPosicaoAbertaAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CotacaoAtivoFinanceiro>> BuscarCotacoesAtuaisAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PosicaoAtivo>> BuscarPosicoesAtivosAsync(CancellationToken cancellationToken = default);
+    Task SubstituirPosicoesAtivosAsync(IReadOnlyList<PosicaoAtivo> posicoes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CarteiraFinanceira>> BuscarCarteirasComAtivosAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default);
+    // F-L(b): rastreabilidade dos arquivos importados (kind/parse/status + contagem de abas/linhas lidas
+    // de ConteudoBruto + nº de alertas por documento). Agregação por fonte/status fica na camada APP.
+    Task<IReadOnlyList<RastreabilidadeDocumentoProjecao>> BuscarRastreabilidadeDocumentosAsync(CancellationToken cancellationToken = default);
     Task<ImportacaoFinanceiraArquivo?> ObterUltimaImportacaoArquivoAsync(CancellationToken cancellationToken = default);
 
     // Tabela única de transações (fonte de verdade): importação materializada + lançamentos manuais.
@@ -52,4 +57,13 @@ public interface IFinancasRepository
     Task AdicionarEventoCorporativoAsync(EventoCorporativo evento, CancellationToken cancellationToken = default);
     void AtualizarEventoCorporativo(EventoCorporativo evento);
     void RemoverEventoCorporativo(EventoCorporativo evento);
+
+    // Alertas de preço (F-H) — CRUD manual + leitura para o job recorrente.
+    // BuscarAlertasPrecoParaJobAsync vem TRACKED (o job atualiza o estado de re-disparo).
+    Task<IReadOnlyList<AlertaPreco>> BuscarAlertasPrecoParaJobAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<AlertaPreco>> BuscarAlertasPrecoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
+    Task<AlertaPreco?> ObterAlertaPrecoAsync(int id, CancellationToken cancellationToken = default);
+    Task AdicionarAlertaPrecoAsync(AlertaPreco alerta, CancellationToken cancellationToken = default);
+    void AtualizarAlertaPreco(AlertaPreco alerta);
+    void RemoverAlertaPreco(AlertaPreco alerta);
 }
