@@ -38,7 +38,7 @@ public class ExcelApuracaoIrTests
     }
 
     [Fact]
-    public void ExcelApuracaoIr_GeraUmaAbaPorBloco_SeparaB3DeCripto()
+    public void ExcelApuracaoIr_EspelhaAsAbasDoConsolidado_ComLinhasChave()
     {
         var cripto = new CriptoExteriorIrDto(
             Alienacoes: new[]
@@ -79,22 +79,40 @@ public class ExcelApuracaoIrTests
         var doc = ExtratoConsolidadoB3Reader.Ler(ms);
 
         var nomes = doc.Abas.Select(a => a.Nome).ToList();
-        Assert.Contains("Ganhos B3", nomes);
-        Assert.Contains("Cripto", nomes);
-        Assert.Contains("Bens e Direitos", nomes);
-        Assert.Contains("Rendimentos isentos", nomes);
-        Assert.Contains("Tributacao exclusiva (JCP)", nomes);
-        Assert.Contains("IN 1888", nomes);
+        Assert.Equal(
+            new[] { "Resumo", "Como_Usar", "Bens_Direitos", "Aplic_Fin_Exterior", "Operacoes_Ganho", "Rendimentos_Rewards", "Resumo_Mensal", "Regras_Fontes" },
+            nomes.ToArray());
 
-        var b3 = doc.Aba("Ganhos B3")!;
-        Assert.Contains(b3.Linhas, l => l.Contains("Ações"));
-        Assert.DoesNotContain(b3.Linhas, l => l.Contains("Cripto")); // cripto não entra nos ganhos mensais B3
+        // Resumo: imposto total = DARF B3 (750) + cripto exterior (1500) = 2250.
+        var resumo = doc.Aba("Resumo")!;
+        Assert.Contains(resumo.Linhas, l => l.Contains("Imposto total estimado") && l.Contains("2250"));
+        Assert.Contains(resumo.Linhas, l => l.Contains("Março")); // mês que passou de R$30k (IN 1888)
 
-        var bens = doc.Aba("Bens e Direitos")!;
+        // Aplic_Fin_Exterior: alíquota 15% e imposto sobre ganho de capital cripto.
+        var exterior = doc.Aba("Aplic_Fin_Exterior")!;
+        Assert.Contains(exterior.Linhas, l => l.Contains("0.15"));
+        Assert.Contains(exterior.Linhas, l => l.Contains("Imposto sobre ganho de capital (R$)") && l.Contains("1500"));
+
+        // Operacoes_Ganho: a alienação de BTC com ganho de 10000.
+        var operacoes = doc.Aba("Operacoes_Ganho")!;
+        Assert.Contains(operacoes.Linhas, l => l.Contains("BTC") && l.Contains("10000") && l.Contains("10/03/2025"));
+
+        // Rendimentos_Rewards: o reward de 300 BRL.
+        var rewards = doc.Aba("Rendimentos_Rewards")!;
+        Assert.Contains(rewards.Linhas, l => l.Contains("BTC") && l.Contains("300"));
+
+        // Bens_Direitos: PETR4 (B3) e o código RFB 08-01 do BTC; cripto com custo 30k é obrigatório.
+        var bens = doc.Aba("Bens_Direitos")!;
         Assert.Contains(bens.Linhas, l => l.Contains("PETR4"));
-        Assert.Contains(bens.Linhas, l => l.Contains("08-01")); // código RFB do BTC (grupo 08)
+        Assert.Contains(bens.Linhas, l => l.Contains("08-01") && l.Contains("Sim"));
 
-        var in1888 = doc.Aba("IN 1888")!;
-        Assert.Contains(in1888.Linhas, l => l.Contains("Sim")); // mês de março ultrapassa R$ 30k
+        // Resumo_Mensal: ganho B3 de Ações (fev) + alienação de cripto de março com flag IN 1888.
+        var mensal = doc.Aba("Resumo_Mensal")!;
+        Assert.Contains(mensal.Linhas, l => l.Contains("Ações") && l.Contains("Fevereiro"));
+        Assert.Contains(mensal.Linhas, l => l.Contains("Março") && l.Contains("Sim"));
+
+        // Abas de texto presentes.
+        Assert.True(doc.Aba("Como_Usar")!.Linhas.Count > 1);
+        Assert.Contains(doc.Aba("Regras_Fontes")!.Linhas, l => l.Contains("Lei 14.754/2023"));
     }
 }
