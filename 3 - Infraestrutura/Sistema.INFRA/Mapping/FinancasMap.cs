@@ -376,3 +376,17 @@ public class EventoCorporativoMap : IEntityTypeConfiguration<EventoCorporativo>
         builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class AlertaPrecoMap : IEntityTypeConfiguration<AlertaPreco>
+{
+    public void Configure(EntityTypeBuilder<AlertaPreco> builder)
+    {
+        builder.ToTable("FinanceiroAlertaPreco");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Limiar).HasPrecision(28, 12);
+        builder.Property(x => x.UltimoPreco).HasPrecision(28, 12);
+        builder.Property(x => x.Observacao).HasMaxLength(400);
+        builder.HasIndex(x => new { x.AtivoFinanceiroId, x.Ativo });
+        builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

@@ -57,4 +57,13 @@ public interface IFinancasRepository
     Task AdicionarEventoCorporativoAsync(EventoCorporativo evento, CancellationToken cancellationToken = default);
     void AtualizarEventoCorporativo(EventoCorporativo evento);
     void RemoverEventoCorporativo(EventoCorporativo evento);
+
+    // Alertas de preço (F-H) — CRUD manual + leitura para o job recorrente.
+    // BuscarAlertasPrecoParaJobAsync vem TRACKED (o job atualiza o estado de re-disparo).
+    Task<IReadOnlyList<AlertaPreco>> BuscarAlertasPrecoParaJobAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<AlertaPreco>> BuscarAlertasPrecoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
+    Task<AlertaPreco?> ObterAlertaPrecoAsync(int id, CancellationToken cancellationToken = default);
+    Task AdicionarAlertaPrecoAsync(AlertaPreco alerta, CancellationToken cancellationToken = default);
+    void AtualizarAlertaPreco(AlertaPreco alerta);
+    void RemoverAlertaPreco(AlertaPreco alerta);
 }

@@ -45,6 +45,7 @@ public class AppDbContext : DbContext
     public DbSet<AgregadoFinanceiro> AgregadosFinanceiros => Set<AgregadoFinanceiro>();
     public DbSet<AlertaConfiabilidade> AlertasConfiabilidade => Set<AlertaConfiabilidade>();
     public DbSet<EventoCorporativo> EventosCorporativos => Set<EventoCorporativo>();
+    public DbSet<AlertaPreco> AlertasPreco => Set<AlertaPreco>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

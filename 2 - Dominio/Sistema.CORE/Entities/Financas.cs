@@ -522,3 +522,33 @@ public class EventoCorporativo : AuditableEntity
     public static string GerarChaveNatural(string ticker, DateTime data, decimal fator)
         => $"{ticker.Trim().ToUpperInvariant()}|{data:yyyyMMdd}|{fator.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }
+
+// Direção do gatilho de um alerta de preço.
+//  Acima  = dispara quando o preço atual fica >= Limiar (rompimento de alta / preço-alvo de venda).
+//  Abaixo = dispara quando o preço atual fica <= Limiar (queda / preço-alvo de compra).
+public enum DirecaoAlertaPreco
+{
+    Acima = 1,
+    Abaixo = 2
+}
+
+// Regra de alerta de preço (F-H): notifica internamente quando a cotação de um ativo cruza um limiar
+// na direção configurada. Para não notificar a cada execução do job, guarda o estado de re-disparo:
+// quando dispara, marca DispararadoEm + UltimoPreco; só re-arma quando o preço volta para o outro
+// lado do limiar (histerese simples). Esse desenho mantém o "cruzou?" como lógica pura e testável
+// (ver AvaliadorAlertaPreco).
+public class AlertaPreco : AuditableEntity
+{
+    public int Id { get; set; }
+    public int AtivoFinanceiroId { get; set; }
+    public AtivoFinanceiro? AtivoFinanceiro { get; set; }
+    public decimal Limiar { get; set; }
+    public DirecaoAlertaPreco Direcao { get; set; } = DirecaoAlertaPreco.Acima;
+    public bool Ativo { get; set; } = true;
+    public string? Observacao { get; set; }
+
+    // Controle de re-disparo: quando != null, o alerta já disparou e está "armado" (não notifica de novo
+    // até re-armar). UltimoPreco guarda o preço observado no disparo (para diagnóstico/UI).
+    public DateTime? DispararadoEm { get; set; }
+    public decimal? UltimoPreco { get; set; }
+}

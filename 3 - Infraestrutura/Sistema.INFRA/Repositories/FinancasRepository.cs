@@ -389,6 +389,36 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
     public void RemoverEventoCorporativo(EventoCorporativo evento)
         => _context.EventosCorporativos.Remove(evento);
 
+    // Tracked de propósito: o job de alertas altera DispararadoEm/UltimoPreco e salva.
+    public async Task<IReadOnlyList<AlertaPreco>> BuscarAlertasPrecoParaJobAsync(CancellationToken cancellationToken = default)
+        => await _context.AlertasPreco
+            .Include(x => x.AtivoFinanceiro)
+            .Where(x => x.Ativo && x.AtivoFinanceiro != null)
+            .ToListAsync(cancellationToken);
+
+    public async Task<PagedResult<AlertaPreco>> BuscarAlertasPrecoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
+    {
+        var query = _context.AlertasPreco.AsNoTracking().Include(x => x.AtivoFinanceiro).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(x =>
+                x.AtivoFinanceiro != null
+                && ((x.AtivoFinanceiro.Sigla != null && x.AtivoFinanceiro.Sigla.Contains(termo))
+                    || x.AtivoFinanceiro.Chave.Contains(termo)));
+        return await query.OrderByDescending(x => x.Ativo).ThenByDescending(x => x.Id).ToPagedResultAsync(NormalizarPage(page), NormalizarPageSize(pageSize), cancellationToken);
+    }
+
+    public Task<AlertaPreco?> ObterAlertaPrecoAsync(int id, CancellationToken cancellationToken = default)
+        => _context.AlertasPreco.Include(x => x.AtivoFinanceiro).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task AdicionarAlertaPrecoAsync(AlertaPreco alerta, CancellationToken cancellationToken = default)
+        => await _context.AlertasPreco.AddAsync(alerta, cancellationToken);
+
+    public void AtualizarAlertaPreco(AlertaPreco alerta)
+        => _context.AlertasPreco.Update(alerta);
+
+    public void RemoverAlertaPreco(AlertaPreco alerta)
+        => _context.AlertasPreco.Remove(alerta);
+
     private async Task<int> ObterCargaIdAsync(CancellationToken cancellationToken)
     {
         var carga = await _context.CargasFinanceiras.AsNoTracking().OrderByDescending(x => x.ImportedAt).Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);
