@@ -598,6 +598,136 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     private static FinancasProventosDashboardDto ProventosDashboardVazio()
         => new(new ProventosResumoDto(0m, 0m, 0m, 0m, 0), [], [], []);
 
+    // F-T — calendário de proventos. Realizado (PaymentDate <= hoje) agrupado por mês × tipo
+    // (Dividendo/JCP/Rendimento FII/Earn), identificando a fonte (B3 Extrato/Brapi/Informe IR/
+    // Binance Earn). Proventos persistidos com PaymentDate futuro entram como "previsto/anunciado"
+    // (não há fonte separada de previstos; NÃO chama API externa no load). À prova de falha: erro
+    // devolve DTO vazio e nunca derruba o dashboard.
+    public async Task<FinancasCalendarioProventosDashboardDto> ObterCalendarioProventosDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var hoje = DateTime.UtcNow.Date;
+            // Janela: do início do realizado a 5 anos à frente (cobre eventuais anúncios futuros já gravados).
+            var todos = await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hoje.AddYears(5), cancellationToken);
+            return AgregarCalendarioProventos(todos, hoje);
+        }
+        catch
+        {
+            return CalendarioProventosVazio();
+        }
+    }
+
+    // Quantos meses de histórico o calendário exibe (além dos meses futuros com provento anunciado).
+    private const int MesesCalendarioProventos = 24;
+
+    // Ordem canônica dos tipos no calendário (colunas/séries). "Outro" agrega o que não casar.
+    private static readonly string[] TiposCalendarioProventos = ["Dividendo", "JCP", "Rendimento FII", "Earn", "Outro"];
+
+    // Lógica PURA da agregação (rendimentos → buckets mês × tipo × fonte). Testável sem banco.
+    // Janela: últimos MesesCalendarioProventos meses (realizado) + todos os meses futuros que tenham
+    // provento anunciado persistido. Mês "previsto" = inteiramente no futuro (todo PaymentDate > hoje).
+    internal static FinancasCalendarioProventosDashboardDto AgregarCalendarioProventos(
+        IReadOnlyList<RendimentoInvestimento> proventos, DateTime hoje)
+    {
+        var comData = proventos.Where(p => p.PaymentDate.HasValue).ToList();
+        if (comData.Count == 0)
+            return CalendarioProventosVazio();
+
+        var cultura = CultureInfo.GetCultureInfo("pt-BR");
+        var primeiroMes = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-(MesesCalendarioProventos - 1));
+
+        // Meses a exibir: a janela histórica fixa + qualquer mês futuro que tenha provento anunciado.
+        var mesesFuturos = comData
+            .Where(p => p.PaymentDate!.Value.Date > hoje)
+            .Select(p => new DateTime(p.PaymentDate!.Value.Year, p.PaymentDate.Value.Month, 1))
+            .Distinct()
+            .ToList();
+
+        var ultimoMes = mesesFuturos.Count > 0
+            ? mesesFuturos.Max()
+            : new DateTime(hoje.Year, hoje.Month, 1);
+
+        var meses = new List<CalendarioProventoMesDto>();
+        for (var m = primeiroMes; m <= ultimoMes; m = m.AddMonths(1))
+        {
+            var doMes = comData
+                .Where(p => p.PaymentDate!.Value.Year == m.Year && p.PaymentDate.Value.Month == m.Month)
+                .ToList();
+
+            var porTipo = TiposCalendarioProventos
+                .Select(tipo => new CalendarioProventoTipoDto(
+                    tipo,
+                    Math.Round(doMes.Where(p => RotuloTipoProvento(p) == tipo).Sum(ValorLiquido), 2)))
+                .ToList();
+
+            // Mês previsto: tem provento e TODO ele é futuro (anunciado, ainda não pago).
+            var previsto = doMes.Count > 0 && doMes.All(p => p.PaymentDate!.Value.Date > hoje);
+
+            meses.Add(new CalendarioProventoMesDto(
+                $"{cultura.DateTimeFormat.GetAbbreviatedMonthName(m.Month)}/{m:yy}",
+                m.Year, m.Month,
+                Math.Round(doMes.Sum(ValorLiquido), 2),
+                previsto,
+                porTipo));
+        }
+
+        // Só os proventos dentro da janela exibida entram nos totais e na quebra por fonte.
+        var naJanela = comData
+            .Where(p => p.PaymentDate!.Value.Date >= primeiroMes && p.PaymentDate.Value < ultimoMes.AddMonths(1))
+            .ToList();
+
+        var totalRealizado = Math.Round(naJanela.Where(p => p.PaymentDate!.Value.Date <= hoje).Sum(ValorLiquido), 2);
+        var totalPrevisto = Math.Round(naJanela.Where(p => p.PaymentDate!.Value.Date > hoje).Sum(ValorLiquido), 2);
+
+        var fontes = naJanela
+            .GroupBy(RotuloFonteProvento)
+            .Select(g => new CalendarioProventoFonteDto(g.Key, Math.Round(g.Sum(ValorLiquido), 2), g.Count()))
+            .Where(f => f.Valor != 0m || f.Quantidade > 0)
+            .OrderByDescending(f => f.Valor)
+            .ToList();
+
+        // Só expõe as colunas/tipos que realmente apareceram (mantendo a ordem canônica), para a
+        // tabela não ficar com colunas sempre-zero (ex.: "Outro").
+        var tiposPresentes = TiposCalendarioProventos
+            .Where(t => meses.Any(mes => mes.PorTipo.Any(pt => pt.Tipo == t && pt.Valor != 0m)))
+            .ToList();
+
+        return new FinancasCalendarioProventosDashboardDto(
+            TemDados: true,
+            Tipos: tiposPresentes.Count > 0 ? tiposPresentes : [TiposCalendarioProventos[0]],
+            Meses: meses,
+            Fontes: fontes,
+            TotalRealizado: totalRealizado,
+            TotalPrevisto: totalPrevisto,
+            TemPrevisto: totalPrevisto != 0m || meses.Any(mes => mes.Previsto));
+    }
+
+    // Normaliza o IncomeType cru para um tipo amigável e estável do calendário. Cobre os tipos que o
+    // sistema grava: "Dividendo", "JCP", "Rendimento" (FII) e "Rendimento (Earn)" (cripto/airdrop).
+    private static string RotuloTipoProvento(RendimentoInvestimento r)
+    {
+        var tipo = (r.IncomeType ?? string.Empty).Trim();
+        if (tipo.Length == 0)
+            return "Outro";
+        if (tipo.Contains("Earn", StringComparison.OrdinalIgnoreCase) ||
+            tipo.Contains("Airdrop", StringComparison.OrdinalIgnoreCase) ||
+            tipo.Contains("Staking", StringComparison.OrdinalIgnoreCase))
+            return "Earn";
+        if (tipo.Contains("JCP", StringComparison.OrdinalIgnoreCase) ||
+            tipo.Contains("Juros", StringComparison.OrdinalIgnoreCase))
+            return "JCP";
+        if (tipo.Contains("Dividendo", StringComparison.OrdinalIgnoreCase))
+            return "Dividendo";
+        // "Rendimento" puro (sem Earn) = rendimento de FII.
+        if (tipo.Contains("Rendimento", StringComparison.OrdinalIgnoreCase))
+            return "Rendimento FII";
+        return "Outro";
+    }
+
+    private static FinancasCalendarioProventosDashboardDto CalendarioProventosVazio()
+        => new(false, [], [], [], 0m, 0m, false);
+
     // Contrato com o ReconciliadorPosicaoB3 (camada INFRA, fora do alcance do APP): as transações de
     // ajuste têm Fonte="Reconciliação" e a contrapartida cai no ativo virtual AssetKey="VARIACAO".
     // Mantidos como literais aqui porque sobrevivem ao resync (são o "contrato" da feature).

@@ -1,0 +1,124 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasCalendarioProventosDashboardDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+
+    // Série mensal serializada para o gráfico ApexCharts (montado no financas.js — script em parcial
+    // injetada via innerHTML NÃO executa; os dados vão por data-*). Uma série por tipo (empilhado).
+    var labels = Model.Meses.Select(m => m.Rotulo);
+    var series = Model.Tipos.Select(tipo => new
+    {
+        name = tipo,
+        data = Model.Meses.Select(m => m.PorTipo.FirstOrDefault(t => t.Tipo == tipo)?.Valor ?? 0m)
+    });
+    // Marca quais meses são previstos (futuros) para a coluna do gráfico/tabela sinalizar.
+    var previstos = Model.Meses.Select(m => m.Previsto);
+
+    // Tabela: só os últimos 12 meses + os meses previstos (mantém a tabela enxuta; o gráfico mostra 24).
+    var mesesTabela = Model.Meses
+        .Where(m => m.Previsto)
+        .Concat(Model.Meses.Where(m => !m.Previsto).TakeLast(12))
+        .OrderBy(m => m.Ano).ThenBy(m => m.Mes)
+        .ToList();
+}
+
+@if (Model.TemDados)
+{
+    <div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-calendar3 me-1"></i>Calendário de proventos</h6>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Proventos">Ver todos</a>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Realizado (24M)</div>
+                        <div class="fs-5 fw-semibold text-success">@Model.TotalRealizado.ToString("C2", br)</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Previsto / anunciado</div>
+                        @if (Model.TemPrevisto)
+                        {
+                            <div class="fs-5 fw-semibold text-info">@Model.TotalPrevisto.ToString("C2", br)</div>
+                        }
+                        else
+                        {
+                            <div class="small text-secondary mt-1">Sem proventos anunciados na base.</div>
+                        }
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary mb-1"><i class="bi bi-shield-check me-1"></i>Por fonte (24M)</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var f in Model.Fontes)
+                            {
+                                var cor = f.Fonte switch
+                                {
+                                    "B3 Extrato" => "text-bg-primary",
+                                    "Brapi" => "text-bg-success",
+                                    "Binance Earn" => "text-bg-warning",
+                                    "Informe IR" => "text-bg-info",
+                                    _ => "text-bg-secondary"
+                                };
+                                <span class="badge @cor" title="@f.Quantidade.ToString("N0", br) lançamento(s)">
+                                    @f.Fonte: @f.Valor.ToString("C2", br)
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="small text-secondary mb-1">Proventos por mês e tipo (24M)</div>
+            <div id="financeCalendarioProventosChart"
+                 class="finance-calendario-proventos-chart"
+                 style="min-height:280px;"
+                 data-labels='@Html.Raw(Json.Serialize(labels))'
+                 data-series='@Html.Raw(Json.Serialize(series))'
+                 data-previstos='@Html.Raw(Json.Serialize(previstos))'></div>
+
+            <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mês</th>
+                            @foreach (var tipo in Model.Tipos)
+                            {
+                                <th scope="col" class="text-end">@tipo</th>
+                            }
+                            <th scope="col" class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var mes in mesesTabela)
+                        {
+                            <tr>
+                                <th scope="row" class="fw-normal">
+                                    @mes.Rotulo
+                                    @if (mes.Previsto)
+                                    {
+                                        <span class="badge text-bg-info ms-1" title="Provento anunciado, ainda não pago">previsto</span>
+                                    }
+                                </th>
+                                @foreach (var tipo in Model.Tipos)
+                                {
+                                    var valor = mes.PorTipo.FirstOrDefault(t => t.Tipo == tipo)?.Valor ?? 0m;
+                                    <td class="text-end @(valor == 0m ? "text-secondary" : "")">
+                                        @(valor == 0m ? "—" : valor.ToString("C2", br))
+                                    </td>
+                                }
+                                <td class="text-end fw-semibold @(mes.Previsto ? "text-info" : "text-success")">@mes.Total.ToString("C2", br)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

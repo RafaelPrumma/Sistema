@@ -17,6 +17,7 @@ public interface IFinancasAppService
     Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasCalendarioProventosDashboardDto> ObterCalendarioProventosDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasReconciliacaoDto> ObterReconciliacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasSaudeCotacoesDto> ObterSaudeCotacoesDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);

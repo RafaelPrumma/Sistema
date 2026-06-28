@@ -19,11 +19,13 @@
     posicoes: document.getElementById('financePosicoesIsland'),
     alertas: document.getElementById('financeAlertasIsland'),
     proventos: document.getElementById('financeProventosIsland'),
+    calendarioProventos: document.getElementById('financeCalendarioProventosIsland'),
     reconciliacao: document.getElementById('financeReconciliacaoIsland'),
     saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland')
   };
 
   let proventosChart = null;
+  let calendarioProventosChart = null;
 
   const PERIODOS = [
     { cod: '1D', label: '1D', dias: 1 },
@@ -128,6 +130,51 @@
       tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
     });
     proventosChart.render();
+  }
+
+  // F-T calendário de proventos: gráfico mensal empilhado por tipo (Dividendo/JCP/Rendimento FII/Earn).
+  // Mesma regra dos demais: script em parcial não roda; dados via data-*, monta aqui.
+  async function loadCalendarioProventos(island, url) {
+    await loadPartial(island, url);
+    const el = island.querySelector('#financeCalendarioProventosChart');
+    if (!el || !window.ApexCharts) return;
+
+    let labels = [];
+    let series = [];
+    try {
+      labels = JSON.parse(el.dataset.labels || '[]');
+      series = JSON.parse(el.dataset.series || '[]');
+    } catch (error) {
+      console.error('Falha ao ler série do calendário de proventos.', error);
+      return;
+    }
+    if (!series.length) return;
+
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    // Paleta estável por tipo; cai para a paleta padrão do Apex se surgir um tipo novo.
+    const coresTipo = {
+      'Dividendo': cssVar('--bs-success', '#16a34a'),
+      'JCP': cssVar('--bs-primary', '#0d6efd'),
+      'Rendimento FII': cssVar('--bs-info', '#0dcaf0'),
+      'Earn': cssVar('--bs-warning', '#ffc107'),
+      'Outro': cssVar('--bs-secondary', '#6c757d')
+    };
+    const colors = series.map(s => coresTipo[s.name] || cssVar('--bs-secondary', '#6c757d'));
+
+    calendarioProventosChart = new ApexCharts(el, {
+      chart: { type: 'bar', height: 280, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, background: 'transparent', animations: { enabled: !prefersReducedMotion } },
+      theme: { mode: dark ? 'dark' : 'light' },
+      series: series.map(s => ({ name: s.name, data: s.data })),
+      colors,
+      plotOptions: { bar: { columnWidth: '60%', borderRadius: 3 } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(148,163,184,.18)' },
+      xaxis: { categories: labels, axisBorder: { show: false }, axisTicks: { show: false }, labels: { rotate: -45, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      legend: { position: 'top', horizontalAlign: 'left', labels: { colors: cssVar('--bs-body-color', '#212529') } },
+      tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
+    });
+    calendarioProventosChart.render();
   }
 
   function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
@@ -382,7 +429,8 @@
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
       loadPartial(islands.alertas, dashboard.dataset.alertasUrl),
-      loadProventos(islands.proventos, dashboard.dataset.proventosUrl)
+      loadProventos(islands.proventos, dashboard.dataset.proventosUrl),
+      loadCalendarioProventos(islands.calendarioProventos, dashboard.dataset.calendarioProventosUrl)
     ]);
   }
 
@@ -390,6 +438,7 @@
     controller.abort();
     chart?.destroy();
     proventosChart?.destroy();
+    calendarioProventosChart?.destroy();
   }, { once: true });
 
   initialize();

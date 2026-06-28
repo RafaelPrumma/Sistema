@@ -541,6 +541,42 @@ public record FinancasSaudeCotacoesDto(
     DateTime? AtualizadoEm,
     IReadOnlyList<SaudeCotacaoGrupoDto> Grupos);
 
+// F-T: calendário de proventos. Valor líquido de um tipo (Dividendo/JCP/Rendimento FII/Earn) num mês.
+public record CalendarioProventoTipoDto(
+    string Tipo,
+    decimal Valor);
+
+// F-T: um mês do calendário. PorTipo traz os tipos na MESMA ordem da lista global Tipos do DTO-raiz
+// (zeros incluídos) para a view montar a tabela sem buscar. Previsto=true quando o mês é futuro
+// (PaymentDate > hoje): provento anunciado/a receber, não realizado.
+public record CalendarioProventoMesDto(
+    string Rotulo,           // ex.: "jun/26"
+    int Ano,
+    int Mes,
+    decimal Total,           // soma líquida do mês
+    bool Previsto,           // mês inteiramente no futuro (a receber/anunciado)
+    IReadOnlyList<CalendarioProventoTipoDto> PorTipo);
+
+// F-T: de onde veio o dado do calendário (B3 Extrato / Brapi / Informe IR / Binance Earn), com o
+// total líquido e a contagem de lançamentos na janela exibida. Mesmo rótulo de fonte do F-N.
+public record CalendarioProventoFonteDto(
+    string Fonte,
+    decimal Valor,
+    int Quantidade);
+
+// F-T: ilha lazy-loaded do calendário de proventos. Realizado (PaymentDate <= hoje) por mês×tipo,
+// identificando a fonte. Previsto/anunciado = proventos JÁ PERSISTIDOS com PaymentDate futuro
+// (não há fonte separada de previstos; não chamamos API no load). TemPrevisto=false → faixa de
+// previsto vira estado vazio rotulado ("sem proventos anunciados na base").
+public record FinancasCalendarioProventosDashboardDto(
+    bool TemDados,
+    IReadOnlyList<string> Tipos,                       // ordem canônica das colunas/séries
+    IReadOnlyList<CalendarioProventoMesDto> Meses,     // janela cronológica (ascendente)
+    IReadOnlyList<CalendarioProventoFonteDto> Fontes,  // fontes presentes na janela
+    decimal TotalRealizado,
+    decimal TotalPrevisto,
+    bool TemPrevisto);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;
