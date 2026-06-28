@@ -508,6 +508,39 @@ public record FinancasReconciliacaoDto(
     decimal CalculadoTotal,
     IReadOnlyList<ReconciliacaoAtivoDto> PrincipaisAtivos);
 
+// F-S: saúde das cotações. Linha por ativo com posição>0, com o status do preço usado para valorar,
+// a última atualização, provedor/símbolo, mensagem de erro e as lacunas da série histórica.
+// SaudeStatus é o rótulo amigável calculado pelo ClassificadorSaudeCotacao (lógica pura).
+public record SaudeCotacaoAtivoDto(
+    string Ticker,
+    string Nome,
+    string Classe,
+    string Status,           // rótulo amigável: Atual / Vencida / Falhou / Sem token / Fallback custo / B3 Custódia / ...
+    string Severidade,       // ok / atencao / critico — controla a cor do badge na view
+    string Provedor,         // provedor da cotação utilizável (ou da última tentada quando não há preço)
+    string Simbolo,
+    DateTime? AtualizadaEm,  // ConsultadoEm da cotação que valoraria a posição
+    string? Erro,            // MensagemErro da cotação (quando houver)
+    bool Lacuna1d,           // sem bucket 1d recente (fechamento) na série histórica
+    bool Lacuna30m);         // sem bucket 30m recente (snapshot intradiário) na série histórica
+
+// F-S: agrupamento por origem do preço (B3 / Cripto / B3 Custódia) + contadores de saúde para o resumo.
+public record SaudeCotacaoGrupoDto(
+    string Titulo,
+    int Total,
+    int Ok,
+    int Atencao,
+    int Critico,
+    IReadOnlyList<SaudeCotacaoAtivoDto> Ativos);
+
+public record FinancasSaudeCotacoesDto(
+    bool TemDados,
+    int TotalAtivos,
+    int Saudaveis,
+    int ComProblema,
+    DateTime? AtualizadoEm,
+    IReadOnlyList<SaudeCotacaoGrupoDto> Grupos);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;

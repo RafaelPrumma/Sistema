@@ -19,7 +19,8 @@
     posicoes: document.getElementById('financePosicoesIsland'),
     alertas: document.getElementById('financeAlertasIsland'),
     proventos: document.getElementById('financeProventosIsland'),
-    reconciliacao: document.getElementById('financeReconciliacaoIsland')
+    reconciliacao: document.getElementById('financeReconciliacaoIsland'),
+    saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland')
   };
 
   let proventosChart = null;
@@ -377,6 +378,7 @@
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
       loadPartial(islands.metas, dashboard.dataset.metasUrl),
       loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
+      loadPartial(islands.saudeCotacoes, dashboard.dataset.saudeCotacoesUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
       loadPartial(islands.alertas, dashboard.dataset.alertasUrl),

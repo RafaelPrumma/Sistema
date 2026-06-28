@@ -20,7 +20,8 @@
      data-posicoes-url="@Url.Action("DashboardPosicoes", "Financas")"
      data-alertas-url="@Url.Action("DashboardAlertas", "Financas")"
      data-proventos-url="@Url.Action("DashboardProventos", "Financas")"
-     data-reconciliacao-url="@Url.Action("DashboardReconciliacao", "Financas")">
+     data-reconciliacao-url="@Url.Action("DashboardReconciliacao", "Financas")"
+     data-saude-cotacoes-url="@Url.Action("DashboardSaudeCotacoes", "Financas")">
 
     <section id="financePatrimonioIsland" class="finance-island mb-3" aria-busy="true" aria-live="polite">
         <div class="finance-skeleton finance-skeleton--hero" role="status">
@@ -51,6 +52,13 @@
     <section id="financeReconciliacaoIsland" class="finance-island mb-3" aria-busy="true" aria-live="polite">
         <div class="finance-skeleton finance-skeleton--table" role="status">
             <span class="visually-hidden">Carregando reconciliação...</span>
+        </div>
+    </section>
+
+    @* F-S: saúde das cotações. A ilha fica vazia (parcial sem markup) quando não há ativo detido. *@
+    <section id="financeSaudeCotacoesIsland" class="finance-island mb-3" aria-busy="true" aria-live="polite">
+        <div class="finance-skeleton finance-skeleton--table" role="status">
+            <span class="visually-hidden">Carregando saúde das cotações...</span>
         </div>
     </section>
 

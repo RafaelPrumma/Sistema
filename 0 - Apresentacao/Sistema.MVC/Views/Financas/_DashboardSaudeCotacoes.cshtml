@@ -1,0 +1,135 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasSaudeCotacoesDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Quando(DateTime? d) => d.HasValue ? d.Value.ToLocalTime().ToString("dd/MM HH:mm", br) : "—";
+
+    // Tom do badge por severidade calculada no serviço (ClassificadorSaudeCotacao).
+    string BadgeSeveridade(string sev) => sev switch
+    {
+        "ok" => "text-bg-success",
+        "atencao" => "text-bg-warning",
+        _ => "text-bg-danger"
+    };
+    string IconeGrupo(string titulo) => titulo switch
+    {
+        "Cripto" => "bi-currency-bitcoin",
+        "B3 Custódia" => "bi-bank",
+        _ => "bi-graph-up-arrow"
+    };
+}
+
+@* F-S: saúde das cotações. A ilha só aparece quando há ativos detidos para classificar. *@
+@if (Model.TemDados)
+{
+    <div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="bi bi-heart-pulse me-1"></i>Saúde das cotações</h6>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Posicoes" title="Ver posições e cotações">
+                    Ver posições
+                </a>
+            </div>
+
+            <p class="small text-secondary mb-3">
+                Status do preço usado para valorar cada ativo com posição aberta, com provedor, última
+                atualização e lacunas na série histórica. Atualizado em <strong>@Quando(Model.AtualizadoEm)</strong>.
+            </p>
+
+            <div class="row g-2 mb-3">
+                <div class="col-4">
+                    <div class="border rounded-2 p-2 h-100 text-center">
+                        <div class="small text-secondary">Ativos</div>
+                        <div class="fs-5 fw-semibold">@Model.TotalAtivos.ToString("N0", br)</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="border rounded-2 p-2 h-100 text-center">
+                        <div class="small text-secondary">Saudáveis</div>
+                        <div class="fs-5 fw-semibold text-success">@Model.Saudaveis.ToString("N0", br)</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="border rounded-2 p-2 h-100 text-center">
+                        <div class="small text-secondary">Com ressalva</div>
+                        <div class="fs-5 fw-semibold @(Model.ComProblema > 0 ? "text-warning" : "text-secondary")">@Model.ComProblema.ToString("N0", br)</div>
+                    </div>
+                </div>
+            </div>
+
+            @foreach (var grupo in Model.Grupos)
+            {
+                <div class="d-flex justify-content-between align-items-center mt-3 mb-1">
+                    <div class="small fw-semibold">
+                        <i class="bi @IconeGrupo(grupo.Titulo) me-1"></i>@grupo.Titulo
+                        <span class="text-secondary fw-normal">(@grupo.Total.ToString("N0", br))</span>
+                    </div>
+                    <div class="small text-secondary">
+                        @if (grupo.Ok > 0)
+                        {
+                            <span class="text-success me-2">@grupo.Ok ok</span>
+                        }
+                        @if (grupo.Atencao > 0)
+                        {
+                            <span class="text-warning me-2">@grupo.Atencao atenção</span>
+                        }
+                        @if (grupo.Critico > 0)
+                        {
+                            <span class="text-danger">@grupo.Critico crítico</span>
+                        }
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ativo</th>
+                                <th>Status</th>
+                                <th>Provedor</th>
+                                <th>Símbolo</th>
+                                <th class="text-end">Atualizada</th>
+                                <th class="text-center">Série</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var a in grupo.Ativos)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@a.Ticker</div>
+                                    <div class="small text-secondary text-truncate" style="max-width:200px">@a.Nome</div>
+                                </td>
+                                <td>
+                                    <span class="badge @BadgeSeveridade(a.Severidade)">@a.Status</span>
+                                    @if (!string.IsNullOrWhiteSpace(a.Erro))
+                                    {
+                                        <i class="bi bi-info-circle ms-1 text-secondary" title="@a.Erro"></i>
+                                    }
+                                </td>
+                                <td class="small">@a.Provedor</td>
+                                <td class="small text-secondary">@a.Simbolo</td>
+                                <td class="text-end small text-secondary">@Quando(a.AtualizadaEm)</td>
+                                <td class="text-center">
+                                    @if (a.Lacuna1d)
+                                    {
+                                        <span class="badge text-bg-light border text-danger" title="Sem fechamento diário (1d) recente na série histórica">1d</span>
+                                    }
+                                    @if (a.Lacuna30m)
+                                    {
+                                        <span class="badge text-bg-light border text-warning" title="Sem snapshot intradiário (30m) nas últimas 24h">30m</span>
+                                    }
+                                    @if (!a.Lacuna1d && !a.Lacuna30m)
+                                    {
+                                        <i class="bi bi-check-circle text-success" title="Série histórica em dia"></i>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

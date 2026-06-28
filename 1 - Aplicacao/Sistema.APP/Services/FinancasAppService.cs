@@ -676,6 +676,119 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         }
     }
 
+    // F-S — painel de saúde das cotações. Para cada ativo com posição>0, classifica o status do preço
+    // que valoraria a posição (mesma escolha de CriarAtivosCotadosDaTabela), expõe provedor/símbolo/
+    // última atualização/erro e detecta lacunas na série histórica (buckets 1d/30m recentes ausentes).
+    // À PROVA DE FALHA: roda no load do dashboard — qualquer erro devolve DTO vazio, nunca estoura.
+    public async Task<FinancasSaudeCotacoesDto> ObterSaudeCotacoesDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+
+            // Só posições visíveis (descarta dust de cripto). Sem ativos detidos, a ilha some.
+            var detidas = posicoes
+                .Where(p => p.AtivoFinanceiro is not null
+                    && EhValorPosicaoVisivel(p.AtivoFinanceiro!, p.Quantidade, p.CustoTotal))
+                .ToList();
+            if (detidas.Count == 0)
+                return SaudeCotacoesVazio();
+
+            // Histórico recente para detectar lacunas. Janela curta: 1d nos últimos ~5 dias úteis e
+            // 30m nas últimas ~24h. Lê do read model (BuscarHistoricoPrecosAsync), nunca de API.
+            var agora = DateTime.UtcNow;
+            var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(agora.AddDays(-7), cancellationToken);
+            var temBucketRecente = historico
+                .GroupBy(h => (h.AtivoFinanceiroId, h.Interval))
+                .ToDictionary(g => g.Key, g => g.Max(x => x.Date));
+
+            // Todas as cotações por ativo (cada provedor tem sua linha; ordenadas por ConsultadoEm desc).
+            var cotacoesPorAtivo = cotacoes
+                .GroupBy(c => c.AtivoFinanceiroId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var linhas = new List<(string Grupo, SaudeCotacaoAtivoDto Dto)>();
+            foreach (var pos in detidas)
+            {
+                var ativo = pos.AtivoFinanceiro!;
+                cotacoesPorAtivo.TryGetValue(ativo.Id, out var doAtivo);
+                doAtivo ??= [];
+
+                // Mesma escolha da valoração: prefere a cotação com PrecoBRL>0 e, dentro dela, a mais
+                // recente. Sem nenhuma utilizável, pega a última tentada (mais recente) para explicar o erro.
+                var utilizavel = doAtivo
+                    .Where(c => c.PrecoBRL > 0m)
+                    .OrderByDescending(c => c.ConsultadoEm)
+                    .FirstOrDefault();
+                var referencia = utilizavel ?? doAtivo.OrderByDescending(c => c.ConsultadoEm).FirstOrDefault();
+                var temPreco = utilizavel is not null;
+
+                var provedor = referencia?.Provedor ?? ProvedorCotacao.Manual;
+                var statusCotacao = referencia?.Status ?? StatusCotacao.Falhou;
+                var vencida = utilizavel is { ExpiraEm: not null } && utilizavel.ExpiraEm < agora;
+
+                var classificacao = ClassificadorSaudeCotacao.Classificar(temPreco, provedor, statusCotacao, vencida);
+                var grupo = ClassificadorSaudeCotacao.Grupo(ativo.EhCripto || ativo.Classe == ClasseAtivo.Cripto, temPreco, provedor);
+
+                // Lacunas: ativo detido sem fechamento (1d) na última semana, ou sem snapshot (30m) nas
+                // últimas 24h. Cripto cota 24/7; B3 só em pregão — por isso a janela do 30m é tolerante.
+                var lacuna1d = !(temBucketRecente.TryGetValue((ativo.Id, "1d"), out var ult1d) && ult1d >= agora.Date.AddDays(-5));
+                var lacuna30m = !(temBucketRecente.TryGetValue((ativo.Id, "30m"), out var ult30m) && ult30m >= agora.AddHours(-24));
+
+                linhas.Add((grupo, new SaudeCotacaoAtivoDto(
+                    ativo.Sigla ?? ativo.Chave ?? ativo.Nome ?? "—",
+                    ativo.Nome ?? string.Empty,
+                    ativo.Classe.ToString(),
+                    classificacao.Status,
+                    ClassificadorSaudeCotacao.RotuloSeveridade(classificacao.Nivel),
+                    RotuloFontePreco(provedor),
+                    referencia?.Simbolo ?? ativo.Sigla ?? ativo.Chave ?? string.Empty,
+                    referencia?.ConsultadoEm,
+                    string.IsNullOrWhiteSpace(referencia?.MensagemErro) ? null : referencia!.MensagemErro,
+                    lacuna1d,
+                    lacuna30m)));
+            }
+
+            // Agrupa nos 3 baldes visuais na ordem B3 → Cripto → B3 Custódia, com contadores de saúde.
+            var ordemGrupo = new Dictionary<string, int> { ["B3"] = 0, ["Cripto"] = 1, ["B3 Custódia"] = 2 };
+            var grupos = linhas
+                .GroupBy(x => x.Grupo)
+                .OrderBy(g => ordemGrupo.TryGetValue(g.Key, out var o) ? o : 99)
+                .Select(g =>
+                {
+                    var itens = g.Select(x => x.Dto)
+                        .OrderBy(d => d.Severidade == "critico" ? 0 : d.Severidade == "atencao" ? 1 : 2)
+                        .ThenBy(d => d.Ticker, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    return new SaudeCotacaoGrupoDto(
+                        g.Key,
+                        itens.Count,
+                        itens.Count(d => d.Severidade == "ok"),
+                        itens.Count(d => d.Severidade == "atencao"),
+                        itens.Count(d => d.Severidade == "critico"),
+                        itens);
+                })
+                .ToList();
+
+            var todos = linhas.Select(x => x.Dto).ToList();
+            return new FinancasSaudeCotacoesDto(
+                TemDados: todos.Count > 0,
+                TotalAtivos: todos.Count,
+                Saudaveis: todos.Count(d => d.Severidade == "ok"),
+                ComProblema: todos.Count(d => d.Severidade != "ok"),
+                AtualizadoEm: cotacoes.Count > 0 ? cotacoes.Max(c => c.ConsultadoEm) : null,
+                Grupos: grupos);
+        }
+        catch
+        {
+            return SaudeCotacoesVazio();
+        }
+    }
+
+    private static FinancasSaudeCotacoesDto SaudeCotacoesVazio()
+        => new(false, 0, 0, 0, null, []);
+
     public async Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _importador.GarantirCargaInicialAsync(cancellationToken);
