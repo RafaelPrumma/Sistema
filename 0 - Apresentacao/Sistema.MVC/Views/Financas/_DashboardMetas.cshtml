@@ -15,7 +15,12 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h6 class="mb-0"><i class="bi bi-bullseye me-1"></i>Metas e rebalanceamento</h6>
-                <span class="small text-secondary">Patrimônio: <strong>@Money(Model.PatrimonioTotal)</strong></span>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="small text-secondary">Patrimônio: <strong>@Money(Model.PatrimonioTotal)</strong></span>
+                    <a class="btn btn-sm btn-outline-primary" asp-controller="Financas" asp-action="PesoAlvo">
+                        <i class="bi bi-pencil-square me-1"></i>Editar peso-alvo
+                    </a>
+                </div>
             </div>
 
             <p class="small text-secondary mb-3">
@@ -89,7 +94,7 @@
             <div class="small text-secondary mt-2">
                 <i class="bi bi-info-circle me-1"></i>
                 O peso-alvo é a soma do alvo dos ativos de cada carteira (e subcarteiras).
-                Edição do alvo por ativo ainda é manual (ver Observação na tabela de carteiras).
+                Use <a asp-controller="Financas" asp-action="PesoAlvo">Editar peso-alvo</a> para ajustar o alvo de cada ativo.
             </div>
         </div>
     </div>

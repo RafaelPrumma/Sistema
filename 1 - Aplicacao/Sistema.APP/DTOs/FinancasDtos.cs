@@ -257,6 +257,43 @@ public record NovoAlertaPrecoInput(
     bool Ativo = true,
     string? Observacao = null);
 
+// F-G — peso-alvo por ativo-em-carteira (CarteiraAtivoFinanceiro). Página de edição que fecha o F-G:
+// lista cada vínculo ativo↔carteira com o alvo atual (em % do patrimônio) e a quantidade em posição
+// (contexto). PesoAlvo nulo/0 = "sem alvo". A soma por carteira é só um aviso (não bloqueia).
+public record PesoAlvoItemDto(
+    int CarteiraAtivoId,
+    int CarteiraId,
+    string CarteiraNome,
+    string Ticker,
+    string AtivoNome,
+    string Classe,
+    decimal? PesoAlvo,
+    decimal Quantidade);
+
+// Agrupado por carteira para renderização; SomaPesoAlvo permite o aviso de >100% por carteira.
+public record PesoAlvoCarteiraDto(
+    int CarteiraId,
+    string CarteiraNome,
+    decimal SomaPesoAlvo,
+    IReadOnlyList<PesoAlvoItemDto> Itens);
+
+public record PesoAlvoEdicaoDto(
+    IReadOnlyList<PesoAlvoCarteiraDto> Carteiras,
+    decimal SomaTotalPesoAlvo);
+
+// Cada linha do POST: id do vínculo + novo peso (nulo/vazio = limpa o alvo).
+// Propriedades mutáveis + List<> para o model binder do MVC ligar os índices Itens[i].* do form.
+public class PesoAlvoLinhaInput
+{
+    public int CarteiraAtivoId { get; set; }
+    public decimal? PesoAlvo { get; set; }
+}
+
+public class SalvarPesosAlvoInput
+{
+    public List<PesoAlvoLinhaInput> Itens { get; set; } = [];
+}
+
 // Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
 // VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
 public record SerieEvolucaoDto(

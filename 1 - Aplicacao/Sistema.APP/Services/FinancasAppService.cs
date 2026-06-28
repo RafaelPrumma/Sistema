@@ -141,6 +141,98 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return temAlvo ? soma : null;
     }
 
+    // F-G: lista dos vínculos ativo↔carteira para a tela de edição do peso-alvo (% do patrimônio).
+    // Agrupa por carteira, anexa a quantidade em posição (contexto) e a soma do alvo por carteira (aviso).
+    // À prova de falha: roda só sob pedido do usuário (página própria), mas qualquer erro devolve vazio.
+    public async Task<PesoAlvoEdicaoDto> ObterPesosAlvoAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var vinculos = await _uow.Financas.BuscarVinculosCarteiraAtivoAsync(cancellationToken);
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var qtdPorAtivo = posicoes
+                .GroupBy(p => p.AtivoFinanceiroId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Quantidade));
+
+            var carteiras = vinculos
+                .GroupBy(v => new { v.CarteiraFinanceiraId, Nome = v.CarteiraFinanceira?.Nome ?? "(sem nome)" })
+                .Select(g =>
+                {
+                    var itens = g
+                        .Select(v => new PesoAlvoItemDto(
+                            v.Id,
+                            v.CarteiraFinanceiraId,
+                            g.Key.Nome,
+                            v.AtivoFinanceiro?.Sigla ?? v.AtivoFinanceiro?.Chave ?? "?",
+                            v.AtivoFinanceiro?.Nome ?? string.Empty,
+                            v.AtivoFinanceiro?.Classe.ToString() ?? string.Empty,
+                            v.PesoAlvo,
+                            qtdPorAtivo.TryGetValue(v.AtivoFinanceiroId, out var q) ? q : 0m))
+                        .OrderBy(i => i.Ticker, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    var soma = itens.Sum(i => i.PesoAlvo ?? 0m);
+                    return new PesoAlvoCarteiraDto(g.Key.CarteiraFinanceiraId, g.Key.Nome, Math.Round(soma, 2), itens);
+                })
+                .OrderBy(c => c.CarteiraNome, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var somaTotal = carteiras.Sum(c => c.SomaPesoAlvo);
+            return new PesoAlvoEdicaoDto(carteiras, Math.Round(somaTotal, 2));
+        }
+        catch
+        {
+            return new PesoAlvoEdicaoDto([], 0m);
+        }
+    }
+
+    // F-G: gravação em lote do peso-alvo. Valida cada linha (0..100); nulo/vazio limpa o alvo ("sem alvo").
+    // PesoAlvo é alvo consumido em leitura por CalculadoraMetasCarteira → NÃO afeta a projeção
+    // FinanceiroPosicaoAtivo, então não recalcula projeção após salvar; só persiste via UnitOfWork.
+    public async Task<ResultadoOperacao> SalvarPesosAlvoAsync(SalvarPesosAlvoInput input, CancellationToken cancellationToken = default)
+    {
+        var linhas = input?.Itens ?? [];
+        if (linhas.Count == 0)
+            return new ResultadoOperacao(false, "Nenhum ativo para atualizar.");
+
+        foreach (var linha in linhas)
+        {
+            if (linha.PesoAlvo is { } peso && (peso < 0m || peso > 100m))
+                return new ResultadoOperacao(false, "Cada peso-alvo deve ficar entre 0 e 100%.");
+        }
+
+        var ids = linhas.Select(l => l.CarteiraAtivoId).Distinct().ToList();
+        var vinculos = await _uow.Financas.BuscarVinculosCarteiraAtivoPorIdsAsync(ids, cancellationToken);
+        if (vinculos.Count == 0)
+            return new ResultadoOperacao(false, "Vínculos não encontrados.");
+
+        var porId = vinculos.ToDictionary(v => v.Id);
+        var alterados = 0;
+        foreach (var linha in linhas)
+        {
+            if (!porId.TryGetValue(linha.CarteiraAtivoId, out var vinculo))
+                continue;
+
+            // 0 e null são tratados como "sem alvo" (persistir null) — CalculadoraMetasCarteira ignora <= 0.
+            var novo = linha.PesoAlvo is > 0m ? Math.Round(linha.PesoAlvo!.Value, 4) : (decimal?)null;
+            if (vinculo.PesoAlvo != novo)
+            {
+                vinculo.PesoAlvo = novo;
+                alterados++;
+            }
+        }
+
+        if (alterados == 0)
+            return new ResultadoOperacao(true, "Nenhuma alteração a salvar.");
+
+        await _log.RegistrarFinanceiroAsync(
+            "CarteiraAtivoFinanceiro", "EditarPesoAlvo", true,
+            $"Peso-alvo atualizado em {alterados} ativo(s)-em-carteira.",
+            LogTipo.Informacao, UsuarioAtual, null, cancellationToken);
+        await _uow.ConfirmarAsync(cancellationToken);
+        return new ResultadoOperacao(true, $"Peso-alvo salvo ({alterados} ativo(s) atualizado(s)).");
+    }
+
     public async Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default)
     {
         var carga = await _uow.Financas.ObterCargaMaisRecenteAsync(cancellationToken);

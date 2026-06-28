@@ -283,6 +283,24 @@ public class FinancasController(IFinancasAppService service) : Controller
         return RedirectToAction(nameof(Eventos));
     }
 
+    // ===== Peso-alvo por ativo-em-carteira (F-G) — edição em lote =====
+
+    [HttpGet]
+    public async Task<IActionResult> PesoAlvo(CancellationToken cancellationToken)
+        => View(await _service.ObterPesosAlvoAsync(cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PesoAlvo(SalvarPesosAlvoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.SalvarPesosAlvoAsync(input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(PesoAlvo));
+    }
+
     // ===== Alertas de preço (F-H) — CRUD manual =====
 
     [HttpGet]

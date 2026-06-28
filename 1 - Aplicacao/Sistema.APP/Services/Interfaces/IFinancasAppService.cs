@@ -9,6 +9,10 @@ public interface IFinancasAppService
     Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasMetasDto> ObterMetasDashboardAsync(decimal aporteHipotetico = 0m, CancellationToken cancellationToken = default);
+
+    // F-G: edição do peso-alvo por ativo-em-carteira (fecha o F-G ponta a ponta).
+    Task<PesoAlvoEdicaoDto> ObterPesosAlvoAsync(CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> SalvarPesosAlvoAsync(SalvarPesosAlvoInput input, CancellationToken cancellationToken = default);
     Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);
