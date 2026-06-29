@@ -22,11 +22,13 @@
     calendarioProventos: document.getElementById('financeCalendarioProventosIsland'),
     reconciliacao: document.getElementById('financeReconciliacaoIsland'),
     reconciliacaoProventos: document.getElementById('financeReconciliacaoProventosIsland'),
-    saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland')
+    saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland'),
+    rentabilidade: document.getElementById('financeRentabilidadeIsland')
   };
 
   let proventosChart = null;
   let calendarioProventosChart = null;
+  let rentabilidadeChart = null;
 
   const PERIODOS = [
     { cod: '1D', label: '1D', dias: 1 },
@@ -176,6 +178,52 @@
       tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
     });
     calendarioProventosChart.render();
+  }
+
+  // F-B F2 rentabilidade vs benchmark: linha sobrepondo a cota da carteira (base 100) × CDI × Ibov.
+  // Mesma regra: script em parcial não roda; dados via data-*, monta aqui. Eixo de datas compartilhado.
+  async function loadRentabilidade(island, url) {
+    await loadPartial(island, url);
+    const el = island.querySelector('#financeRentabilidadeChart');
+    if (!el || !window.ApexCharts) return;
+
+    let datas = [];
+    let series = [];
+    try {
+      datas = JSON.parse(el.dataset.datas || '[]');
+      series = JSON.parse(el.dataset.series || '[]');
+    } catch (error) {
+      console.error('Falha ao ler série de rentabilidade.', error);
+      return;
+    }
+    if (!series.length || !datas.length) return;
+
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    const coresSerie = {
+      'Carteira': cssVar('--bs-primary', '#0d6efd'),
+      'CDI': cssVar('--bs-secondary', '#6c757d'),
+      'Ibovespa': cssVar('--bs-warning', '#ffc107')
+    };
+    const colors = series.map(s => coresSerie[s.name] || cssVar('--bs-info', '#0dcaf0'));
+    const apexSeries = series.map(s => ({
+      name: s.name,
+      data: s.data.map((y, i) => ({ x: datas[i], y }))
+    }));
+
+    rentabilidadeChart = new ApexCharts(el, {
+      chart: { type: 'line', height: 300, fontFamily: 'inherit', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', animations: { enabled: !prefersReducedMotion } },
+      theme: { mode: dark ? 'dark' : 'light' },
+      series: apexSeries,
+      colors,
+      stroke: { curve: 'smooth', width: series.map(s => s.name === 'Carteira' ? 2.5 : 1.5), dashArray: series.map(s => s.name === 'Carteira' ? 0 : 4) },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
+      xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
+      yaxis: { labels: { formatter: value => value.toFixed(0), style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      legend: { position: 'top', horizontalAlign: 'left', labels: { colors: cssVar('--bs-body-color', '#212529') } },
+      tooltip: { theme: dark ? 'dark' : 'light', shared: true, x: { format: 'dd/MM/yyyy' }, y: { formatter: value => `base ${value.toFixed(1)}` } }
+    });
+    rentabilidadeChart.render();
   }
 
   function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
@@ -610,7 +658,8 @@
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
       loadPartial(islands.alertas, dashboard.dataset.alertasUrl),
       loadProventos(islands.proventos, dashboard.dataset.proventosUrl),
-      loadCalendarioProventos(islands.calendarioProventos, dashboard.dataset.calendarioProventosUrl)
+      loadCalendarioProventos(islands.calendarioProventos, dashboard.dataset.calendarioProventosUrl),
+      loadRentabilidade(islands.rentabilidade, dashboard.dataset.rentabilidadeUrl)
     ]);
   }
 
@@ -619,6 +668,7 @@
     chart?.destroy();
     proventosChart?.destroy();
     calendarioProventosChart?.destroy();
+    rentabilidadeChart?.destroy();
     explicarModal?.dispose();
   }, { once: true });
 

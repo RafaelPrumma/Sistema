@@ -1569,6 +1569,156 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
     }
 
+    // F-B F2: rentabilidade vs benchmark. Reaproveita a curva diária de CriarEvolucaoPatrimonio (valor de
+    // mercado por dia + aportes acumulados) — o fluxo diário é o delta do aporte acumulado. Lê a série
+    // persistida de benchmarks (NÃO chama API aqui), acumula CDI/Ibov/IPCA no período (lógica pura) e
+    // delega TWR/MWR/TIR à CalculadoraRentabilidade. À PROVA DE FALHA: qualquer erro → DTO vazio (ilha some).
+    public async Task<FinancasRentabilidadeDto> ObterRentabilidadeDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        var vazio = new FinancasRentabilidadeDto(false, 0, 0m, 0m, 0m, false, 0m, 0m, [], [], [], [], [], false, false);
+        try
+        {
+            await _importador.GarantirCargaInicialAsync(cancellationToken);
+
+            var hoje = DateTime.UtcNow.Date;
+            var inicio = hoje.AddYears(-1);
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            var historico = await _uow.Financas.BuscarHistoricoPrecosAsync(inicio, cancellationToken);
+            var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var evolucao = CriarEvolucaoPatrimonio(transacoes, historico, carteiras, cotacoes, hoje, inicio);
+
+            // Sem curva (ou patrimônio sempre zero) não há rentabilidade a apurar → ilha vazia.
+            if (evolucao.Datas.Count == 0 || evolucao.Total.All(v => v == 0m))
+                return vazio;
+
+            // Recorta a partir do primeiro dia com patrimônio > 0: antes do 1º aporte a "carteira" é vazia
+            // (a base 100 do gráfico e a TWR só fazem sentido a partir do capital investido).
+            var primeiroAtivo = evolucao.Total
+                .Select((v, i) => (v, i))
+                .Where(x => x.v > 0m)
+                .Select(x => x.i)
+                .DefaultIfEmpty(0)
+                .First();
+
+            var datas = evolucao.Datas
+                .Skip(primeiroAtivo)
+                .Select(d => DateTime.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .ToList();
+            var totais = evolucao.Total.Skip(primeiroAtivo).ToList();
+            var aportesAcum = evolucao.CustoAcumulado.Skip(primeiroAtivo).ToList();
+            if (datas.Count < 2)
+                return vazio;
+
+            // Fluxo diário = delta do aporte acumulado (mesmos dados de CriarEvolucaoPatrimonio, sem
+            // recalcular transações). O 1º ponto carrega todo o aporte acumulado até o início do recorte.
+            var serie = new List<PontoRentabilidadeDto>(datas.Count);
+            for (var i = 0; i < datas.Count; i++)
+            {
+                var fluxo = i == 0 ? aportesAcum[0] : aportesAcum[i] - aportesAcum[i - 1];
+                serie.Add(new PontoRentabilidadeDto(datas[i], totais[i], fluxo));
+            }
+
+            var inicioPeriodo = datas[0];
+            var fimPeriodo = datas[^1];
+            // IPCA é mensal e seus pontos são datados no 1º dia do mês: para não perder a inflação do mês
+            // de início (quando a carteira começou no meio do mês), acumula a partir do início do mês.
+            var inicioMes = new DateTime(inicioPeriodo.Year, inicioPeriodo.Month, 1);
+
+            // Série persistida dos benchmarks (só LÊ — o job financas-benchmarks alimenta). Busca desde o
+            // início do mês para incluir o ponto mensal do IPCA do 1º mês.
+            var pontosBenchmark = (await _uow.Financas.BuscarSeriesBenchmarkAsync(inicioMes, cancellationToken))
+                .Select(x => new AcumuladorBenchmark.PontoBenchmark(x.Indice, x.Date, x.Valor))
+                .ToList();
+
+            // CDI/Ibov acumulam no período exato em que houve carteira; IPCA acumula por mês (janela mensal).
+            decimal Acumular(IndiceBenchmark indice)
+            {
+                var ini = indice == IndiceBenchmark.Ipca ? inicioMes : inicioPeriodo;
+                return AcumuladorBenchmark.Acumular(indice, pontosBenchmark.Where(p => p.Indice == indice), ini, fimPeriodo);
+            }
+            bool TemSerie(IndiceBenchmark indice)
+            {
+                var ini = indice == IndiceBenchmark.Ipca ? inicioMes : inicioPeriodo;
+                return pontosBenchmark.Any(p => p.Indice == indice && p.Data.Date >= ini.Date && p.Data.Date <= fimPeriodo.Date);
+            }
+
+            var cdiDisponivel = TemSerie(IndiceBenchmark.Cdi);
+            var ibovDisponivel = TemSerie(IndiceBenchmark.Ibov);
+            var ipcaDisponivel = TemSerie(IndiceBenchmark.Ipca);
+            var cdiAcum = Acumular(IndiceBenchmark.Cdi);
+            var ibovAcum = Acumular(IndiceBenchmark.Ibov);
+            var ipcaAcum = Acumular(IndiceBenchmark.Ipca);
+
+            // Só compara contra índices que têm série no período (degrade gracioso).
+            var benchmarksParaApurar = new List<(string Nome, decimal RetornoAcumulado)>();
+            if (cdiDisponivel) benchmarksParaApurar.Add(("CDI", cdiAcum));
+            if (ibovDisponivel) benchmarksParaApurar.Add(("Ibovespa", ibovAcum));
+
+            var apuracao = CalculadoraRentabilidade.Apurar(serie, benchmarksParaApurar);
+            var retornoReal = ipcaDisponivel ? CalculadoraRentabilidade.RetornoReal(apuracao.Twr, ipcaAcum) : apuracao.Twr;
+
+            var comparativos = new List<RentabilidadeBenchmarkDto>
+            {
+                MapearBenchmark("CDI", cdiDisponivel, apuracao.Benchmarks),
+                MapearBenchmark("Ibovespa", ibovDisponivel, apuracao.Benchmarks)
+            };
+
+            // Séries base 100 alinhadas ao eixo de datas (carteira pela cota TWR; CDI/Ibov pela acumulação).
+            var carteiraBase100 = SerieCarteiraBase100(serie);
+            var cdiBase100 = cdiDisponivel
+                ? AcumuladorBenchmark.SerieBase100(IndiceBenchmark.Cdi, datas, pontosBenchmark.Where(p => p.Indice == IndiceBenchmark.Cdi).ToList())
+                : [];
+            var ibovBase100 = ibovDisponivel
+                ? AcumuladorBenchmark.SerieBase100(IndiceBenchmark.Ibov, datas, pontosBenchmark.Where(p => p.Indice == IndiceBenchmark.Ibov).ToList())
+                : [];
+
+            return new FinancasRentabilidadeDto(
+                true,
+                apuracao.Dias,
+                apuracao.Twr,
+                apuracao.TwrAnualizado,
+                apuracao.Mwr,
+                ipcaDisponivel,
+                ipcaAcum,
+                retornoReal,
+                comparativos,
+                datas.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList(),
+                carteiraBase100,
+                cdiBase100,
+                ibovBase100,
+                cdiDisponivel,
+                ibovDisponivel);
+        }
+        catch
+        {
+            // À prova de falha: qualquer erro (série ausente, parsing, etc.) → ilha some, dashboard segue.
+            return vazio;
+        }
+    }
+
+    private static RentabilidadeBenchmarkDto MapearBenchmark(string nome, bool disponivel, IReadOnlyList<ComparativoBenchmarkDto> benchmarks)
+    {
+        var c = benchmarks.FirstOrDefault(b => string.Equals(b.Nome, nome, StringComparison.OrdinalIgnoreCase));
+        return disponivel && c is not null
+            ? new RentabilidadeBenchmarkDto(nome, true, c.RetornoBenchmark, c.ExcessoAbsoluto, c.RetornoRelativo)
+            : new RentabilidadeBenchmarkDto(nome, false, 0m, 0m, 0m);
+    }
+
+    // Cota da carteira (base 100) por dia: reusa o sistema de cotas da CalculadoraRentabilidade aplicado
+    // ao prefixo da série até cada dia, para a linha do gráfico bater com a TWR do card.
+    private static IReadOnlyList<decimal> SerieCarteiraBase100(IReadOnlyList<PontoRentabilidadeDto> serie)
+    {
+        var ordenada = serie.OrderBy(p => p.Data).ToList();
+        var saida = new decimal[ordenada.Count];
+        for (var i = 0; i < ordenada.Count; i++)
+        {
+            var twrAteAqui = CalculadoraRentabilidade.CalcularTwr(ordenada.Take(i + 1).ToList());
+            saida[i] = 100m * (1m + twrAteAqui);
+        }
+        return saida;
+    }
+
     // Apuração de IR (cola): usa o carregador central (já com ajuste de split) + os proventos.
     public async Task<ApuracaoIrDto> ObterApuracaoIrAsync(int ano, CancellationToken cancellationToken = default)
     {

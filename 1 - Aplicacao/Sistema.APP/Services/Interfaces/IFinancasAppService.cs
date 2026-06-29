@@ -27,6 +27,10 @@ public interface IFinancasAppService
     Task<FinancasReconciliacaoDto> ObterReconciliacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasReconciliacaoProventosAnualDto> ObterReconciliacaoProventosAnualDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasSaudeCotacoesDto> ObterSaudeCotacoesDashboardAsync(CancellationToken cancellationToken = default);
+
+    // F-B F2: rentabilidade vs benchmark — TWR/MWR/TIR + comparação CDI/Ibov + retorno real (− IPCA) +
+    // séries base 100 p/ o gráfico. À prova de falha: erro → DTO vazio (TemDados=false → ilha some).
+    Task<FinancasRentabilidadeDto> ObterRentabilidadeDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<DocumentoFinanceiroDto>> BuscarDocumentosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<(DocumentoFinanceiroDto? Documento, IReadOnlyList<ConteudoBrutoFinanceiroDto> Conteudos)> ObterDocumentoAsync(int id, CancellationToken cancellationToken = default);

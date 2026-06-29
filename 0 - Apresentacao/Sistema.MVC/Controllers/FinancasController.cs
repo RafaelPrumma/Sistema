@@ -90,6 +90,11 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardSaudeCotacoes(CancellationToken cancellationToken)
         => PartialView("_DashboardSaudeCotacoes", await _service.ObterSaudeCotacoesDashboardAsync(cancellationToken));
 
+    // F-B F2: rentabilidade vs benchmark (TWR/MWR + CDI/Ibov + retorno real). Ilha vazia se não há série/posição.
+    [HttpGet("/Financas/Dashboard/Rentabilidade")]
+    public async Task<IActionResult> DashboardRentabilidade(CancellationToken cancellationToken)
+        => PartialView("_DashboardRentabilidade", await _service.ObterRentabilidadeDashboardAsync(cancellationToken));
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportarPasta(CancellationToken cancellationToken)

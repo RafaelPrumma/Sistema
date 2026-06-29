@@ -718,3 +718,35 @@ public record FinancasReconciliacaoProventosAnualDto(
     decimal TotalMaterializado,
     bool TemDivergencia,
     IReadOnlyList<ReconciliacaoProventoAnoDto> Anos);
+
+// F-B F2 — comparativo da carteira contra um benchmark acumulado no período (CDI/Ibovespa).
+//  Disponivel=false → não havia série persistida do índice no período (degrade gracioso na UI).
+//  Excesso = carteira − índice (pontos); Relativo = (1+carteira)/(1+índice)−1 (ex.: % do CDI).
+public record RentabilidadeBenchmarkDto(
+    string Nome,
+    bool Disponivel,
+    decimal RetornoBenchmark,
+    decimal Excesso,
+    decimal Relativo);
+
+// F-B F2 — ilha lazy-loaded de Rentabilidade vs benchmark. TemDados=false → ilha vazia (sem série/posição).
+//  - Twr/TwrAnualizado: time-weighted (neutraliza aportes), base de comparação com benchmark.
+//  - Mwr: money-weighted (TIR anualizada), experiência real do investidor.
+//  - RetornoReal: TWR descontado do IPCA do período (IpcaDisponivel diz se foi possível calcular).
+//  - Datas + séries base 100 (carteira/CDI/Ibov acumulados) para o gráfico sobreposto (montado no JS).
+public record FinancasRentabilidadeDto(
+    bool TemDados,
+    int Dias,
+    decimal Twr,
+    decimal TwrAnualizado,
+    decimal Mwr,
+    bool IpcaDisponivel,
+    decimal IpcaAcumulado,
+    decimal RetornoReal,
+    IReadOnlyList<RentabilidadeBenchmarkDto> Benchmarks,
+    IReadOnlyList<string> Datas,
+    IReadOnlyList<decimal> CarteiraBase100,
+    IReadOnlyList<decimal> CdiBase100,
+    IReadOnlyList<decimal> IbovBase100,
+    bool CdiDisponivel,
+    bool IbovDisponivel);

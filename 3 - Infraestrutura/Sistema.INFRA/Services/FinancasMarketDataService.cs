@@ -71,12 +71,10 @@ public class FinancasMarketDataService(
             await _context.SaveChangesAsync(cancellationToken);
     }
 
-    // Cobertura de proventos da B3 (fonte primária): (AssetId × ano-mês de pagamento) com pelo menos
-    // um RendimentoInvestimento de Fonte="B3 Extrato". É o gabarito que suprime os candidatos Brapi.
-    // F-B F2: alimenta a serie dos benchmarks (CDI/IPCA via BCB SGS - publico, sem token; Ibov via SGS 7
-    // ou Brapi opcional). Upsert idempotente por (indice, data) em FinanceiroSerieBenchmark. A PROVA DE
-    // FALHA: cada indice e isolado em try-catch - uma fonte offline loga e nao derruba as demais; nunca
-    // estoura. NAO e chamado no load do dashboard (so o job financas-benchmarks).
+    // F-B F2: alimenta a serie dos benchmarks. CDI/IPCA = BCB SGS (publico, sem token); Ibov = Brapi
+    // ^BVSP (OPCIONAL, exige token). Upsert idempotente por (indice, data) em FinanceiroSerieBenchmark.
+    // A PROVA DE FALHA: cada indice e isolado em try-catch - uma fonte offline loga e nao derruba as
+    // demais; nunca estoura. NAO e chamado no load do dashboard (so o job financas-benchmarks).
     public async Task AtualizarBenchmarksAsync(bool force = false, CancellationToken cancellationToken = default)
     {
         // Janela de ~4 anos cobre o periodo de 1 ano do grafico com folga (e o historico de aportes).
@@ -86,11 +84,65 @@ public class FinancasMarketDataService(
         var algum = false;
         algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Cdi, "12", dataInicial, dataFinal, cancellationToken);
         algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Ipca, "433", dataInicial, dataFinal, cancellationToken);
-        // Ibov e OPCIONAL: tenta o SGS (codigo 7, fechamento). Degrada sem derrubar se a serie nao vier.
-        algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Ibov, "7", dataInicial, dataFinal, cancellationToken);
+        // Ibov e OPCIONAL: o SGS 7 esta descontinuado (404). Usa a Brapi ^BVSP (historico diario) quando
+        // ha token; sem token, degrada (a UI mostra so a carteira + CDI e marca "Ibov indisponivel").
+        algum |= await AtualizarBenchmarkIbovBrapiAsync(dataInicial, cancellationToken);
 
         if (algum)
             await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Ibov via Brapi ^BVSP (range/interval=1d): nivel de fechamento por dia. OPCIONAL — sem token a Brapi
+    // nao devolve o indice; loga e segue (degrade gracioso). A PROVA DE FALHA: try-catch isolado.
+    private async Task<bool> AtualizarBenchmarkIbovBrapiAsync(DateTime inicio, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var token = await _config.ObterTextoAsync("Financas", "MarketData:BrapiToken", null, cancellationToken);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/ibov",
+                    "sem token: Ibovespa indisponivel (benchmark opcional) — configure Financas:MarketData:BrapiToken.");
+                return false;
+            }
+
+            var client = _httpClientFactory.CreateClient("Brapi");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "api/quote/%5EBVSP?range=5y&interval=1d");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/ibov", $"HTTP {(int)response.StatusCode}");
+                return false;
+            }
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
+                return false;
+            if (!results[0].TryGetProperty("historicalDataPrice", out var historical) || historical.ValueKind != JsonValueKind.Array)
+                return false;
+
+            var pontos = new List<(DateTime Data, decimal Valor)>();
+            foreach (var item in historical.EnumerateArray())
+            {
+                var unix = GetDecimal(item, "date");
+                var close = GetDecimal(item, "close");
+                if (unix is null || close is null || close <= 0m)
+                    continue;
+                var data = DateTimeOffset.FromUnixTimeSeconds((long)unix.Value).UtcDateTime.Date;
+                if (data < inicio.Date)
+                    continue;
+                pontos.Add((data, close.Value));
+            }
+
+            return pontos.Count > 0 && await UpsertSerieBenchmarkAsync(IndiceBenchmark.Ibov, "Brapi", pontos, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/ibov", ex.Message);
+            return false;
+        }
     }
 
     // Busca uma serie do BCB SGS e faz upsert por (indice, data). Devolve true se incluiu/atualizou algo.
@@ -184,6 +236,8 @@ public class FinancasMarketDataService(
         return algum;
     }
 
+    // Cobertura de proventos da B3 (fonte primaria): (AssetId x ano-mes de pagamento) com pelo menos
+    // um RendimentoInvestimento de Fonte="B3 Extrato". E o gabarito que suprime os candidatos Brapi.
     private async Task<HashSet<(int AssetId, int AnoMes)>> ObterCoberturaProventosB3Async(CancellationToken cancellationToken)
     {
         var b3 = await _context.RendimentosInvestimento
