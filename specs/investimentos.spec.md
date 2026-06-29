@@ -31,6 +31,12 @@ Importação (notas/Binance/extratos B3), posição/preço médio, proventos, da
 - **F-H Alertas** — entidade `AlertaPreco` + job `financas-alertas` + CRUD + notificação interna (preço com re-arme; provento novo).
 - **Dashboard transparência** — F-K card de proventos · F-L painel de saúde/rastreabilidade + composição do valor + "Posições calculadas vs custódia" · F-M card de reconciliação B3 · F-N proventos por fonte · F-O aviso "cripto parcialmente reconciliado".
 - **Cripto/IR** (`cripto.spec.md` + `ir.spec.md`) — netting fonte única + §11 idempotência (USDT); F2 valoração BRL das pernas; IR cripto exterior (Lei 14.754) + B&D código RFB + IN 1888 + export 8 abas.
+- **F-G (fim)** — tela `/Financas/PesoAlvo`: edição em lote do peso-alvo por ativo-em-carteira (link na ilha de Metas + menu). Fecha o F-G ponta a ponta. *(branch `feat/investimentos-final`)*
+- **F-S Saúde das cotações** — ilha dedicada (`DashboardSaudeCotacoes`): por ativo com posição>0, status (atual/vencida/falhou/sem token/fallback custo/B3Custodia) + provedor/símbolo/última atualização/erro + lacunas 1d/30m, agrupado B3 / cripto / B3Custódia. Lógica pura `ClassificadorSaudeCotacao`.
+- **F-T Calendário de proventos** — ilha (`DashboardCalendarioProventos`): realizado mês×tipo×fonte (B3 Extrato/Brapi/IR/Binance Earn) + faixa "previsto/anunciado" (PaymentDate futuro já persistido).
+- **F-H (fim)** — 3 tipos de alerta novos no `FinancasAlertaService`: cotação vencida/sem fonte (reusa `ClassificadorSaudeCotacao`), ativo posição>0 sem carteira, divergência calculado×custódia (reusa o nº do card F-M); dedup/re-arme por marcador `AlertaConfiabilidade`; config `Alertas:DivergenciaValorLimiar`/`:DivergenciaPctLimiar`.
+- **F-Q (1ª fatia)** — "Explique este valor" em **Posições + Patrimônio**: modal mostra qtd, PM, preço usado, fonte do preço/fallback (reusa `ClassificadorSaudeCotacao`), resultado, ajuste de reconciliação (`VARIACAO`) + deep-link p/ transações do ticker. Mecanismo reutilizável (`MontadorExplicacaoValor` puro). **Falta: Carteiras + Proventos.**
+- **Fix proventos — dupla contagem B3+Brapi** — a precedência "B3 manda" agora vale também p/ proventos: Brapi suprimida onde `Fonte='B3 Extrato'` cobre o ativo×mês de pagamento; limpeza self-healing dos duplicados históricos (soft-delete). Inflava ~+R$1,6k (2023)/+R$0,9k (2024)/+R$1,2k (2025).
 
 **Mapa de classificação de carteiras** (referência; semeado, editável na tela):
 | Topo | Sub | Ativos |
@@ -44,17 +50,17 @@ Fallback p/ ativos novos: FII com "RECEBÍVEIS/CRI/SECURITIES"→Papel senão Ti
 
 ## 🔲 Falta para TERMINAR Investimentos
 
+> Atualizado (jun/2026, branch `feat/investimentos-final`): **F-G(fim), F-S, F-T, F-H(fim) e F-Q(1ª fatia) entregues** (ver ✅ Concluído) + fix da dupla contagem de proventos.
+
 **Prioridade alta**
 1. **F-B F2 · Rentabilidade vs benchmark (UI).** Motor pronto (`CalculadoraRentabilidade`, TWR/MWR/TIR). Falta: alimentar a série diária (valor + fluxo) de `CriarEvolucaoPatrimonio`, **buscar CDI/Ibov/IPCA** (BCB SGS / Brapi) e expor no gráfico/UI (excesso vs índice + rentabilidade real descontando IPCA). ⚠️ mexe em market-data.
 2. **F-F · Baldes Trade/Rendimentos (cripto).** Separar a posição em balde **Trade** (PM limpo) e **Rendimentos** (earn, custo = mercado na data); total = soma dos baldes. `cripto.spec.md §6`. ⚠️ mexe no netting.
-3. **F-Q · "Explique este valor".** Todo número relevante do dashboard abre sua composição/fonte (qtd, PM, preço usado, fonte do preço — Brapi/Binance/B3Custodia/custo —, fallback, transações, ajustes de reconciliação). Sem recalcular na UI (usa os read models). Aplicar 1º em Patrimônio, Carteiras, Posições, Proventos.
-4. **F-R · Reconciliação cripto por snapshot.** Equivalente ao da B3: importar/cadastrar saldo real por moeda/data (Spot/Earn/Funding/staking), comparar com `FinanceiroPosicaoAtivo`, status (bate/falta/sobra/sem cotação/sem ativo), ajuste auditável (não apaga histórico). Remove o aviso "parcialmente reconciliado".
+3. **F-R · Reconciliação cripto por snapshot.** Equivalente ao da B3: importar/cadastrar saldo real por moeda/data (Spot/Earn/Funding/staking), comparar com `FinanceiroPosicaoAtivo`, status (bate/falta/sobra/sem cotação/sem ativo), ajuste auditável (não apaga histórico). Remove o aviso "parcialmente reconciliado". ⚠️ depende de o Rafael fornecer o snapshot de saldos.
+4. **F-Q (resto) · "Explique este valor" em Carteiras + Proventos.** A 1ª fatia (Posições + Patrimônio) já foi. Reaplicar o mesmo mecanismo (`MontadorExplicacaoValor`/modal) às ilhas de Carteiras e de Proventos.
 
-**Prioridade média**
-5. **F-S · Saúde das cotações.** Painel dedicado: por ativo com posição>0, status (atual/vencida/falhou/sem token/fallback custo/B3Custodia), última atualização, provedor, símbolo, erro; lacunas do `1d`/`30m`. Separar B3 / cripto / B3Custodia.
-6. **F-T · Calendário de proventos.** Realizado (`FinanceiroRendimento` por fonte: B3 Extrato/Brapi/IR/Binance Earn) × previsto/anunciado (Brapi data-com/pagamento), por mês e por tipo (Dividendo/JCP/Rendimento FII/Earn/Airdrop).
-7. **Tela de edição do `PesoAlvo`** (CRUD por ativo-em-carteira) — fecha o F-G ponta a ponta.
-8. **Tipos de alerta restantes (F-H):** cotação vencida/sem fonte; ativo com posição>0 sem carteira; divergência calculado×custódia (há card, falta virar alerta).
+**Proventos — pendência de dado (não é bug de código)**
+- **Nov/2025 (~R$660) faltava** porque o extrato `relatorio-consolidado-mensal-2025-novembro.xlsx` não estava em `arquivos/b3/`. **Arquivo já fornecido** → materializa no próximo start do app (resync). Conferir após reimport.
+- A **dupla contagem B3+Brapi** já foi corrigida (precedência + limpeza self-healing); a limpeza roda no `AtualizarProventosAsync`. Validar os totais anuais batendo com os reais (2023 R$6.053 / 2024 R$7.267 / 2025 R$8.381) após o job rodar.
 
 **Pendências menores**
 - **Troca de ticker / incorporação** (ex.: TAEE3→TAEE4) — fora do split.
