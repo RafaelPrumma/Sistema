@@ -27,6 +27,9 @@ public interface IFinancasRepository
     // F-V: agregados oficiais anuais de proventos do relatório anual da B3 (verdade do ano p/ reconciliação).
     Task<IReadOnlyList<ProventoAnualB3>> BuscarProventosAnuaisB3Async(CancellationToken cancellationToken = default);
 
+    // F-B F2: série temporal dos benchmarks (CDI/IPCA/Ibov) desde a data informada, p/ acumular no período.
+    Task<IReadOnlyList<SerieBenchmark>> BuscarSeriesBenchmarkAsync(DateTime inicio, CancellationToken cancellationToken = default);
+
     // Proventos (dividendos/JCP/rendimentos), independentes de carga — incluem os buscados na Brapi.
     Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);

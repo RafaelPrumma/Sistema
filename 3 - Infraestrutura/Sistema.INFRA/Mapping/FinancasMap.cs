@@ -409,3 +409,19 @@ public class AlertaPrecoMap : IEntityTypeConfiguration<AlertaPreco>
         builder.HasOne(x => x.AtivoFinanceiro).WithMany().HasForeignKey(x => x.AtivoFinanceiroId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class SerieBenchmarkMap : IEntityTypeConfiguration<SerieBenchmark>
+{
+    public void Configure(EntityTypeBuilder<SerieBenchmark> builder)
+    {
+        builder.ToTable("FinanceiroSerieBenchmark");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Fonte).HasMaxLength(40);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(60);
+        builder.Property(x => x.Valor).HasPrecision(28, 12);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.HasIndex(x => new { x.Indice, x.Date });
+        // Índice único filtrado: o upsert por (índice, data) é idempotente — rodar o job diário não duplica.
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+    }
+}

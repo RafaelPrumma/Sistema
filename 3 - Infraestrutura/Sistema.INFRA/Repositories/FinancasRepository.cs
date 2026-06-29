@@ -155,6 +155,13 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .OrderByDescending(x => x.Year)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<SerieBenchmark>> BuscarSeriesBenchmarkAsync(DateTime inicio, CancellationToken cancellationToken = default)
+        => await _context.SeriesBenchmark
+            .AsNoTracking()
+            .Where(x => x.Date >= inicio)
+            .OrderBy(x => x.Date)
+            .ToListAsync(cancellationToken);
+
     public async Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
     {
         var query = _context.RendimentosInvestimento.AsNoTracking().Include(x => x.Asset).AsQueryable();

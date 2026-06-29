@@ -140,6 +140,13 @@ using (var scope = app.Services.CreateScope())
                 s => s.AtualizarEventosCorporativosAsync(false, CancellationToken.None),
                 Cron.Daily());
 
+            // F-B F2: benchmarks (CDI/IPCA via BCB SGS público; Ibov opcional). Mudam pouco (CDI diário,
+            // IPCA mensal): busca diária + upsert idempotente. À prova de falha — fonte offline não derruba.
+            RecurringJob.AddOrUpdate<IFinancasMarketDataService>(
+                "financas-benchmarks",
+                s => s.AtualizarBenchmarksAsync(false, CancellationToken.None),
+                Cron.Daily());
+
             // F-H: alertas de preço/provento. Roda junto da coleta de cotações (mesmo cron) para reagir
             // logo após o preço atualizar; à prova de falha (try-catch por regra), notifica via Mensagens.
             RecurringJob.AddOrUpdate<IFinancasAlertaService>(
@@ -153,6 +160,7 @@ using (var scope = app.Services.CreateScope())
             RecurringJob.RemoveIfExists("financas-historico-consolidacao");
             RecurringJob.RemoveIfExists("financas-proventos");
             RecurringJob.RemoveIfExists("financas-eventos-corporativos");
+            RecurringJob.RemoveIfExists("financas-benchmarks");
             RecurringJob.RemoveIfExists("financas-alertas");
         }
     }

@@ -73,6 +73,117 @@ public class FinancasMarketDataService(
 
     // Cobertura de proventos da B3 (fonte primária): (AssetId × ano-mês de pagamento) com pelo menos
     // um RendimentoInvestimento de Fonte="B3 Extrato". É o gabarito que suprime os candidatos Brapi.
+    // F-B F2: alimenta a serie dos benchmarks (CDI/IPCA via BCB SGS - publico, sem token; Ibov via SGS 7
+    // ou Brapi opcional). Upsert idempotente por (indice, data) em FinanceiroSerieBenchmark. A PROVA DE
+    // FALHA: cada indice e isolado em try-catch - uma fonte offline loga e nao derruba as demais; nunca
+    // estoura. NAO e chamado no load do dashboard (so o job financas-benchmarks).
+    public async Task AtualizarBenchmarksAsync(bool force = false, CancellationToken cancellationToken = default)
+    {
+        // Janela de ~4 anos cobre o periodo de 1 ano do grafico com folga (e o historico de aportes).
+        var dataInicial = DateTime.UtcNow.Date.AddYears(-4);
+        var dataFinal = DateTime.UtcNow.Date;
+
+        var algum = false;
+        algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Cdi, "12", dataInicial, dataFinal, cancellationToken);
+        algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Ipca, "433", dataInicial, dataFinal, cancellationToken);
+        // Ibov e OPCIONAL: tenta o SGS (codigo 7, fechamento). Degrada sem derrubar se a serie nao vier.
+        algum |= await AtualizarBenchmarkSgsAsync(IndiceBenchmark.Ibov, "7", dataInicial, dataFinal, cancellationToken);
+
+        if (algum)
+            await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Busca uma serie do BCB SGS e faz upsert por (indice, data). Devolve true se incluiu/atualizou algo.
+    // A PROVA DE FALHA: try-catch que loga e segue (retorna false); nao chama SaveChanges (o chamador faz).
+    private async Task<bool> AtualizarBenchmarkSgsAsync(IndiceBenchmark indice, string codigoSgs, DateTime inicio, DateTime fim, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("Bcb");
+            var url = $"dados/serie/bcdata.sgs.{codigoSgs}/dados?formato=json" +
+                $"&dataInicial={inicio:dd/MM/yyyy}&dataFinal={fim:dd/MM/yyyy}";
+
+            using var response = await client.GetAsync(url, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, $"BCB/{indice}", $"HTTP {(int)response.StatusCode}");
+                return false;
+            }
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, $"BCB/{indice}", "resposta nao e uma lista JSON.");
+                return false;
+            }
+
+            var crus = new List<(string? Data, string? Valor)>();
+            foreach (var item in doc.RootElement.EnumerateArray())
+                crus.Add((GetString(item, "data"), GetString(item, "valor")));
+
+            var pontos = BenchmarkSgsParser.ParseMuitos(crus);
+            if (pontos.Count == 0)
+            {
+                FinancasMarketDataLogMessages.FalhaCotacao(_logger, $"BCB/{indice}", "serie vazia ou ilegivel.");
+                return false;
+            }
+
+            return await UpsertSerieBenchmarkAsync(indice, "BCB SGS", pontos.Select(p => (p.Data, p.Valor)), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, $"BCB/{indice}", ex.Message);
+            return false;
+        }
+    }
+
+    // Upsert idempotente da serie de um indice por (indice, data). Carrega os pontos ja existentes do
+    // periodo num unico query e atualiza/insere em memoria; nao chama SaveChanges (o chamador faz o flush).
+    private async Task<bool> UpsertSerieBenchmarkAsync(IndiceBenchmark indice, string fonte, IEnumerable<(DateTime Data, decimal Valor)> pontos, CancellationToken cancellationToken)
+    {
+        var lista = pontos.ToList();
+        if (lista.Count == 0)
+            return false;
+
+        var inicio = lista.Min(p => p.Data);
+        var fim = lista.Max(p => p.Data);
+        var existentes = (await _context.SeriesBenchmark
+                .Where(x => x.Indice == indice && x.Date >= inicio && x.Date <= fim)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(x => x.Date.Date);
+
+        var algum = false;
+        foreach (var (data, valor) in lista)
+        {
+            if (existentes.TryGetValue(data.Date, out var atual))
+            {
+                if (atual.Valor != valor)
+                {
+                    atual.Valor = valor;
+                    atual.Fonte = fonte;
+                    algum = true;
+                }
+                continue;
+            }
+
+            var novo = new SerieBenchmark
+            {
+                Indice = indice,
+                Date = DateTime.SpecifyKind(data.Date, DateTimeKind.Utc),
+                Valor = valor,
+                Fonte = fonte,
+                ChaveNatural = SerieBenchmark.GerarChaveNatural(indice, data),
+                RawJson = "{}",
+                UsuarioInclusao = UsuarioSistema
+            };
+            existentes[data.Date] = novo;
+            _context.SeriesBenchmark.Add(novo);
+            algum = true;
+        }
+
+        return algum;
+    }
+
     private async Task<HashSet<(int AssetId, int AnoMes)>> ObterCoberturaProventosB3Async(CancellationToken cancellationToken)
     {
         var b3 = await _context.RendimentosInvestimento

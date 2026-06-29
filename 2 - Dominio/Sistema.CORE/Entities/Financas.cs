@@ -583,3 +583,37 @@ public class AlertaPreco : AuditableEntity
     public DateTime? DispararadoEm { get; set; }
     public decimal? UltimoPreco { get; set; }
 }
+
+// Índice de benchmark cuja série temporal alimenta a comparação de rentabilidade (F-B F2).
+//  Cdi  = taxa diária em % a.d. (BCB SGS 12) — acumula por produtório dos dias úteis no período.
+//  Ipca = taxa mensal em % a.m. (BCB SGS 433) — acumula por produtório dos meses no período.
+//  Ibov = nível de fechamento do índice (BCB SGS 7 ou Brapi ^BVSP) — acumula por fim/início − 1.
+public enum IndiceBenchmark
+{
+    Cdi = 1,
+    Ipca = 2,
+    Ibov = 3
+}
+
+// Ponto da série temporal de um benchmark (CDI/IPCA/Ibovespa), populado pelo job financas-benchmarks
+// a partir do BCB SGS (público, sem token) e da Brapi (Ibov, opcional). NÃO reusa
+// FinanceiroPrecoHistoricoAtivo de propósito: um índice não é um "ativo" da carteira (não tem posição,
+// saúde de cotação, etc.). O significado de Valor depende do índice (ver IndiceBenchmark). A ChaveNatural
+// (indice|data) torna o upsert idempotente: rodar o job todo dia não duplica o ponto.
+public class SerieBenchmark : AuditableEntity
+{
+    public int Id { get; set; }
+    public IndiceBenchmark Indice { get; set; }
+    // Data do ponto (UTC, sem hora). Para o IPCA mensal, o 1º dia do mês de referência.
+    public DateTime Date { get; set; }
+    // Significado por índice: CDI = % a.d.; IPCA = % a.m.; Ibov = nível do índice (pontos).
+    public decimal Valor { get; set; }
+    public string Fonte { get; set; } = string.Empty;
+    // Chave natural (indice|data) — índice único filtrado, idempotência do upsert.
+    public string? ChaveNatural { get; set; }
+    public string RawJson { get; set; } = "{}";
+
+    /// <summary>Chave natural canônica do ponto da série: indice|data (yyyyMMdd).</summary>
+    public static string GerarChaveNatural(IndiceBenchmark indice, DateTime data)
+        => $"{indice}|{data:yyyyMMdd}";
+}
