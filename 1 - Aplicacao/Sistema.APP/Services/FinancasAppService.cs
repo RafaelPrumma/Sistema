@@ -985,6 +985,75 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
     private static FinancasCalendarioProventosDashboardDto CalendarioProventosVazio()
         => new(false, [], [], [], 0m, 0m, false);
 
+    // F-V — reconciliação ANUAL de proventos: confronta o agregado OFICIAL do relatório anual da B3
+    // (ProventoAnualB3, total do ano por ticker×tipo, sem datas) contra o que foi MATERIALIZADO (soma
+    // dos RendimentoInvestimento daquele ano), por ticker×tipo e no total do ano. Base = valor líquido
+    // (oficial já é líquido; materializado = Amount - TaxWithheld = ValorLiquido). À prova de falha:
+    // erro aqui devolve DTO vazio e nunca derruba o dashboard.
+    public async Task<FinancasReconciliacaoProventosAnualDto> ObterReconciliacaoProventosAnualDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var oficiaisRaw = await _uow.Financas.BuscarProventosAnuaisB3Async(cancellationToken);
+            if (oficiaisRaw.Count == 0)
+                return ReconciliacaoProventosAnualVazio();
+
+            // Janela de comparação = os anos que o relatório anual cobre (não busca além do necessário).
+            var anos = oficiaisRaw.Select(o => o.Year).ToHashSet();
+            var minAno = anos.Min();
+            var maxAno = anos.Max();
+            var materializadosRaw = await _uow.Financas.BuscarProventosPorPeriodoAsync(
+                new DateTime(minAno, 1, 1), new DateTime(maxAno, 12, 31), cancellationToken);
+
+            var oficiais = oficiaisRaw
+                .Select(o => new ReconciliadorProventosAnuais.OficialAnual(
+                    o.Year,
+                    o.Asset?.Sigla ?? o.Asset?.Chave ?? string.Empty,
+                    o.Tipo,
+                    o.ValorLiquido))
+                .ToList();
+
+            var materializados = materializadosRaw
+                .Where(m => m.PaymentDate.HasValue && anos.Contains(m.PaymentDate.Value.Year))
+                .Select(m => new ReconciliadorProventosAnuais.MaterializadoAnual(
+                    m.PaymentDate!.Value.Year,
+                    m.Asset?.Sigla ?? m.Asset?.Chave,
+                    NormalizarTipoProventoReconciliacao(m.IncomeType),
+                    ValorLiquido(m)))
+                .ToList();
+
+            return ReconciliadorProventosAnuais.Reconciliar(oficiais, materializados);
+        }
+        catch
+        {
+            return ReconciliacaoProventosAnualVazio();
+        }
+    }
+
+    // Normaliza o IncomeType cru do materializado para o MESMO vocabulário do oficial anual
+    // (Dividendo/JCP/Rendimento/Amortização), para casar as linhas por tipo. Espelha o MapTipoProvento
+    // do importador B3; tipos não reconhecidos viram "Outro" (não casam com o oficial → ficam visíveis).
+    private static string NormalizarTipoProventoReconciliacao(string? incomeType)
+    {
+        var texto = (incomeType ?? string.Empty).Trim().ToUpperInvariant();
+        if (texto.Length == 0)
+            return "Outro";
+        if (texto.Contains("JCP") || texto.Contains("JUROS") || texto.Contains("CAPITAL PR"))
+            return "JCP";
+        if (texto.Contains("AMORTIZA"))
+            return "Amortização";
+        if (texto.Contains("DIVIDENDO"))
+            return "Dividendo";
+        // "Rendimento" (FII) e "Rendimento (Earn)" — o anual da B3 não traz earn cripto, então o que
+        // casar com o oficial é o rendimento de FII; earn fica como "Rendimento" e some no diff (sem oficial).
+        if (texto.Contains("RENDIMENTO"))
+            return "Rendimento";
+        return "Outro";
+    }
+
+    private static FinancasReconciliacaoProventosAnualDto ReconciliacaoProventosAnualVazio()
+        => new(false, 0m, 0m, false, []);
+
     // Contrato com o ReconciliadorPosicaoB3 (camada INFRA, fora do alcance do APP): as transações de
     // ajuste têm Fonte="Reconciliação" e a contrapartida cai no ativo virtual AssetKey="VARIACAO".
     // Mantidos como literais aqui porque sobrevivem ao resync (são o "contrato" da feature).

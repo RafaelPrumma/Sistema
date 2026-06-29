@@ -21,6 +21,7 @@
     proventos: document.getElementById('financeProventosIsland'),
     calendarioProventos: document.getElementById('financeCalendarioProventosIsland'),
     reconciliacao: document.getElementById('financeReconciliacaoIsland'),
+    reconciliacaoProventos: document.getElementById('financeReconciliacaoProventosIsland'),
     saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland')
   };
 
@@ -603,6 +604,7 @@
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
       loadPartial(islands.metas, dashboard.dataset.metasUrl),
       loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
+      loadPartial(islands.reconciliacaoProventos, dashboard.dataset.reconciliacaoProventosUrl),
       loadPartial(islands.saudeCotacoes, dashboard.dataset.saudeCotacoesUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),

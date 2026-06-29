@@ -82,6 +82,10 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardReconciliacao(CancellationToken cancellationToken)
         => PartialView("_DashboardReconciliacao", await _service.ObterReconciliacaoDashboardAsync(cancellationToken));
 
+    [HttpGet("/Financas/Dashboard/ReconciliacaoProventos")]
+    public async Task<IActionResult> DashboardReconciliacaoProventos(CancellationToken cancellationToken)
+        => PartialView("_DashboardReconciliacaoProventos", await _service.ObterReconciliacaoProventosAnualDashboardAsync(cancellationToken));
+
     [HttpGet("/Financas/Dashboard/SaudeCotacoes")]
     public async Task<IActionResult> DashboardSaudeCotacoes(CancellationToken cancellationToken)
         => PartialView("_DashboardSaudeCotacoes", await _service.ObterSaudeCotacoesDashboardAsync(cancellationToken));

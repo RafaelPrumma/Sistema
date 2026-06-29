@@ -146,6 +146,15 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .ToListAsync(cancellationToken);
     }
 
+    // F-V: agregados oficiais anuais (ProventoAnualB3) com o ativo, p/ a reconciliação anual de proventos.
+    // Independente de carga (o anual é a verdade oficial do ano — não filtra por carga corrente).
+    public async Task<IReadOnlyList<ProventoAnualB3>> BuscarProventosAnuaisB3Async(CancellationToken cancellationToken = default)
+        => await _context.ProventosAnuaisB3
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .OrderByDescending(x => x.Year)
+            .ToListAsync(cancellationToken);
+
     public async Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
     {
         var query = _context.RendimentosInvestimento.AsNoTracking().Include(x => x.Asset).AsQueryable();

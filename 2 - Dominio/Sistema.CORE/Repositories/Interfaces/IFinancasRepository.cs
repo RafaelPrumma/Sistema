@@ -24,6 +24,9 @@ public interface IFinancasRepository
     Task<IReadOnlyList<AgregadoFinanceiro>> BuscarAgregadosAsync(string dimensao, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarRendimentosAsync(CancellationToken cancellationToken = default);
 
+    // F-V: agregados oficiais anuais de proventos do relatório anual da B3 (verdade do ano p/ reconciliação).
+    Task<IReadOnlyList<ProventoAnualB3>> BuscarProventosAnuaisB3Async(CancellationToken cancellationToken = default);
+
     // Proventos (dividendos/JCP/rendimentos), independentes de carga — incluem os buscados na Brapi.
     Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);

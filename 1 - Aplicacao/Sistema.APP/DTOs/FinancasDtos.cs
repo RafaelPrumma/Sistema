@@ -689,3 +689,32 @@ public class FinancasDashboardDto
     public string? DashboardJson { get; set; }
     public IReadOnlyList<ProventoMensalDto> ProventosMensais { get; set; } = [];
 }
+
+// F-V: reconciliação ANUAL de proventos — oficial (relatório anual da B3, ProventoAnualB3) × materializado
+// (soma dos RendimentoInvestimento do ano), por ticker×tipo. Status calculado pelo ReconciliadorProventosAnuais
+// (lógica pura). Base = valor líquido (oficial já é líquido; materializado = Amount - TaxWithheld).
+public record ReconciliacaoProventoLinhaDto(
+    string Ticker,
+    string Tipo,                 // Dividendo / JCP / Rendimento / Amortização
+    decimal Oficial,             // total líquido do ano na planilha anual da B3
+    decimal Materializado,       // soma líquida materializada (B3 Extrato + Brapi + IR) no mesmo ano×ticker×tipo
+    decimal Diferenca,           // Materializado - Oficial (negativo = falta materializar)
+    string Status);              // Bate / Falta materializado / Sobra materializado / Sem ativo
+
+// F-V: um ano da reconciliação, com os totais do ano e as linhas por ticker×tipo.
+public record ReconciliacaoProventoAnoDto(
+    int Ano,
+    decimal TotalOficial,
+    decimal TotalMaterializado,
+    decimal Diferenca,
+    string Status,               // status do TOTAL do ano (mesma régua de tolerância das linhas)
+    int LinhasDivergentes,       // quantas linhas do ano não batem (para o resumo/badge)
+    IReadOnlyList<ReconciliacaoProventoLinhaDto> Linhas);
+
+// F-V: ilha lazy-loaded da reconciliação anual de proventos. TemDados=false → ilha vazia (sem anual importado).
+public record FinancasReconciliacaoProventosAnualDto(
+    bool TemDados,
+    decimal TotalOficial,
+    decimal TotalMaterializado,
+    bool TemDivergencia,
+    IReadOnlyList<ReconciliacaoProventoAnoDto> Anos);

@@ -1,0 +1,122 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasReconciliacaoProventosAnualDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Money(decimal value) => value.ToString("C2", br);
+
+    // Cor do badge por status da reconciliação anual de proventos.
+    string BadgeStatus(string status) => status switch
+    {
+        "Bate" => "text-bg-success",
+        "Falta materializado" => "text-bg-danger",
+        "Sobra materializado" => "text-bg-warning",
+        "Sem ativo" => "text-bg-secondary",
+        _ => "text-bg-secondary"
+    };
+}
+
+@* F-V: a reconciliação anual só aparece quando há relatório ANUAL importado (ProventoAnualB3). Sem dados, a ilha some. *@
+@if (Model.TemDados)
+{
+    <div class="card h-100" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-clipboard-check me-1"></i>Reconciliação anual de proventos (B3)</h6>
+                @if (Model.TemDivergencia)
+                {
+                    <span class="badge text-bg-warning" title="Há anos/ativos cujo materializado não bate com o oficial">divergências</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-success" title="Todos os anos batem com o oficial dentro da tolerância">tudo bate</span>
+                }
+            </div>
+
+            <p class="small text-secondary mb-3">
+                Confronta o total <strong>oficial</strong> do relatório <strong>anual</strong> da B3 (por ticker × tipo, sem datas)
+                com o que foi <strong>materializado</strong> (soma dos proventos do ano). Base = <strong>valor líquido</strong>
+                (o materializado usa <code>Valor − IR retido</code>; pequenas diferenças gross×net da Brapi são esperadas —
+                o objetivo é achar buracos grandes, como um mês faltando ou dupla contagem).
+            </p>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Oficial (anual B3)</div>
+                        <div class="fs-5 fw-semibold">@Money(Model.TotalOficial)</div>
+                        <div class="small text-secondary">soma de todos os anos</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Materializado</div>
+                        <div class="fs-5 fw-semibold">@Money(Model.TotalMaterializado)</div>
+                        <div class="small text-secondary">no mesmo período</div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Diferença</div>
+                        @{ var diffGlobal = Model.TotalMaterializado - Model.TotalOficial; }
+                        <div class="fs-5 fw-semibold @(Math.Abs(diffGlobal) < 1m ? "" : diffGlobal < 0 ? "text-danger" : "text-warning")">
+                            @(diffGlobal >= 0 ? "+" : "")@Money(diffGlobal)
+                        </div>
+                        <div class="small text-secondary">materializado − oficial</div>
+                    </div>
+                </div>
+            </div>
+
+            @foreach (var ano in Model.Anos)
+            {
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="fw-semibold">
+                            @ano.Ano
+                            <span class="badge @BadgeStatus(ano.Status) ms-1">@ano.Status</span>
+                            @if (ano.LinhasDivergentes > 0)
+                            {
+                                <span class="small text-secondary ms-1">@ano.LinhasDivergentes linha(s) divergente(s)</span>
+                            }
+                        </div>
+                        <div class="small text-secondary">
+                            Oficial @Money(ano.TotalOficial) · Materializado @Money(ano.TotalMaterializado) ·
+                            <span class="@(Math.Abs(ano.Diferenca) < 1m ? "" : ano.Diferenca < 0 ? "text-danger" : "text-warning")">
+                                @(ano.Diferenca >= 0 ? "+" : "")@Money(ano.Diferenca)
+                            </span>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Ativo</th>
+                                    <th scope="col">Tipo</th>
+                                    <th scope="col" class="text-end">Oficial</th>
+                                    <th scope="col" class="text-end">Materializado</th>
+                                    <th scope="col" class="text-end">Diferença</th>
+                                    <th scope="col" class="text-end">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var linha in ano.Linhas)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@linha.Ticker</td>
+                                    <td class="small text-secondary">@linha.Tipo</td>
+                                    <td class="text-end">@Money(linha.Oficial)</td>
+                                    <td class="text-end">@Money(linha.Materializado)</td>
+                                    <td class="text-end @(linha.Status == "Bate" ? "text-secondary" : linha.Diferenca < 0 ? "text-danger" : "text-warning")">
+                                        @(linha.Diferenca >= 0 ? "+" : "")@Money(linha.Diferenca)
+                                    </td>
+                                    <td class="text-end"><span class="badge @BadgeStatus(linha.Status)">@linha.Status</span></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
