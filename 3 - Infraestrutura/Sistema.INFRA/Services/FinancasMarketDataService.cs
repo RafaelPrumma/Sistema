@@ -60,10 +60,68 @@ public class FinancasMarketDataService(
 
     public async Task AtualizarProventosAsync(bool force = false, CancellationToken cancellationToken = default)
     {
+        // Self-healing: remove (soft-delete) os proventos Brapi que duplicam a cobertura B3 já gravada
+        // antes de buscar de novo. À prova de falha — se a limpeza falhar, loga e segue (não pode
+        // derrubar o job/load do dashboard). Roda primeiro para a busca abaixo já partir do estado limpo.
+        await LimparProventosBrapiDuplicadosB3Async(cancellationToken);
+
         var algumGravado = await AtualizarProventosB3Async(cancellationToken);
         algumGravado |= await AtualizarProventosCriptoEarnAsync(cancellationToken);
         if (algumGravado)
             await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Cobertura de proventos da B3 (fonte primária): (AssetId × ano-mês de pagamento) com pelo menos
+    // um RendimentoInvestimento de Fonte="B3 Extrato". É o gabarito que suprime os candidatos Brapi.
+    private async Task<HashSet<(int AssetId, int AnoMes)>> ObterCoberturaProventosB3Async(CancellationToken cancellationToken)
+    {
+        var b3 = await _context.RendimentosInvestimento
+            .Where(x => x.Fonte == ExtratoB3Materializador.Fonte && x.AssetId != null)
+            .Select(x => new { AssetId = x.AssetId!.Value, x.PaymentDate, x.ReferenceDate })
+            .ToListAsync(cancellationToken);
+
+        var cobertura = new HashSet<(int AssetId, int AnoMes)>();
+        foreach (var p in b3)
+        {
+            var anoMes = ExtratoB3Materializador.AnoMesPagamento(p.PaymentDate, p.ReferenceDate);
+            if (anoMes is int am)
+                cobertura.Add((p.AssetId, am));
+        }
+
+        return cobertura;
+    }
+
+    // Self-healing dos duplicados históricos (purga + regenera, no espírito de AtualizarProventosCriptoEarnAsync):
+    // remove os proventos Fonte="Brapi" que são duplicata de cobertura da B3 (mesmo AssetId, mesmo ano-mês de
+    // pagamento). NÃO remove proventos B3, nem Brapi de ativo×mês que a B3 não cubra (fallback legítimo).
+    // À PROVA DE FALHA: try-catch que loga e segue. Idempotente: rodar 2× não muda o resultado.
+    private async Task LimparProventosBrapiDuplicadosB3Async(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var cobertura = await ObterCoberturaProventosB3Async(cancellationToken);
+            if (cobertura.Count == 0)
+                return; // sem cobertura B3 não há o que suprimir.
+
+            var brapi = await _context.RendimentosInvestimento
+                .Where(x => x.Fonte == "Brapi" && x.AssetId != null)
+                .ToListAsync(cancellationToken);
+
+            var duplicados = brapi
+                .Where(x => ExtratoB3Materializador.AnoMesPagamento(x.PaymentDate, x.ReferenceDate) is int am
+                    && ExtratoB3Materializador.DeveSuprimirProventoBrapi(x.AssetId, am, cobertura))
+                .ToList();
+            if (duplicados.Count == 0)
+                return;
+
+            // Remove → soft-delete (o SaveChanges converte Deleted em DataExclusao + filtro global oculta).
+            _context.RendimentosInvestimento.RemoveRange(duplicados);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            FinancasMarketDataLogMessages.FalhaCotacao(_logger, "Brapi/proventos-limpeza", ex.Message);
+        }
     }
 
     // Busca desdobramentos/grupamentos na Brapi (dividendsData.stockDividends) e faz upsert idempotente
@@ -209,6 +267,10 @@ public class FinancasMarketDataService(
         var limiteInferior = DateTime.UtcNow.Date.AddYears(-3);
         var algumGravado = false;
 
+        // Precedência "B3 manda" (§3.1) aplicada aos PROVENTOS: a Brapi é fallback. Onde a B3 já cobre
+        // o ativo×ano-mês de pagamento, o candidato Brapi é suprimido (evita contar o provento em dobro).
+        var coberturaB3 = await ObterCoberturaProventosB3Async(cancellationToken);
+
         foreach (var (assetId, dados) in emCarteira)
         {
             var symbol = ResolverTickerB3(dados.Asset);
@@ -252,6 +314,13 @@ public class FinancasMarketDataService(
                     var qtd = QtdEm(dataCom.Value);
                     if (qtd <= 0.000000001m)
                         continue; // não detinha o ativo na data-com → não recebeu.
+
+                    // Fallback: se a B3 (fonte primária) já cobre este ativo×ano-mês de pagamento, não
+                    // grava o candidato Brapi (senão o mesmo provento entraria 2× — bug histórico).
+                    // PaymentDate sempre presente aqui (filtro acima); fallback no dataCom por consistência.
+                    var anoMesPagamento = ExtratoB3Materializador.AnoMesPagamento(pagamento.Value.Date, dataCom.Value.Date);
+                    if (anoMesPagamento is int am && ExtratoB3Materializador.DeveSuprimirProventoBrapi(assetId, am, coberturaB3))
+                        continue;
 
                     var label = (GetString(ev, "label") ?? GetString(ev, "relatedTo") ?? "Provento").Trim();
                     var bruto = Math.Round(qtd * rate, 2);

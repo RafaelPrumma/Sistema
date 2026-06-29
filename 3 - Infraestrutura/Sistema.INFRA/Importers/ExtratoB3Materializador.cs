@@ -28,6 +28,32 @@ public static class ExtratoB3Materializador
     /// <summary>Ano-mês no formato yyyyMM (ex.: 2022/9 → 202209).</summary>
     public static int AnoMes(int ano, int mes) => ano * 100 + mes;
 
+    /// <summary>
+    /// Precedência de PROVENTOS (mesma regra "B3 manda" das Negociações, §3.1): a fonte
+    /// <see cref="Fonte"/> (extrato consolidado mensal, custódia oficial) é primária; a Brapi
+    /// (estimada por ticker) é apenas FALLBACK. Um provento candidato da Brapi deve ser
+    /// SUPRIMIDO se a B3 já cobre o mesmo ativo no mesmo ano-mês de pagamento.
+    /// </summary>
+    /// <param name="assetId">
+    /// AssetId do candidato Brapi. Null = não dá pra casar com a cobertura → NÃO suprime
+    /// (não dá pra afirmar que a B3 cobre; mantém como fallback).
+    /// </param>
+    /// <param name="anoMesPagamento">
+    /// Ano-mês de pagamento do candidato (yyyyMM). Quando o PaymentDate da Brapi for nulo, o
+    /// chamador deriva o mês do ReferenceDate (data-com) — documentado no caminho de inserção.
+    /// </param>
+    /// <param name="cobertosPorB3">Conjunto (AssetId × ano-mês de pagamento) com provento da B3.</param>
+    /// <returns>true = suprimir o candidato Brapi (a B3 manda nesse ativo×mês).</returns>
+    public static bool DeveSuprimirProventoBrapi(int? assetId, int anoMesPagamento, ISet<(int AssetId, int AnoMes)> cobertosPorB3)
+        => assetId is int id && cobertosPorB3.Contains((id, anoMesPagamento));
+
+    /// <summary>Ano-mês (yyyyMM) de uma data; usa PaymentDate, com fallback no ReferenceDate (data-com).</summary>
+    public static int? AnoMesPagamento(DateTime? pagamento, DateTime? referencia)
+    {
+        var data = pagamento ?? referencia;
+        return data is null ? null : data.Value.Year * 100 + data.Value.Month;
+    }
+
     /// <summary>Sigla = prefixo antes de " - " no campo Produto (ex.: "BBAS3 - BANCO DO BRASIL S/A").</summary>
     public static string? ExtrairTickerProduto(string? produto)
     {

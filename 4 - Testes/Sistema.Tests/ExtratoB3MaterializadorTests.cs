@@ -43,6 +43,67 @@ public class ExtratoB3MaterializadorTests
         Assert.True(ExtratoB3Materializador.DeveMaterializarNotaB3(1, 2022, 10, cobertosPorB3));
     }
 
+    // --- Precedência "B3 manda" aplicada aos PROVENTOS (Brapi vira fallback) ---
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AtivoMesCobertoPelaB3_Suprime()
+    {
+        // BBAS3 (assetId 1) tem provento B3 em 2024-04 → o candidato Brapi do mesmo ativo×mês é suprimido.
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202404, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AtivoMesNaoCobertoPelaB3_Mantem()
+    {
+        // A B3 cobre BBAS3/2024-04; onde NÃO cobre, a Brapi complementa:
+        // outro ativo no mesmo mês (assetId 2 / 2024-04) e o MESMO ativo em outro mês (1 / 2024-05).
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(2, 202404, cobertura));
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202405, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_MesmoAtivoVariosMeses_SuprimeSoOsCobertos()
+    {
+        // B3 cobre HGLG11 (assetId 7) em jan e mar/2025, mas não fev → só jan e mar são suprimidos.
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (7, 202501), (7, 202503) };
+
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202501, cobertura));
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202502, cobertura));
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202503, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AssetIdNulo_NaoSuprime()
+    {
+        // Sem AssetId não dá pra casar com a cobertura → mantém (não dá pra afirmar que a B3 cobre).
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(null, 202404, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_CoberturaVazia_NuncaSuprime()
+    {
+        var cobertura = new HashSet<(int AssetId, int AnoMes)>();
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202404, cobertura));
+    }
+
+    [Fact]
+    public void AnoMesPagamento_UsaPagamento_ComFallbackNaReferencia()
+    {
+        // Caminho normal: ano-mês vem do PaymentDate.
+        Assert.Equal(202404, ExtratoB3Materializador.AnoMesPagamento(new DateTime(2024, 4, 15), null));
+        // PaymentDate nulo: cai na ReferenceDate (data-com) — documentado no caminho de inserção.
+        Assert.Equal(202403, ExtratoB3Materializador.AnoMesPagamento(null, new DateTime(2024, 3, 20)));
+        // Ambos nulos: não dá pra datar.
+        Assert.Null(ExtratoB3Materializador.AnoMesPagamento(null, null));
+    }
+
     [Fact]
     public void InterpretarNegociacao_LinhaSoCompra_GeraUmaCompra()
     {
