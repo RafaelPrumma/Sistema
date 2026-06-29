@@ -197,8 +197,92 @@ public class ExtratoB3MaterializadorTests
     [InlineData("Dividendo", "Dividendo")]
     [InlineData("Rendimento", "Rendimento")]
     [InlineData("Juros Sobre Capital Próprio", "JCP")]
-    public void MapTipoProvento_ReconheceOsTresTipos(string evento, string esperado)
+    [InlineData("Amortização", "Amortização")]      // aparece no relatório ANUAL (devolução de principal de FII)
+    public void MapTipoProvento_ReconheceOsTipos(string evento, string esperado)
         => Assert.Equal(esperado, ExtratoB3Materializador.MapTipoProvento(evento));
+
+    // --- Parser do relatório ANUAL: aba "Proventos Recebidos" (3 colunas, agregado por ticker×tipo) ---
+
+    [Fact]
+    public void InterpretarProventosAnuais_ParseiaAgregadosEIgnoraTotalEVazias()
+    {
+        // Layout real do anual: Produto | Tipo de Evento | Valor líquido. Agregado do ano (sem datas).
+        // O rodapé tem uma linha vazia, a linha "Total" (label) e o valor do total — todas devem ser ignoradas.
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "BBAS3", "Dividendo", "59.77" },
+            new[] { "BBAS3", "Juros Sobre Capital Próprio", "299.01" },
+            new[] { "AFHI11", "Rendimento", "255.74" },
+            new[] { "BRCR11", "Amortização", "3.8" },
+            new[] { "", "", "" },           // linha em branco
+            new[] { "", "", "Total" },      // label do rodapé
+            new[] { "", "", "7272.27" },    // valor oficial do total (não é um agregado por ativo)
+            new[] { "", "", "" }
+        };
+
+        var agregados = ExtratoB3Materializador.InterpretarProventosAnuais(linhas);
+
+        Assert.Equal(4, agregados.Count);
+        Assert.Contains(agregados, a => a.Ticker == "BBAS3" && a.Tipo == "Dividendo" && a.ValorLiquido == 59.77m);
+        Assert.Contains(agregados, a => a.Ticker == "BBAS3" && a.Tipo == "JCP" && a.ValorLiquido == 299.01m);
+        Assert.Contains(agregados, a => a.Ticker == "AFHI11" && a.Tipo == "Rendimento" && a.ValorLiquido == 255.74m);
+        Assert.Contains(agregados, a => a.Ticker == "BRCR11" && a.Tipo == "Amortização" && a.ValorLiquido == 3.8m);
+        // A linha "Total" (7272.27) NÃO entra como agregado — só os 4 por-ativo somam.
+        Assert.Equal(59.77m + 299.01m + 255.74m + 3.8m, agregados.Sum(a => a.ValorLiquido));
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_NormalizaFracionarioEAplicaAlias()
+    {
+        // Produto às vezes vem "CÓDIGO - NOME" (mensal) ou só "CÓDIGO" (anual): ambos resolvem o ticker.
+        // Fracionário (sufixo F) e alias (IRIM11→IRDM11) são unificados como no resto do código.
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "ITUB4F", "Dividendo", "10" },
+            new[] { "IRIM11", "Rendimento", "20" },
+            new[] { "BBAS3 - BANCO DO BRASIL S/A", "Dividendo", "30" }
+        };
+
+        var agregados = ExtratoB3Materializador.InterpretarProventosAnuais(linhas);
+
+        Assert.Equal("ITUB4", agregados[0].Ticker);
+        Assert.Equal("IRDM11", agregados[1].Ticker);
+        Assert.Equal("BBAS3", agregados[2].Ticker);
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_ValorNaoPositivoOuSemTicker_Ignora()
+    {
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "PETR4", "Dividendo", "0" },     // valor zero → ignora
+            new[] { "PETR4", "Dividendo", "-5" },    // valor negativo → ignora
+            new[] { "", "Dividendo", "10" },         // sem ticker → ignora
+            new[] { "VALE3", "", "10" }              // sem tipo → ignora
+        };
+
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(linhas));
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_AbaVaziaOuSoHeader_RetornaVazio()
+    {
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(new List<IReadOnlyList<string>>()));
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" }
+        }));
+    }
+
+    [Fact]
+    public void ProventoAnualB3_GerarChaveNatural_NormalizaAnoAssetTipo()
+    {
+        var chave = ProventoAnualB3.GerarChaveNatural(2024, 7, "jcp");
+        Assert.Equal("2024|7|JCP", chave);
+    }
 
     [Fact]
     public void ChaveNegociacao_IncluiTickerAnoMesSentidoCorretora()

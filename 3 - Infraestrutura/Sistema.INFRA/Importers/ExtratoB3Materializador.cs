@@ -100,7 +100,7 @@ public static class ExtratoB3Materializador
         ["IRIM11"] = "IRDM11",
     };
 
-    /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo).</summary>
+    /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo/Amortização).</summary>
     public static string MapTipoProvento(string? tipoEvento)
     {
         var texto = (tipoEvento ?? string.Empty).Trim().ToUpperInvariant();
@@ -110,6 +110,9 @@ public static class ExtratoB3Materializador
             return "Rendimento";
         if (texto.Contains("DIVIDENDO"))
             return "Dividendo";
+        // Amortização aparece no anual (devolução de principal de FII); mantém o tipo próprio.
+        if (texto.Contains("AMORTIZA"))
+            return "Amortização";
         return string.IsNullOrWhiteSpace(tipoEvento) ? "Provento" : tipoEvento!.Trim();
     }
 
@@ -214,9 +217,57 @@ public static class ExtratoB3Materializador
             Campo(row, "Produto"));
     }
 
+    /// <summary>
+    /// Interpreta a aba "Proventos Recebidos" do relatório consolidado ANUAL (3 colunas:
+    /// "Produto" | "Tipo de Evento" | "Valor líquido"). É um AGREGADO do ano por ticker × tipo,
+    /// SEM datas → vira <see cref="ProventoAnualLinha"/> (verdade oficial p/ reconciliação), nunca
+    /// RendimentoInvestimento (sem data corromperia o calendário mensal). Filtra:
+    ///  - o cabeçalho (1ª linha);
+    ///  - a linha de TOTAL (rodapé "Total" + valor) — Produto/Tipo vazios;
+    ///  - linhas em branco e valores não-positivos.
+    /// Recebe TODAS as linhas da aba (inclusive header) para ser totalmente testável sem banco.
+    /// </summary>
+    public static IReadOnlyList<ProventoAnualLinha> InterpretarProventosAnuais(IReadOnlyList<IReadOnlyList<string>> linhas)
+    {
+        var resultado = new List<ProventoAnualLinha>();
+        if (linhas is null || linhas.Count < 2)
+            return resultado;
+
+        var headers = linhas[0].Select(c => (c ?? string.Empty).Trim()).ToList();
+        for (var i = 1; i < linhas.Count; i++)
+        {
+            var row = MapearLinha(headers, linhas[i]);
+
+            // "Produto" no anual é só o código (ex.: "BBAS3"); ExtrairTickerProduto também
+            // cobre o formato "CÓDIGO - NOME" caso a B3 mude o layout.
+            var ticker = ExtrairTickerProduto(Campo(row, "Produto"));
+            if (string.IsNullOrWhiteSpace(ticker))
+                continue; // rodapé "Total" e linhas em branco têm Produto vazio → ignorados.
+
+            var tipoBruto = Campo(row, "Tipo de Evento");
+            if (string.IsNullOrWhiteSpace(tipoBruto))
+                continue; // sem tipo não há agregado válido.
+
+            var valor = ParseDecimal(Campo(row, "Valor líquido"));
+            if (valor <= 0m)
+                continue;
+
+            resultado.Add(new ProventoAnualLinha(ticker, MapTipoProvento(tipoBruto), valor, Campo(row, "Produto")));
+        }
+
+        return resultado;
+    }
+
     private static string? Campo(IReadOnlyDictionary<string, string> row, string header)
         => row.TryGetValue(header, out var value) && !string.IsNullOrWhiteSpace(value) ? value.Trim() : null;
 }
+
+/// <summary>Uma linha agregada (ano inteiro) da aba "Proventos Recebidos" do relatório ANUAL.</summary>
+public sealed record ProventoAnualLinha(
+    string Ticker,
+    string Tipo,
+    decimal ValorLiquido,
+    string? Produto);
 
 /// <summary>Um movimento (compra ou venda) extraído de uma linha agregada de Negociações.</summary>
 public sealed record MovimentoNegociacaoB3(

@@ -24,20 +24,26 @@ public partial class FinancasImportador
             extrato = ExtratoConsolidadoB3Reader.Ler(stream);
         }
 
-        // Período vem do NOME do arquivo (as abas de Posição são snapshot sem data interna).
+        // Período (mês) vem do NOME do arquivo (as abas de Posição são snapshot sem data interna).
         var periodo = ExtratoConsolidadoB3Reader.DerivarPeriodo(documento.FileName);
+        // Relatório ANUAL (relatorio-consolidado-anual-AAAA): só ano, sem mês e sem aba Negociações.
+        // É a verdade oficial do total do ano (reconciliação). Mensal e anual são mutuamente exclusivos.
+        var anoAnual = periodo is null ? ExtratoConsolidadoB3Reader.DerivarAno(documento.FileName) : null;
         if (periodo is not null)
             documento.ReferenceYear = periodo.Value.Ano;
+        else if (anoAnual is not null)
+            documento.ReferenceYear = anoAnual;
 
-        // Guarda o ano-mês derivado no RawMetadataJson.
+        // Guarda o ano-mês (mensal) ou o ano (anual) derivado no RawMetadataJson.
         documento.RawMetadataJson = JsonSerializer.Serialize(new
         {
             path = file,
             sha256 = documento.Sha256,
             documentKind = documento.DocumentKind.ToString(),
-            referenceYear = periodo?.Ano,
+            referenceYear = periodo?.Ano ?? anoAnual,
             referenceMonth = periodo?.Mes,
             referencePeriod = periodo is null ? null : $"{periodo.Value.Ano:D4}-{periodo.Value.Mes:D2}",
+            annualYear = anoAnual,
             sheetNames = extrato.Abas.Select(a => a.Nome).ToArray()
         });
 
@@ -82,6 +88,12 @@ public partial class FinancasImportador
         {
             PovoarNegociacoesMensaisB3(extrato, documento, carga, periodo.Value, ativos);
             await MaterializarProventosExtratoB3(extrato, documento, carga, ativos, cancellationToken);
+        }
+        // Relatório ANUAL: grava o agregado oficial de proventos do ano (reconciliação). NÃO materializa
+        // negociação (a aba não existe) nem RendimentoInvestimento (sem data → corromperia o calendário).
+        else if (anoAnual is not null)
+        {
+            await MaterializarProventosAnuaisB3(extrato, documento, carga, anoAnual.Value, ativos, cancellationToken);
         }
 
         documento.ParseStatus = totalLinhas > 0
@@ -219,6 +231,56 @@ public partial class FinancasImportador
                 "BRL",
                 string.Empty,
                 JsonSerializer.Serialize(new { produto = provento.Produto, cells = aba.Linhas[i] }));
+        }
+    }
+
+    // Relatório ANUAL — aba "Proventos Recebidos" (3 colunas, agregado por ticker × tipo, SEM datas).
+    // Grava o agregado oficial em ProventoAnualB3 (verdade do ano p/ reconciliação). Upsert idempotente
+    // por ChaveNatural (ano|assetId|tipo): reimportar o anual ATUALIZA o valor, não duplica. NÃO mexe em
+    // RendimentoInvestimento (sem data) — o calendário mensal continua só com a fonte mensal.
+    private async Task MaterializarProventosAnuaisB3(ExtratoConsolidadoB3Documento extrato, DocumentoFinanceiro documento, CargaFinanceira carga, int ano, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
+    {
+        var aba = extrato.Aba("Proventos Recebidos");
+        if (aba is null || aba.Linhas.Count < 2)
+            return;
+
+        foreach (var linha in ExtratoB3Materializador.InterpretarProventosAnuais(aba.Linhas))
+        {
+            var classe = ExtratoB3Materializador.ClassePorTicker(linha.Ticker);
+            var ativo = ObterOuCriarAtivo(ativos, linha.Ticker, linha.Produto ?? linha.Ticker, classe, false, linha.Ticker);
+
+            // Ativo recém-criado tem Id=0 até salvar; a chave natural usa o AssetId → persistimos o ativo
+            // novo ANTES de montar a chave/gravar o agregado (senão a FK e a chave ficam com AssetId=0).
+            if (ativo.Id == 0)
+                await _context.SaveChangesAsync(cancellationToken);
+
+            var chave = ProventoAnualB3.GerarChaveNatural(ano, ativo.Id, linha.Tipo);
+            var rawJson = JsonSerializer.Serialize(new { produto = linha.Produto, tipo = linha.Tipo, valorLiquido = linha.ValorLiquido });
+
+            // Upsert idempotente: reimportar o anual atualiza o valor do mesmo ano×ativo×tipo (não duplica).
+            var existente = _context.ProventosAnuaisB3.Local.FirstOrDefault(x => x.ChaveNatural == chave)
+                ?? _context.ProventosAnuaisB3.FirstOrDefault(x => x.ChaveNatural == chave);
+            if (existente is not null)
+            {
+                existente.ValorLiquido = linha.ValorLiquido;
+                existente.CargaFinanceira = carga;
+                existente.SourceDocument = documento;
+                existente.RawJson = rawJson;
+                continue;
+            }
+
+            _context.ProventosAnuaisB3.Add(new ProventoAnualB3
+            {
+                CargaFinanceira = carga,
+                SourceDocument = documento,
+                AssetId = ativo.Id,
+                Year = ano,
+                Tipo = linha.Tipo,
+                ValorLiquido = linha.ValorLiquido,
+                ChaveNatural = chave,
+                RawJson = rawJson,
+                UsuarioInclusao = "financas-importador"
+            });
         }
     }
 }

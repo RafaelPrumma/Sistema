@@ -395,6 +395,37 @@ public class NegociacaoMensalB3 : AuditableEntity
     public string RawJson { get; set; } = "{}";
 }
 
+// Agregado OFICIAL ANUAL de proventos do extrato consolidado ANUAL da B3
+// (relatorio-consolidado-anual-AAAA.xlsx, aba "Proventos Recebidos"). É um total por
+// ticker × tipo de evento, SEM datas → NÃO entra em RendimentoInvestimento (corromperia o
+// calendário mensal). Serve de VERDADE OFICIAL do total do ano para reconciliação/validação:
+// confronta-se com a soma dos RendimentoInvestimento materializados do mesmo ano.
+// A ChaveNatural (ano|assetId|tipo) torna o upsert idempotente: reimportar o anual atualiza o
+// valor, não duplica.
+public class ProventoAnualB3 : AuditableEntity
+{
+    public int Id { get; set; }
+    public int? CargaFinanceiraId { get; set; }
+    public CargaFinanceira? CargaFinanceira { get; set; }
+    public int? SourceDocumentId { get; set; }
+    public DocumentoFinanceiro? SourceDocument { get; set; }
+    public int AssetId { get; set; }
+    public AtivoFinanceiro? Asset { get; set; }
+    // Ano de referência do agregado (ex.: 2024). Vem do nome do arquivo anual.
+    public int Year { get; set; }
+    // Tipo do evento normalizado (Dividendo/JCP/Rendimento/Amortização) — mesma normalização do mensal.
+    public string Tipo { get; set; } = string.Empty;
+    // Valor LÍQUIDO total do ano (a planilha já traz líquido). Base da reconciliação.
+    public decimal ValorLiquido { get; set; }
+    // Chave natural (ano|assetId|tipo) — índice único filtrado, idempotência do upsert.
+    public string? ChaveNatural { get; set; }
+    public string RawJson { get; set; } = "{}";
+
+    /// <summary>Chave natural canônica do agregado anual: ano|assetId|tipo (case/trim-normalizado).</summary>
+    public static string GerarChaveNatural(int year, int assetId, string tipo)
+        => $"{year:D4}|{assetId}|{(tipo ?? string.Empty).Trim().ToUpperInvariant()}";
+}
+
 public class EstimativaPosicaoCarteira : AuditableEntity
 {
     public int Id { get; set; }

@@ -264,6 +264,25 @@ public class NegociacaoMensalB3Map : IEntityTypeConfiguration<NegociacaoMensalB3
     }
 }
 
+public class ProventoAnualB3Map : IEntityTypeConfiguration<ProventoAnualB3>
+{
+    public void Configure(EntityTypeBuilder<ProventoAnualB3> builder)
+    {
+        builder.ToTable("FinanceiroProventoAnualB3");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Tipo).IsRequired().HasMaxLength(80);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(120);
+        builder.Property(x => x.RawJson).IsRequired();
+        builder.Property(x => x.ValorLiquido).HasPrecision(24, 8);
+        builder.HasIndex(x => new { x.Year, x.AssetId });
+        // Mesmo agregado (ano×ativo×tipo) não entra duas vezes — reimportar o anual atualiza o valor.
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasOne(x => x.CargaFinanceira).WithMany().HasForeignKey(x => x.CargaFinanceiraId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.SourceDocument).WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
 public class EstimativaPosicaoCarteiraMap : IEntityTypeConfiguration<EstimativaPosicaoCarteira>
 {
     public void Configure(EntityTypeBuilder<EstimativaPosicaoCarteira> builder)
