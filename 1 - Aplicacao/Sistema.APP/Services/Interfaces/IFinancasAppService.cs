@@ -31,7 +31,7 @@ public interface IFinancasAppService
     Task<PagedResult<TransacaoCriptoDto>> BuscarTransacoesCriptoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PosicaoFinanceiraDto>> BuscarPosicoesAsync(bool? somenteAbertas, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> BuscarAlertasAsync(CancellationToken cancellationToken = default);
-    Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
+    Task<int> ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
     Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default);
     Task AtualizarProventosAsync(CancellationToken cancellationToken = default);
     Task<ProventosPaginaDto> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);

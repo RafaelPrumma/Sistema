@@ -1140,25 +1140,42 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         return result.Select(MapAlerta).ToList();
     }
 
-    public async Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default)
+    // Reimport on-demand (botão "Atualizar / importar novos extratos"): varre as pastas, materializa
+    // o staging e RECALCULA a projeção de posição (FinanceiroPosicaoAtivo). Devolve quantos arquivos
+    // novos foram importados para dar feedback ao usuário. Idempotente: 0 quando não há nada novo.
+    public async Task<int> ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default)
     {
-        await _importador.ImportarPastaMonitoradaAsync(cancellationToken);
+        var importados = await _importador.ImportarPastaMonitoradaAsync(cancellationToken);
+
+        // Recalcula a projeção para as posições novas/atualizadas aparecerem na hora (o dashboard lê
+        // FinanceiroPosicaoAtivo). Só quando importou algo novo — recálculo à toa é desperdício.
+        if (importados > 0)
+            await _projection.RecalcularAsync(cancellationToken);
+
+        var mensagem = importados > 0
+            ? $"Importação da pasta monitorada concluída: {importados} novo(s) extrato(s)/arquivo(s) importado(s)."
+            : "Importação da pasta monitorada concluída: nenhum arquivo novo.";
 
         await _log.RegistrarFinanceiroAsync(
             "Importacao", "ImportarPasta", true,
-            "Importação da pasta monitorada concluída.",
+            mensagem,
             LogTipo.Sucesso, usuarioId?.ToString(CultureInfo.InvariantCulture) ?? "sistema", null, cancellationToken);
         await _uow.ConfirmarAsync(cancellationToken);
 
         // Notifica quem disparou a importação (aparece no badge de não-lidas / tela de avisos).
         if (usuarioId is > 0)
         {
+            var corpo = importados > 0
+                ? $"{importados} novo(s) extrato(s)/arquivo(s) foram importados e a carteira foi atualizada. Confira o dashboard de Finanças."
+                : "Nenhum arquivo novo foi encontrado nas pastas monitoradas. A carteira já estava atualizada.";
             await _mensagem.EnviarAsync(
                 null, usuarioId.Value,
                 "Importação financeira concluída",
-                "Seus relatórios foram importados e a carteira foi atualizada. Confira o dashboard de Finanças.",
+                corpo,
                 null, cancellationToken);
         }
+
+        return importados;
     }
 
     public async Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default)

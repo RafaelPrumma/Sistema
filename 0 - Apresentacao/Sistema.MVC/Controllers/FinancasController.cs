@@ -86,13 +86,15 @@ public class FinancasController(IFinancasAppService service) : Controller
             // Roda em segundo plano (Hangfire) para não travar a requisição com PDFs grandes.
             // O usuarioId é capturado agora e usado para notificar quem disparou ao concluir.
             BackgroundJob.Enqueue<IFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(usuarioId, CancellationToken.None));
-            TempData["MensagemSucesso"] = "Importação iniciada em segundo plano. Você será notificado ao concluir — acompanhe na tela de Fila.";
+            TempData["MensagemSucesso"] = "Atualização iniciada em segundo plano: buscando novos extratos nas pastas monitoradas. Você será notificado ao concluir — acompanhe na tela de Fila.";
         }
         catch
         {
-            // Sem Hangfire configurado: importa de forma síncrona como fallback.
-            await _service.ImportarPastaMonitoradaAsync(usuarioId, cancellationToken);
-            TempData["MensagemSucesso"] = "Pasta financeira importada.";
+            // Sem Hangfire configurado: importa de forma síncrona como fallback (feedback com a contagem).
+            var importados = await _service.ImportarPastaMonitoradaAsync(usuarioId, cancellationToken);
+            TempData["MensagemSucesso"] = importados > 0
+                ? $"{importados} novo(s) extrato(s)/arquivo(s) importado(s) e posições atualizadas."
+                : "Nenhum arquivo novo encontrado. A carteira já estava atualizada.";
         }
 
         return RedirectToAction(nameof(Index));
