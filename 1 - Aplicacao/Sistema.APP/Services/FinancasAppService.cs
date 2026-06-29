@@ -470,6 +470,7 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
                     decimal? precoB3 = precoB3PorAtivo.TryGetValue(a.AtivoId, out var p) ? p : null;
                     decimal? diferenca = precoB3.HasValue ? Math.Round(a.ValorMercado - a.Quantidade * precoB3.Value, 2) : null;
                     return new PosicaoCalculadaDto(
+                        a.AtivoId,
                         a.Ativo,
                         a.Classe,
                         a.Quantidade,
@@ -489,6 +490,122 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         catch
         {
             return new FinancasPosicoesDashboardDto(new ComposicaoValorDto(0m, 0m, 0m, 0m), []);
+        }
+    }
+
+    // F-Q — "Explique este valor" (Posições). Para um ativo, monta a composição/fonte do número usando
+    // SÓ read models (FinanceiroPosicaoAtivo + FinanceiroCotacaoAtivo + ajustes de reconciliação). Não
+    // recalcula transações nem chama API. À PROVA DE FALHA: qualquer erro devolve "não encontrada".
+    public async Task<ExplicacaoPosicaoDto> ExplicarPosicaoAsync(int ativoId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var pos = posicoes.FirstOrDefault(p => p.AtivoFinanceiroId == ativoId && p.AtivoFinanceiro is not null);
+            if (pos is null)
+                return MontadorExplicacaoValor.PosicaoNaoEncontrada();
+
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var ajustesVariacao = await CalcularAjustesVariacaoPorAtivoAsync(cancellationToken);
+
+            var ativo = pos.AtivoFinanceiro!;
+            // Mesma escolha da valoração (CriarAtivosCotadosDaTabela): prefere a cotação com PrecoBRL>0 e,
+            // dentro dela, a mais recente; sem nenhuma utilizável, a última tentada explica o erro.
+            var doAtivo = cotacoes.Where(c => c.AtivoFinanceiroId == ativo.Id).ToList();
+            var utilizavel = doAtivo.Where(c => c.PrecoBRL > 0m).OrderByDescending(c => c.ConsultadoEm).FirstOrDefault();
+            var referencia = utilizavel ?? doAtivo.OrderByDescending(c => c.ConsultadoEm).FirstOrDefault();
+            var temPreco = utilizavel is not null;
+            var precoUsado = temPreco ? utilizavel!.PrecoBRL : (decimal?)null;
+            var custo = pos.CustoTotal;
+            var valorMercado = precoUsado.HasValue ? pos.Quantidade * precoUsado.Value : custo;
+            var vencida = utilizavel is { ExpiraEm: not null } && utilizavel.ExpiraEm < DateTime.UtcNow;
+
+            ajustesVariacao.TryGetValue(ativo.Id, out var ajuste);
+
+            return MontadorExplicacaoValor.Posicao(new MontadorExplicacaoValor.EntradaPosicao(
+                Ticker: ativo.Sigla ?? ativo.Chave ?? ativo.Nome ?? "—",
+                Nome: ativo.Nome ?? string.Empty,
+                Classe: ativo.Classe.ToString(),
+                EhCripto: ativo.EhCripto || ativo.Classe == ClasseAtivo.Cripto,
+                Quantidade: pos.Quantidade,
+                PrecoMedio: pos.PrecoMedio,
+                Custo: custo,
+                ValorMercado: valorMercado,
+                PrecoUsado: precoUsado,
+                TemPrecoUtilizavel: temPreco,
+                Provedor: referencia?.Provedor ?? ProvedorCotacao.Manual,
+                StatusCotacao: referencia?.Status ?? StatusCotacao.Falhou,
+                Vencida: vencida,
+                CotacaoEm: temPreco ? referencia?.ConsultadoEm : null,
+                Simbolo: referencia?.Simbolo,
+                ValorAjusteReconciliacao: ajuste,
+                TemAjusteReconciliacao: ajuste != 0m));
+        }
+        catch
+        {
+            return MontadorExplicacaoValor.PosicaoNaoEncontrada();
+        }
+    }
+
+    // F-Q — "Explique este valor" (Patrimônio). Decompõe o total por fonte do preço (cotação ao vivo ×
+    // fechamento B3 × custo) e o quanto está em reconciliação, REUSANDO os mesmos números do dashboard
+    // (composição do F-L + reconciliação do F-M). À PROVA DE FALHA: erro devolve DTO vazio.
+    public async Task<ExplicacaoPatrimonioDto> ExplicarPatrimonioAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+
+            // Mesma classificação por fonte do preço da ilha de Posições (F-L) — sem cálculo paralelo.
+            decimal comCotacao = 0m, comFechamentoB3 = 0m, comCusto = 0m;
+            int qCotacao = 0, qFechamento = 0, qCusto = 0;
+            foreach (var a in ativos)
+            {
+                if (a.FontePreco == "Custo") { comCusto += a.ValorMercado; qCusto++; }
+                else if (a.FontePreco == "Fechamento B3") { comFechamentoB3 += a.ValorMercado; qFechamento++; }
+                else { comCotacao += a.ValorMercado; qCotacao++; }
+            }
+
+            // Reconciliação: valor líquido no ativo virtual VARIACAO + nº de ajustes (mesmo F-M).
+            var reconc = await ObterReconciliacaoDashboardAsync(cancellationToken);
+
+            return MontadorExplicacaoValor.Patrimonio(new MontadorExplicacaoValor.EntradaPatrimonio(
+                Total: comCotacao + comFechamentoB3 + comCusto,
+                ComCotacao: comCotacao,
+                ComFechamentoB3: comFechamentoB3,
+                ComCusto: comCusto,
+                QtdAtivos: ativos.Count,
+                QtdComCotacao: qCotacao,
+                QtdComFechamentoB3: qFechamento,
+                QtdComCusto: qCusto,
+                TemReconciliacao: reconc.TemDados && reconc.ValorTotalVariacao != 0m,
+                ValorReconciliacao: reconc.ValorTotalVariacao,
+                QtdAjustesReconciliacao: reconc.NumeroAjustes));
+        }
+        catch
+        {
+            return MontadorExplicacaoValor.PatrimonioVazio();
+        }
+    }
+
+    // Valor do ajuste de reconciliação B3 por ativo REAL (não o virtual VARIACAO). Lê as transações
+    // Fonte="Reconciliação" (o mesmo contrato do F-M) e soma o valor lançado (Quantity × UnitPrice) por
+    // ativo. Usado para mostrar, na explicação da posição, quanto da diferença caiu naquele ativo.
+    private async Task<IReadOnlyDictionary<int, decimal>> CalcularAjustesVariacaoPorAtivoAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var transacoes = await _uow.Financas.BuscarTodasTransacoesAsync(cancellationToken);
+            return transacoes
+                .Where(t => t.Fonte == FonteReconciliacao && t.Asset is not null && t.Asset.Chave != AssetKeyVariacao)
+                .GroupBy(t => t.AssetId)
+                .ToDictionary(g => g.Key, g => Math.Round(g.Sum(t => t.Quantity * t.UnitPrice), 2));
+        }
+        catch
+        {
+            return new Dictionary<int, decimal>();
         }
     }
 

@@ -46,6 +46,16 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardPosicoes(CancellationToken cancellationToken)
         => PartialView("_DashboardPosicoes", await _service.ObterPosicoesDashboardAsync(cancellationToken));
 
+    // F-Q — "Explique este valor": composição/fonte de uma posição (JSON p/ o popover do dashboard).
+    [HttpGet("/Financas/Dashboard/ExplicarPosicao")]
+    public async Task<IActionResult> ExplicarPosicao(int ativoId, CancellationToken cancellationToken)
+        => Json(await _service.ExplicarPosicaoAsync(ativoId, cancellationToken));
+
+    // F-Q — "Explique este valor": composição do patrimônio total por fonte do preço + reconciliação.
+    [HttpGet("/Financas/Dashboard/ExplicarPatrimonio")]
+    public async Task<IActionResult> ExplicarPatrimonio(CancellationToken cancellationToken)
+        => Json(await _service.ExplicarPatrimonioAsync(cancellationToken));
+
     [HttpGet("/Financas/Dashboard/Alertas")]
     public async Task<IActionResult> DashboardAlertas(CancellationToken cancellationToken)
         => PartialView("_DashboardAlertas", await _service.ObterAlertasDashboardAsync(cancellationToken));
@@ -178,9 +188,10 @@ public class FinancasController(IFinancasAppService service) : Controller
         => View(await _service.BuscarAlertasAsync(cancellationToken));
 
     [HttpGet]
-    public IActionResult Transacoes(string? origem)
+    public IActionResult Transacoes(string? origem, string? busca)
     {
         ViewBag.Origem = origem;
+        ViewBag.Busca = busca;   // F-Q: deep-link "Ver transações de TICKER" pré-filtra a grid.
         return View();
     }
 

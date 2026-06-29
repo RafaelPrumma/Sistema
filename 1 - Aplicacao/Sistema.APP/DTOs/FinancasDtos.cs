@@ -468,6 +468,7 @@ public record FinancasProventosDashboardDto(
 // F-L: painel de saúde/transparência. Posição calculada (das transações) confrontada com a custódia
 // oficial da B3 (Preço de Fechamento da aba Posição), com a fonte do preço que valorou cada ativo.
 public record PosicaoCalculadaDto(
+    int AtivoId,             // F-Q: chave p/ o "Explique este valor" (deep-link ExplicarPosicao)
     string Ticker,
     string Classe,
     decimal Quantidade,
@@ -576,6 +577,58 @@ public record FinancasCalendarioProventosDashboardDto(
     decimal TotalRealizado,
     decimal TotalPrevisto,
     bool TemPrevisto);
+
+// F-Q — "Explique este valor". Mecanismo reutilizável: cada número relevante do dashboard abre sua
+// composição/fonte, lendo SÓ os read models (FinanceiroPosicaoAtivo + FinanceiroCotacaoAtivo + ajustes
+// de reconciliação) — nunca recalcula transações na UI nem chama API. Esta passada cobre Posições e
+// Patrimônio (Carteiras/Proventos ficam para depois).
+
+// Uma linha "rótulo: valor" da explicação (ex.: "Preço usado: R$ 12,34"). Tipo controla a cor/ênfase
+// na UI (neutro / positivo / negativo / atencao). Já vem formatado pelo montador? Não: valor cru +
+// formato sugerido, a view formata. Mantemos cru para a view escolher moeda/quantidade/percentual.
+public record ExplicacaoLinhaDto(
+    string Rotulo,
+    string Valor,           // já formatado pelo montador (pt-BR) — a view só exibe
+    string Tipo = "neutro"); // neutro | positivo | negativo | atencao
+
+// Explicação de UMA posição (um ativo da ilha de Posições). Reúne quantidade, preço médio, preço usado
+// na valoração + a fonte do preço (Brapi/Binance/B3Custódia/custo) com fallback, o resultado
+// (mercado − custo) e, quando houver, o ajuste de reconciliação (ativo virtual VARIACAO).
+public record ExplicacaoPosicaoDto(
+    bool Encontrada,
+    string Ticker,
+    string Nome,
+    string Classe,
+    string FontePreco,          // rótulo amigável (Cotação (Brapi) / Fechamento B3 / Custo / ...)
+    string FonteStatus,         // rótulo da saúde (Atual / Vencida / B3 Custódia / Fallback custo / ...)
+    string FonteSeveridade,     // ok | atencao | critico — cor do selo da fonte
+    bool ValoradoPeloCusto,     // true = caiu no fallback ao custo (sem cotação utilizável)
+    decimal ValorMercado,
+    decimal Custo,
+    decimal Resultado,
+    decimal ResultadoPercentual,
+    bool TemAjusteReconciliacao,
+    decimal ValorAjusteReconciliacao,   // valor que a reconciliação B3 parou no ativo VARIACAO p/ este ativo
+    string? BuscaTransacoes,            // termo p/ deep-link da grid de transações (filtra pelo ticker)
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// Explicação do card de Patrimônio: a composição do total por fonte do preço (cotação ao vivo ×
+// fechamento B3 × custo/fallback) e quanto está em reconciliação (VARIACAO). Reusa exatamente os
+// números que o dashboard já calcula (composição do F-L + reconciliação do F-M) — sem cálculo paralelo.
+public record ExplicacaoPatrimonioDto(
+    bool TemDados,
+    decimal Total,
+    decimal ComCotacao,
+    decimal ComFechamentoB3,
+    decimal ComCusto,
+    int QtdAtivos,
+    int QtdComCotacao,
+    int QtdComFechamentoB3,
+    int QtdComCusto,
+    bool TemReconciliacao,
+    decimal ValorReconciliacao,         // valor líquido parado no ativo virtual VARIACAO
+    int QtdAjustesReconciliacao,
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
 
 public class FinancasDashboardDto
 {

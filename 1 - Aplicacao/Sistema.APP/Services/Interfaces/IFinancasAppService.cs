@@ -15,6 +15,10 @@ public interface IFinancasAppService
     Task<ResultadoOperacao> SalvarPesosAlvoAsync(SalvarPesosAlvoInput input, CancellationToken cancellationToken = default);
     Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default);
+
+    // F-Q — "Explique este valor": composição/fonte de um número do dashboard (lê só read models).
+    Task<ExplicacaoPosicaoDto> ExplicarPosicaoAsync(int ativoId, CancellationToken cancellationToken = default);
+    Task<ExplicacaoPatrimonioDto> ExplicarPatrimonioAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasCalendarioProventosDashboardDto> ObterCalendarioProventosDashboardAsync(CancellationToken cancellationToken = default);

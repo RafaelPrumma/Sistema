@@ -346,7 +346,19 @@
     const cor = positivo ? corPositiva() : corNegativa();
 
     document.getElementById('financeHeaderTitulo').textContent = rotuloDe(serieAtual);
-    document.getElementById('financeHeaderValor').textContent = money.format(atual);
+    // F-Q: "Explique este valor" só faz sentido sobre o patrimônio total (a explicação decompõe o total
+    // por fonte do preço). Em uma série de setor, mostra só o valor sem o gatilho.
+    const valorEl = document.getElementById('financeHeaderValor');
+    if (serieAtual === 'total') {
+      valorEl.innerHTML = `${money.format(atual)} <i class="bi bi-info-circle fs-6 text-secondary align-text-top"></i>`;
+      valorEl.setAttribute('data-explicar', 'patrimonio');
+      valorEl.removeAttribute('disabled');
+      valorEl.classList.remove('pe-none');
+    } else {
+      valorEl.textContent = money.format(atual);
+      valorEl.removeAttribute('data-explicar');
+      valorEl.classList.add('pe-none');
+    }
     document.getElementById('financeHeaderDelta').innerHTML =
       `<span class="${positivo ? 'text-success' : 'text-danger'}">${positivo ? '+' : ''}${money.format(variacao)} (${positivo ? '+' : ''}${pct.format(percentual)}%)</span>` +
       `<span class="finance-hero-today ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>`;
@@ -381,7 +393,7 @@
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
                 <div>
                   <div class="text-secondary small" id="financeHeaderTitulo">Patrimônio total</div>
-                  <div class="finance-hero-value" id="financeHeaderValor">${money.format(payload.valorMercadoTotal)}</div>
+                  <button type="button" class="btn btn-link p-0 text-reset text-decoration-none border-0 finance-hero-value" id="financeHeaderValor" data-explicar="patrimonio" title="Explicar este valor">${money.format(payload.valorMercadoTotal)} <i class="bi bi-info-circle fs-6 text-secondary align-text-top"></i></button>
                   <div class="finance-hero-delta ${payload.resultadoNaoRealizadoTotal >= 0 ? 'text-success' : 'text-danger'}" id="financeHeaderDelta">${money.format(payload.resultadoNaoRealizadoTotal)}</div>
                 </div>
                 <div class="d-flex flex-column align-items-end gap-2">
@@ -411,6 +423,143 @@
     }
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // F-Q — "Explique este valor". Mecanismo reutilizável: qualquer elemento com
+  // data-explicar="posicao|patrimonio" abre um modal Bootstrap com a composição/fonte do número,
+  // buscada de um endpoint que lê SÓ os read models (sem recalcular transações na UI).
+  // ───────────────────────────────────────────────────────────────────────────
+  let explicarModal = null;
+  let explicarModalEl = null;
+
+  function tomClasse(tipo) {
+    switch (tipo) {
+      case 'positivo': return 'text-success';
+      case 'negativo': return 'text-danger';
+      case 'atencao': return 'text-warning-emphasis';
+      default: return '';
+    }
+  }
+
+  function severidadeBadge(sev) {
+    const map = { ok: 'text-bg-success', atencao: 'text-bg-warning', critico: 'text-bg-danger' };
+    return map[sev] || 'text-bg-secondary';
+  }
+
+  function garantirModal() {
+    if (explicarModal) return explicarModal;
+    if (!window.bootstrap) return null;
+    explicarModalEl = document.createElement('div');
+    explicarModalEl.className = 'modal fade';
+    explicarModalEl.tabIndex = -1;
+    explicarModalEl.setAttribute('aria-hidden', 'true');
+    explicarModalEl.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i><span data-explicar-titulo>Explique este valor</span></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body" data-explicar-corpo></div>
+        </div>
+      </div>`;
+    document.body.appendChild(explicarModalEl);
+    explicarModal = new window.bootstrap.Modal(explicarModalEl);
+    return explicarModal;
+  }
+
+  function linhasHtml(linhas) {
+    if (!linhas || !linhas.length) return '';
+    return `<ul class="list-group list-group-flush">${linhas.map(l => {
+      // Linha sem rótulo = nota explicativa (texto secundário em largura total).
+      if (!l.rotulo) {
+        return `<li class="list-group-item px-0 small text-secondary">${escapeHtml(l.valor)}</li>`;
+      }
+      return `<li class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
+        <span class="text-secondary">${escapeHtml(l.rotulo)}</span>
+        <span class="fw-medium text-end ${tomClasse(l.tipo)}">${escapeHtml(l.valor)}</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+
+  function linkTransacoes(busca) {
+    const base = dashboard.dataset.transacoesUrl;
+    if (!base || !busca) return '';
+    const url = `${base}?busca=${encodeURIComponent(busca)}`;
+    return `<div class="mt-3 text-end">
+      <a class="btn btn-sm btn-outline-secondary" href="${url}">
+        <i class="bi bi-list-ul me-1"></i>Ver transações de ${escapeHtml(busca)}
+      </a></div>`;
+  }
+
+  function corpoCarregando() {
+    return `<div class="text-center text-secondary py-4">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>Carregando explicação...</div>`;
+  }
+
+  function corpoErro() {
+    return `<div class="text-center text-secondary py-4">
+      <i class="bi bi-exclamation-triangle d-block fs-4 mb-2"></i>Não foi possível explicar este valor agora.</div>`;
+  }
+
+  function renderPosicao(corpo, titulo, dto) {
+    if (!dto || !dto.encontrada) {
+      titulo.textContent = 'Explique este valor';
+      corpo.innerHTML = `<div class="text-secondary py-2">Posição não encontrada na projeção atual.</div>`;
+      return;
+    }
+    titulo.textContent = `${dto.ticker} — composição do valor`;
+    const fonte = `<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="badge ${severidadeBadge(dto.fonteSeveridade)}">Fonte: ${escapeHtml(dto.fontePreco)}</span>
+        <span class="small text-secondary">${escapeHtml(dto.fonteStatus)}</span>
+      </div>`;
+    corpo.innerHTML = fonte + linhasHtml(dto.linhas) + linkTransacoes(dto.buscaTransacoes);
+  }
+
+  function renderPatrimonio(corpo, titulo, dto) {
+    titulo.textContent = 'Patrimônio total — composição';
+    if (!dto || !dto.temDados) {
+      corpo.innerHTML = `<div class="text-secondary py-2">Sem posições para compor o patrimônio.</div>`;
+      return;
+    }
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Soma das posições valoradas — sem recalcular transações.</div>`;
+  }
+
+  async function abrirExplicacao(trigger) {
+    const modal = garantirModal();
+    if (!modal) return;
+    const tipo = trigger.dataset.explicar;
+    const corpo = explicarModalEl.querySelector('[data-explicar-corpo]');
+    const titulo = explicarModalEl.querySelector('[data-explicar-titulo]');
+    titulo.textContent = trigger.dataset.titulo ? `${trigger.dataset.titulo}` : 'Explique este valor';
+    corpo.innerHTML = corpoCarregando();
+    modal.show();
+
+    try {
+      if (tipo === 'posicao') {
+        const id = trigger.dataset.ativoId;
+        const url = `${dashboard.dataset.explicarPosicaoUrl}?ativoId=${encodeURIComponent(id)}`;
+        const dto = await (await fetchChecked(url, 'application/json')).json();
+        renderPosicao(corpo, titulo, dto);
+      } else if (tipo === 'patrimonio') {
+        const dto = await (await fetchChecked(dashboard.dataset.explicarPatrimonioUrl, 'application/json')).json();
+        renderPatrimonio(corpo, titulo, dto);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error('Falha ao explicar valor.', error);
+      corpo.innerHTML = corpoErro();
+    }
+  }
+
+  // Delegação: dispara para qualquer gatilho atual ou futuro (ilhas carregam depois via innerHTML).
+  dashboard.addEventListener('click', event => {
+    const trigger = event.target.closest('[data-explicar]');
+    if (!trigger || !dashboard.contains(trigger)) return;
+    event.preventDefault();
+    abrirExplicacao(trigger);
+  });
+
   async function initialize() {
     try {
       await fetchChecked(dashboard.dataset.prepareUrl, 'application/json');
@@ -439,6 +588,7 @@
     chart?.destroy();
     proventosChart?.destroy();
     calendarioProventosChart?.destroy();
+    explicarModal?.dispose();
   }, { once: true });
 
   initialize();

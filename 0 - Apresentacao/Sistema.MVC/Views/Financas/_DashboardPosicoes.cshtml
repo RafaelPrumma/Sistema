@@ -55,7 +55,14 @@
                             <div class="small text-secondary">@p.Classe &middot; @p.Quantidade.ToString("N4", br)</div>
                         </td>
                         <td class="text-end">@Money(p.PrecoMedio)</td>
-                        <td class="text-end">@Money(p.ValorMercado)</td>
+                        <td class="text-end">
+                            @* F-Q: o valor abre a explicação (composição/fonte) — sem recalcular na UI. *@
+                            <button type="button" class="btn btn-link btn-sm p-0 text-reset text-decoration-none fw-medium"
+                                    data-explicar="posicao" data-ativo-id="@p.AtivoId" data-titulo="@p.Ticker"
+                                    title="Explicar este valor">
+                                @Money(p.ValorMercado) <i class="bi bi-info-circle small text-secondary"></i>
+                            </button>
+                        </td>
                         <td><span class="badge @FonteClasse(p.FontePreco)">@p.FontePreco</span></td>
                         <td class="text-end">
                             @if (p.DiferencaB3.HasValue)

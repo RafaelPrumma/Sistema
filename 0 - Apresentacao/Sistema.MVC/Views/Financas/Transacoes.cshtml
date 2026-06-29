@@ -1,6 +1,7 @@
 @{
     ViewData["Title"] = "Transações";
     var origem = ViewBag.Origem as string;
+    var busca = ViewBag.Busca as string;
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
@@ -133,6 +134,10 @@
             ],
             extraData: function () { return { origem: document.getElementById('fOrigem').value }; }
         });
+
+        // F-Q: deep-link "?busca=TICKER" vindo do "Explique este valor" pré-filtra a grid pelo ticker.
+        var buscaInicial = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(busca ?? string.Empty));
+        if (buscaInicial) { tabela.search(buscaInicial).draw(); }
 
         document.getElementById('fOrigem').addEventListener('change', function () { tabela.ajax.reload(); });
 
