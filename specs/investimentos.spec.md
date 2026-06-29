@@ -37,6 +37,9 @@ Importação (notas/Binance/extratos B3), posição/preço médio, proventos, da
 - **F-H (fim)** — 3 tipos de alerta novos no `FinancasAlertaService`: cotação vencida/sem fonte (reusa `ClassificadorSaudeCotacao`), ativo posição>0 sem carteira, divergência calculado×custódia (reusa o nº do card F-M); dedup/re-arme por marcador `AlertaConfiabilidade`; config `Alertas:DivergenciaValorLimiar`/`:DivergenciaPctLimiar`.
 - **F-Q (1ª fatia)** — "Explique este valor" em **Posições + Patrimônio**: modal mostra qtd, PM, preço usado, fonte do preço/fallback (reusa `ClassificadorSaudeCotacao`), resultado, ajuste de reconciliação (`VARIACAO`) + deep-link p/ transações do ticker. Mecanismo reutilizável (`MontadorExplicacaoValor` puro). **Falta: Carteiras + Proventos.**
 - **Fix proventos — dupla contagem B3+Brapi** — a precedência "B3 manda" agora vale também p/ proventos: Brapi suprimida onde `Fonte='B3 Extrato'` cobre o ativo×mês de pagamento; limpeza self-healing dos duplicados históricos (soft-delete). Inflava ~+R$1,6k (2023)/+R$0,9k (2024)/+R$1,2k (2025).
+- **F-Q (completo)** — "Explique este valor" estendido a **Carteiras + Proventos** (além de Posições+Patrimônio): mesmo modal `[data-explicar]` + `MontadorExplicacaoValor` puro. Carteira mostra fonte do preço/peso-alvo/reconciliação; Proventos mostra fonte×tipo + nota de precedência.
+- **F-E (reimport on-demand)** — a varredura nunca re-rodava (gate por-pasta) → arquivos novos largados em `arquivos/b3/` não entravam. Agora: **detecção de arquivo novo no load** (compara arquivos da pasta com `DocumentoFinanceiro` já importados, barato/à prova de falha) + **botão "Atualizar / importar novos extratos"** na ilha de Importação (recalcula a projeção e diz quantos entraram) → **posições atualizáveis a qualquer momento**. E o staging passou a **atualizar no reimport** ("extrato mais recente do mês manda": parcial do dia 15 se autocorrige no completo do fechamento; antes pulava e travava no parcial). `MaterializacaoVersao` 13→14.
+- **F-V (relatórios anuais → validação de proventos)** — o relatório consolidado **anual** da B3 (`relatorio-consolidado-anual-AAAA.xlsx`) traz a aba `Proventos Recebidos` como **agregado anual por ticker×tipo, SEM datas** (não serve p/ preencher meses, mas é a verdade oficial do total do ano). Nova entidade `ProventoAnualB3` (parser puro, upsert idempotente, migration `AddProventoAnualB3`) + **ilha de reconciliação anual** (oficial B3 × materializado, por ticker×tipo e total, base líquida, status bate/falta/sobra) — torna visível mês faltando / dupla contagem. (Abas de Posição do anual = evolução futura.)
 
 **Mapa de classificação de carteiras** (referência; semeado, editável na tela):
 | Topo | Sub | Ativos |
@@ -50,17 +53,16 @@ Fallback p/ ativos novos: FII com "RECEBÍVEIS/CRI/SECURITIES"→Papel senão Ti
 
 ## 🔲 Falta para TERMINAR Investimentos
 
-> Atualizado (jun/2026, branch `feat/investimentos-final`): **F-G(fim), F-S, F-T, F-H(fim) e F-Q(1ª fatia) entregues** (ver ✅ Concluído) + fix da dupla contagem de proventos.
+> Atualizado (jun/2026, branch `feat/investimentos-final`): **F-G(fim), F-S, F-T, F-H(fim), F-Q(completo), F-E(reimport on-demand) e F-V(validação anual) entregues** (ver ✅ Concluído) + fix da dupla contagem de proventos.
 
-**Prioridade alta**
+**Prioridade alta (resta)**
 1. **F-B F2 · Rentabilidade vs benchmark (UI).** Motor pronto (`CalculadoraRentabilidade`, TWR/MWR/TIR). Falta: alimentar a série diária (valor + fluxo) de `CriarEvolucaoPatrimonio`, **buscar CDI/Ibov/IPCA** (BCB SGS / Brapi) e expor no gráfico/UI (excesso vs índice + rentabilidade real descontando IPCA). ⚠️ mexe em market-data.
 2. **F-F · Baldes Trade/Rendimentos (cripto).** Separar a posição em balde **Trade** (PM limpo) e **Rendimentos** (earn, custo = mercado na data); total = soma dos baldes. `cripto.spec.md §6`. ⚠️ mexe no netting.
 3. **F-R · Reconciliação cripto por snapshot.** Equivalente ao da B3: importar/cadastrar saldo real por moeda/data (Spot/Earn/Funding/staking), comparar com `FinanceiroPosicaoAtivo`, status (bate/falta/sobra/sem cotação/sem ativo), ajuste auditável (não apaga histórico). Remove o aviso "parcialmente reconciliado". ⚠️ depende de o Rafael fornecer o snapshot de saldos.
-4. **F-Q (resto) · "Explique este valor" em Carteiras + Proventos.** A 1ª fatia (Posições + Patrimônio) já foi. Reaplicar o mesmo mecanismo (`MontadorExplicacaoValor`/modal) às ilhas de Carteiras e de Proventos.
 
-**Proventos — pendência de dado (não é bug de código)**
-- **Nov/2025 (~R$660) faltava** porque o extrato `relatorio-consolidado-mensal-2025-novembro.xlsx` não estava em `arquivos/b3/`. **Arquivo já fornecido** → materializa no próximo start do app (resync). Conferir após reimport.
-- A **dupla contagem B3+Brapi** já foi corrigida (precedência + limpeza self-healing); a limpeza roda no `AtualizarProventosAsync`. Validar os totais anuais batendo com os reais (2023 R$6.053 / 2024 R$7.267 / 2025 R$8.381) após o job rodar.
+**Proventos — verificar no app (não é mais bug de código)**
+- **Nov/2025 (~R$660):** o extrato mensal já está em `arquivos/b3/` e, com o F-E, é **importado na detecção de arquivo novo no próximo start** (ou pelo botão "Atualizar"). Conferir que aparece após o resync.
+- **Dupla contagem B3+Brapi** corrigida (precedência + limpeza self-healing no `AtualizarProventosAsync`). A **ilha de reconciliação anual (F-V)** mostra, por ano/ativo, oficial B3 × materializado — usar pra validar os totais (2023 R$6.053 / 2024 R$7.267 / 2025 R$8.381) e caçar buracos restantes.
 
 **Pendências menores**
 - **Troca de ticker / incorporação** (ex.: TAEE3→TAEE4) — fora do split.
