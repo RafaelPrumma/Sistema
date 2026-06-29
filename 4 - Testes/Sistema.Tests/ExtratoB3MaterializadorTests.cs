@@ -215,6 +215,38 @@ public class ExtratoB3MaterializadorTests
         Assert.Equal(ClasseAtivo.Acao, ExtratoB3Materializador.ClassePorTicker("BBAS3"));
     }
 
+    // --- Causa B: "o extrato mais recente do mês manda" (atualização do staging no reimport) ---
+
+    [Fact]
+    public void NegociacaoMudou_QuantidadeMaior_DetectaMudanca()
+    {
+        // Extrato parcial (qtd 300) e depois o completo (qtd 500): a quantidade muda → atualiza staging.
+        Assert.True(ExtratoB3Materializador.NegociacaoMudou(
+            quantidadeExistente: 300m, precoExistente: 10m, brutoExistente: 3000m,
+            quantidadeNova: 500m, precoNovo: 10m, brutoNovo: 5000m));
+    }
+
+    [Fact]
+    public void NegociacaoMudou_MesmosValores_NaoEhMudanca()
+    {
+        // Reimportar o agregado com os MESMOS valores é no-op (não remateraliza à toa).
+        Assert.False(ExtratoB3Materializador.NegociacaoMudou(
+            quantidadeExistente: 500m, precoExistente: 10m, brutoExistente: 5000m,
+            quantidadeNova: 500m, precoNovo: 10m, brutoNovo: 5000m));
+    }
+
+    [Theory]
+    // só o preço mudou
+    [InlineData(500, 10, 5000, 500, 11, 5500, true)]
+    // só o bruto mudou (ex.: arredondamento/recálculo)
+    [InlineData(500, 10, 5000, 500, 10, 5001, true)]
+    // tudo igual
+    [InlineData(100, 9.5, 950, 100, 9.5, 950, false)]
+    public void NegociacaoMudou_CobrePrecoEBruto(
+        decimal qExist, decimal pExist, decimal bExist,
+        decimal qNova, decimal pNovo, decimal bNovo, bool esperado)
+        => Assert.Equal(esperado, ExtratoB3Materializador.NegociacaoMudou(qExist, pExist, bExist, qNova, pNovo, bNovo));
+
     private static Dictionary<string, string> LinhaNegociacao(
         string ticker, string periodoInicial, string periodoFinal, string instituicao,
         string qtdCompra, string qtdVenda, string qtdLiquida, string pmCompra, string pmVenda)

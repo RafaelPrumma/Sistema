@@ -25,6 +25,21 @@ public static class ExtratoB3Materializador
     public static string ChaveNegociacao(string assetKey, int anoMes, TipoOperacaoFinanceira tipo, string? broker)
         => $"{Fonte}|{assetKey}|{anoMes:D6}|{(int)tipo}|{(broker ?? string.Empty).Trim().ToUpperInvariant()}";
 
+    /// <summary>
+    /// "O extrato mais recente do mês manda" (§3.1, Causa B). A <see cref="ChaveNegociacao"/> NÃO inclui
+    /// quantidade/preço: um extrato parcial no meio do mês (qtd 300) e o completo no fechamento (qtd 500)
+    /// têm a MESMA chave. Antes a reimportação do agregado era pulada e a posição travava no parcial.
+    /// Agora, quando um documento NOVO traz valores diferentes para o mesmo ticker×mês×sentido×corretora,
+    /// o staging é ATUALIZADO (o mais recente vence). Este helper diz se há mudança que justifique
+    /// reescrever o staging e remateralizar — evita churn quando os valores são idênticos (no-op real).
+    /// </summary>
+    public static bool NegociacaoMudou(
+        decimal quantidadeExistente, decimal precoExistente, decimal brutoExistente,
+        decimal quantidadeNova, decimal precoNovo, decimal brutoNovo)
+        => quantidadeExistente != quantidadeNova
+           || precoExistente != precoNovo
+           || brutoExistente != brutoNovo;
+
     /// <summary>Ano-mês no formato yyyyMM (ex.: 2022/9 → 202209).</summary>
     public static int AnoMes(int ano, int mes) => ano * 100 + mes;
 

@@ -119,13 +119,44 @@ public partial class FinancasImportador
 
                 var broker = string.IsNullOrWhiteSpace(mov.Broker) ? "NU Invest" : mov.Broker!;
                 var chave = ExtratoB3Materializador.ChaveNegociacao(ativo.Chave, anoMes, mov.OperationType, broker);
-
-                // Idempotência: o mesmo agregado (reimportar o mesmo mês) não duplica no staging.
-                if (_context.NegociacoesMensaisB3.Local.Any(x => x.ChaveNatural == chave)
-                    || _context.NegociacoesMensaisB3.Any(x => x.ChaveNatural == chave))
-                    continue;
-
                 var data = (mov.PeriodoFinal ?? ultimoDiaDoMes).Date;
+                var bruto = decimal.Round(mov.Quantity * mov.UnitPrice, 8);
+                var rawJson = JsonSerializer.Serialize(new { data = data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), cells = aba.Linhas[i] });
+
+                // "O extrato mais recente do mês manda" (Causa B). A chave natural NÃO inclui
+                // quantidade/preço, então um extrato parcial (qtd 300) e depois o completo (qtd 500)
+                // colidem na mesma chave. ANTES isto era pulado (continue) e a posição travava no
+                // parcial. AGORA: se já existe staging com essa chave, ATUALIZAMOS o registro com os
+                // valores do extrato sendo importado (o mais recente vence) e removemos a transação
+                // canônica antiga (StagingTipo/StagingId) para o resync remateralizar com o novo valor.
+                // Reimportar o MESMO arquivo é barrado antes (dedup por Sha256 do documento); aqui a
+                // atualização só vale quando chega um documento NOVO para o mesmo ticker×mês.
+                var existente = _context.NegociacoesMensaisB3.Local.FirstOrDefault(x => x.ChaveNatural == chave)
+                    ?? _context.NegociacoesMensaisB3.FirstOrDefault(x => x.ChaveNatural == chave);
+                if (existente is not null)
+                {
+                    if (!ExtratoB3Materializador.NegociacaoMudou(
+                            existente.Quantity, existente.UnitPrice, existente.GrossAmount,
+                            mov.Quantity, mov.UnitPrice, bruto))
+                        continue; // mesmos valores → no-op (nada a remateralizar).
+
+                    existente.Quantity = mov.Quantity;
+                    existente.UnitPrice = mov.UnitPrice;
+                    existente.GrossAmount = bruto;
+                    existente.PeriodoInicial = mov.PeriodoInicial;
+                    existente.PeriodoFinal = mov.PeriodoFinal;
+                    existente.Broker = broker;
+                    existente.SourceDocument = documento;   // passa a apontar para o extrato mais recente.
+                    existente.CargaFinanceira = carga;
+                    existente.RawJson = rawJson;
+
+                    // Remove a transação canônica antiga deste staging para o resync reconstruí-la com o
+                    // valor atualizado (o DuplicateGroupKey = "NegociacaoMensalB3#{Id}" continua o mesmo,
+                    // então sem este delete o SincronizarTransacoesCanonicas pularia por já-materializada).
+                    RemoverTransacaoCanonicaDoStaging("NegociacaoMensalB3", existente.Id);
+                    continue;
+                }
+
                 _context.NegociacoesMensaisB3.Add(new NegociacaoMensalB3
                 {
                     CargaFinanceira = carga,
@@ -135,12 +166,12 @@ public partial class FinancasImportador
                     OperationType = mov.OperationType,
                     Quantity = mov.Quantity,
                     UnitPrice = mov.UnitPrice,
-                    GrossAmount = decimal.Round(mov.Quantity * mov.UnitPrice, 8),
+                    GrossAmount = bruto,
                     PeriodoInicial = mov.PeriodoInicial,
                     PeriodoFinal = mov.PeriodoFinal,
                     Broker = broker,
                     ChaveNatural = chave,
-                    RawJson = JsonSerializer.Serialize(new { data = data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), cells = aba.Linhas[i] }),
+                    RawJson = rawJson,
                     UsuarioInclusao = "financas-importador"
                 });
             }
