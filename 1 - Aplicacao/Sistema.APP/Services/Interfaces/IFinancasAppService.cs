@@ -19,6 +19,8 @@ public interface IFinancasAppService
     // F-Q — "Explique este valor": composição/fonte de um número do dashboard (lê só read models).
     Task<ExplicacaoPosicaoDto> ExplicarPosicaoAsync(int ativoId, CancellationToken cancellationToken = default);
     Task<ExplicacaoPatrimonioDto> ExplicarPatrimonioAsync(CancellationToken cancellationToken = default);
+    Task<ExplicacaoCarteiraDto> ExplicarCarteiraAsync(int carteiraId, CancellationToken cancellationToken = default);
+    Task<ExplicacaoProventosDto> ExplicarProventosAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasCalendarioProventosDashboardDto> ObterCalendarioProventosDashboardAsync(CancellationToken cancellationToken = default);

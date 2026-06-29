@@ -580,8 +580,8 @@ public record FinancasCalendarioProventosDashboardDto(
 
 // F-Q — "Explique este valor". Mecanismo reutilizável: cada número relevante do dashboard abre sua
 // composição/fonte, lendo SÓ os read models (FinanceiroPosicaoAtivo + FinanceiroCotacaoAtivo + ajustes
-// de reconciliação) — nunca recalcula transações na UI nem chama API. Esta passada cobre Posições e
-// Patrimônio (Carteiras/Proventos ficam para depois).
+// de reconciliação + FinanceiroRendimento) — nunca recalcula transações na UI nem chama API. Cobre
+// Posições, Patrimônio (1ª fatia) e Carteiras + Proventos (2ª fatia).
 
 // Uma linha "rótulo: valor" da explicação (ex.: "Preço usado: R$ 12,34"). Tipo controla a cor/ênfase
 // na UI (neutro / positivo / negativo / atencao). Já vem formatado pelo montador? Não: valor cru +
@@ -628,6 +628,40 @@ public record ExplicacaoPatrimonioDto(
     bool TemReconciliacao,
     decimal ValorReconciliacao,         // valor líquido parado no ativo virtual VARIACAO
     int QtdAjustesReconciliacao,
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// F-Q (2ª fatia) — explicação de UMA carteira (topo/subcarteira). Decompõe o valor da carteira por
+// fonte do preço (cotação ao vivo × fechamento B3 × custo/fallback) reusando os mesmos números da ilha
+// de Carteiras, mostra o peso atual no patrimônio vs o peso-alvo (PesoAlvo) quando definido e a parcela
+// de reconciliação (VARIACAO) que recaiu sobre os ativos da carteira (e subcarteiras).
+public record ExplicacaoCarteiraDto(
+    bool Encontrada,
+    string Nome,
+    string Tipo,
+    decimal ValorMercado,
+    decimal ComCotacao,
+    decimal ComFechamentoB3,
+    decimal ComCusto,
+    int QtdAtivos,
+    int QtdComCotacao,
+    int QtdComFechamentoB3,
+    int QtdComCusto,
+    decimal PesoAtual,                  // participação no patrimônio hoje (%)
+    decimal? PesoAlvo,                  // soma dos PesoAlvo dos ativos da carteira (e subcarteiras), em %
+    bool TemAjusteReconciliacao,
+    decimal ValorAjusteReconciliacao,   // valor da reconciliação B3 que recaiu sobre ativos desta carteira
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// F-Q (2ª fatia) — explicação do card de Proventos. Decompõe o recebido (12M) por FONTE do dado
+// (B3 Extrato/Brapi/Informe IR/Binance Earn) e por TIPO (Dividendo/JCP/Rendimento FII/Earn), com
+// contagem e soma de cada, o período coberto e a nota de precedência (B3 manda; Brapi só fallback).
+// Reusa RotuloFonteProvento/RotuloTipoProvento — sem cálculo paralelo.
+public record ExplicacaoProventosDto(
+    bool TemDados,
+    decimal TotalRecebido,              // recebido na janela coberta (12M)
+    int Quantidade,                     // nº de lançamentos na janela
+    string? PeriodoInicio,              // dd/MM/yyyy do provento mais antigo na janela
+    string? PeriodoFim,                 // dd/MM/yyyy do provento mais recente na janela
     IReadOnlyList<ExplicacaoLinhaDto> Linhas);
 
 public class FinancasDashboardDto

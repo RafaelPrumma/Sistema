@@ -42,7 +42,14 @@
             </td>
             <td class="text-end">@Percent(carteira.PercentualPatrimonio)</td>
             <td class="text-end @diaClass">@Percent(carteira.VariacaoDiaPercentual)</td>
-            <td class="text-end">@Money(carteira.ValorMercado)</td>
+            <td class="text-end">
+                @* F-Q: o valor da carteira abre a explicação (composição por fonte + peso atual/alvo). *@
+                <button type="button" class="btn btn-link btn-sm p-0 text-reset text-decoration-none fw-medium"
+                        data-explicar="carteira" data-carteira-id="@carteira.Id" data-titulo="@carteira.Nome"
+                        title="Explicar este valor">
+                    @Money(carteira.ValorMercado) <i class="bi bi-info-circle small text-secondary"></i>
+                </button>
+            </td>
             <td class="text-end @resultadoClass">
                 @Money(carteira.ResultadoNaoRealizado)
                 <div class="small">@Percent(carteira.ResultadoNaoRealizadoPercentual)</div>

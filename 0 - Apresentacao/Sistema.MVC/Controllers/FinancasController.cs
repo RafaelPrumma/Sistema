@@ -56,6 +56,16 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> ExplicarPatrimonio(CancellationToken cancellationToken)
         => Json(await _service.ExplicarPatrimonioAsync(cancellationToken));
 
+    // F-Q — "Explique este valor": composição de uma carteira por fonte do preço + peso atual/alvo.
+    [HttpGet("/Financas/Dashboard/ExplicarCarteira")]
+    public async Task<IActionResult> ExplicarCarteira(int carteiraId, CancellationToken cancellationToken)
+        => Json(await _service.ExplicarCarteiraAsync(carteiraId, cancellationToken));
+
+    // F-Q — "Explique este valor": composição dos proventos recebidos (12M) por fonte e por tipo.
+    [HttpGet("/Financas/Dashboard/ExplicarProventos")]
+    public async Task<IActionResult> ExplicarProventos(CancellationToken cancellationToken)
+        => Json(await _service.ExplicarProventosAsync(cancellationToken));
+
     [HttpGet("/Financas/Dashboard/Alertas")]
     public async Task<IActionResult> DashboardAlertas(CancellationToken cancellationToken)
         => PartialView("_DashboardAlertas", await _service.ObterAlertasDashboardAsync(cancellationToken));

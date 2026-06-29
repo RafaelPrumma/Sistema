@@ -175,6 +175,146 @@ public static class MontadorExplicacaoValor
     public static ExplicacaoPatrimonioDto PatrimonioVazio()
         => new(false, 0m, 0m, 0m, 0m, 0, 0, 0, 0, false, 0m, 0, []);
 
+    // F-Q (2ª fatia) — sinais de UMA carteira já agregados pelo service (mesmos números da ilha de
+    // Carteiras: composição por fonte do preço + peso atual/alvo + reconciliação que recaiu nos ativos).
+    public readonly record struct EntradaCarteira(
+        string Nome,
+        string Tipo,
+        decimal ValorMercado,
+        decimal ComCotacao,
+        decimal ComFechamentoB3,
+        decimal ComCusto,
+        int QtdAtivos,
+        int QtdComCotacao,
+        int QtdComFechamentoB3,
+        int QtdComCusto,
+        decimal PesoAtual,
+        decimal? PesoAlvo,
+        bool TemAjusteReconciliacao,
+        decimal ValorAjusteReconciliacao);
+
+    // Monta a explicação de UMA carteira: composição do valor por fonte do preço, peso atual vs alvo e
+    // a parcela de reconciliação. Reusa os números da ilha (sem cálculo paralelo). À prova de falha: o
+    // service trata try-catch e decide encontrada/não encontrada.
+    public static ExplicacaoCarteiraDto Carteira(EntradaCarteira e)
+    {
+        string Parte(decimal valor) => e.ValorMercado == 0m ? "0,00%" : Pct(valor / e.ValorMercado * 100m);
+
+        var linhas = new List<ExplicacaoLinhaDto>
+        {
+            new("Valor da carteira", Money(e.ValorMercado), "neutro"),
+            new($"Cotação ao vivo ({e.QtdComCotacao} ativo(s))", $"{Money(e.ComCotacao)} · {Parte(e.ComCotacao)}", "positivo"),
+            new($"Fechamento B3 ({e.QtdComFechamentoB3} ativo(s))", $"{Money(e.ComFechamentoB3)} · {Parte(e.ComFechamentoB3)}", "neutro"),
+            new($"Custo / fallback ({e.QtdComCusto} ativo(s))", $"{Money(e.ComCusto)} · {Parte(e.ComCusto)}", e.ComCusto > 0m ? "atencao" : "neutro"),
+        };
+
+        if (e.QtdComCusto > 0)
+            linhas.Add(new("", "Ativos sem cotação utilizável entram pelo custo (preço médio) — valor é piso, não preço de mercado.", "atencao"));
+
+        // Peso atual no patrimônio vs peso-alvo (PesoAlvo). O desvio (p.p.) ajuda a decidir aporte.
+        linhas.Add(new("Peso atual (no patrimônio)", Pct(e.PesoAtual), "neutro"));
+        if (e.PesoAlvo.HasValue)
+        {
+            var desvio = e.PesoAtual - e.PesoAlvo.Value;
+            linhas.Add(new("Peso-alvo", Pct(e.PesoAlvo.Value), "neutro"));
+            linhas.Add(new(
+                "Desvio (atual − alvo)",
+                $"{(desvio >= 0 ? "+" : "")}{Pct(desvio)} p.p.",
+                Math.Abs(desvio) < 0.01m ? "neutro" : "atencao"));
+        }
+        else
+        {
+            linhas.Add(new("Peso-alvo", "— (não definido)", "neutro"));
+        }
+
+        if (e.TemAjusteReconciliacao)
+        {
+            linhas.Add(new(
+                "Ajuste de reconciliação (B3)",
+                $"{(e.ValorAjusteReconciliacao >= 0 ? "+" : "")}{Money(e.ValorAjusteReconciliacao)}",
+                "atencao"));
+            linhas.Add(new("", "Diferença entre o calculado e a custódia oficial B3 que recaiu sobre ativos desta carteira.", "atencao"));
+        }
+
+        return new ExplicacaoCarteiraDto(
+            Encontrada: true,
+            Nome: e.Nome,
+            Tipo: e.Tipo,
+            ValorMercado: Math.Round(e.ValorMercado, 2),
+            ComCotacao: Math.Round(e.ComCotacao, 2),
+            ComFechamentoB3: Math.Round(e.ComFechamentoB3, 2),
+            ComCusto: Math.Round(e.ComCusto, 2),
+            QtdAtivos: e.QtdAtivos,
+            QtdComCotacao: e.QtdComCotacao,
+            QtdComFechamentoB3: e.QtdComFechamentoB3,
+            QtdComCusto: e.QtdComCusto,
+            PesoAtual: Math.Round(e.PesoAtual, 2),
+            PesoAlvo: e.PesoAlvo.HasValue ? Math.Round(e.PesoAlvo.Value, 2) : null,
+            TemAjusteReconciliacao: e.TemAjusteReconciliacao,
+            ValorAjusteReconciliacao: Math.Round(e.ValorAjusteReconciliacao, 2),
+            Linhas: linhas);
+    }
+
+    public static ExplicacaoCarteiraDto CarteiraNaoEncontrada()
+        => new(false, "—", string.Empty, 0m, 0m, 0m, 0m, 0, 0, 0, 0, 0m, null, false, 0m, []);
+
+    // F-Q (2ª fatia) — sinais do card de Proventos já agregados pelo service. As quebras por fonte/tipo
+    // vêm prontas (o service reusa RotuloFonteProvento/RotuloTipoProvento), cada uma como (rótulo, valor,
+    // contagem); o montador só formata as linhas e adiciona a nota de precedência.
+    public readonly record struct GrupoProvento(string Rotulo, decimal Valor, int Quantidade);
+
+    public readonly record struct EntradaProventos(
+        decimal TotalRecebido,
+        int Quantidade,
+        DateTime? PeriodoInicio,
+        DateTime? PeriodoFim,
+        IReadOnlyList<GrupoProvento> PorFonte,
+        IReadOnlyList<GrupoProvento> PorTipo);
+
+    public static ExplicacaoProventosDto Proventos(EntradaProventos e)
+    {
+        string Parte(decimal valor) => e.TotalRecebido == 0m ? "0,00%" : Pct(valor / e.TotalRecebido * 100m);
+        string Data(DateTime d) => d.ToString("dd/MM/yyyy", Br);
+
+        var linhas = new List<ExplicacaoLinhaDto>
+        {
+            new("Recebido (12 meses)", Money(e.TotalRecebido), "positivo"),
+            new("Lançamentos", e.Quantidade.ToString("N0", Br), "neutro"),
+        };
+
+        if (e.PeriodoInicio.HasValue && e.PeriodoFim.HasValue)
+            linhas.Add(new("Período coberto", $"{Data(e.PeriodoInicio.Value)} a {Data(e.PeriodoFim.Value)}", "neutro"));
+
+        if (e.PorFonte.Count > 0)
+        {
+            linhas.Add(new("Por fonte do dado", "", "neutro"));
+            foreach (var f in e.PorFonte)
+                linhas.Add(new($"  {f.Rotulo} ({f.Quantidade} lançamento(s))", $"{Money(f.Valor)} · {Parte(f.Valor)}", "neutro"));
+        }
+
+        if (e.PorTipo.Count > 0)
+        {
+            linhas.Add(new("Por tipo", "", "neutro"));
+            foreach (var t in e.PorTipo)
+                linhas.Add(new($"  {t.Rotulo} ({t.Quantidade} lançamento(s))", $"{Money(t.Valor)} · {Parte(t.Valor)}", "neutro"));
+        }
+
+        // Nota de confiança/precedência: a B3 é a fonte primária; Brapi só complementa onde a B3 não
+        // cobre. FII vem da B3 porque o informe de IR só cobre ações.
+        linhas.Add(new("", "Precedência: a B3 manda quando há extrato; Brapi entra só como complemento. FII vem da B3 (o informe de IR só cobre ações).", "atencao"));
+
+        return new ExplicacaoProventosDto(
+            TemDados: e.Quantidade > 0,
+            TotalRecebido: Math.Round(e.TotalRecebido, 2),
+            Quantidade: e.Quantidade,
+            PeriodoInicio: e.PeriodoInicio.HasValue ? Data(e.PeriodoInicio.Value) : null,
+            PeriodoFim: e.PeriodoFim.HasValue ? Data(e.PeriodoFim.Value) : null,
+            Linhas: linhas);
+    }
+
+    public static ExplicacaoProventosDto ProventosVazio()
+        => new(false, 0m, 0, null, null, []);
+
     // Mesmo rótulo de fonte do FinancasAppService.RotuloFontePreco (mantido aqui para a lógica ser pura).
     private static string RotuloFontePreco(ProvedorCotacao provedor) => provedor switch
     {

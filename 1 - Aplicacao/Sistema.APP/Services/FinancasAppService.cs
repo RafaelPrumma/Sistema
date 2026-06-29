@@ -609,6 +609,146 @@ public class FinancasAppService(IUnitOfWork uow, IFinancasImportador importador,
         }
     }
 
+    // F-Q (2ª fatia) — "Explique este valor" (Carteiras). Para uma carteira (topo ou subcarteira),
+    // decompõe o valor por fonte do preço (cotação ao vivo × fechamento B3 × custo/fallback) sobre os
+    // ativos da carteira E de suas subcarteiras, expõe o peso atual no patrimônio vs o peso-alvo
+    // (PesoAlvo) e a parcela de reconciliação (VARIACAO) que recaiu sobre esses ativos. REUSA os mesmos
+    // números da ilha de Carteiras (CriarAtivosCotadosDaTabela + SomarPesoAlvo) — sem cálculo paralelo.
+    // À PROVA DE FALHA: qualquer erro devolve "não encontrada".
+    public async Task<ExplicacaoCarteiraDto> ExplicarCarteiraAsync(int carteiraId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cotacoes = await _uow.Financas.BuscarCotacoesAtuaisAsync(cancellationToken);
+            var carteiras = await _uow.Financas.BuscarCarteirasComAtivosAsync(cancellationToken);
+            var carteira = carteiras.FirstOrDefault(c => c.Id == carteiraId);
+            if (carteira is null)
+                return MontadorExplicacaoValor.CarteiraNaoEncontrada();
+
+            var posicoes = await ObterPosicoesAtivosProjetadasAsync(cancellationToken);
+            var ativos = CriarAtivosCotadosDaTabela(posicoes, cotacoes).Where(EhAtivoCotadoVisivel).ToList();
+            var ativosPorId = ativos.ToDictionary(x => x.AtivoId);
+            var valorPatrimonio = ativos.Sum(x => x.ValorMercado);
+
+            // Ativos da carteira + de todas as subcarteiras (recursivo) que de fato têm posição visível.
+            var filhasPorPai = carteiras
+                .Where(c => c.CarteiraPaiId.HasValue)
+                .GroupBy(c => c.CarteiraPaiId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var idsAtivos = new HashSet<int>();
+            ColetarAtivosDaCarteira(carteira, carteiras.ToDictionary(c => c.Id), filhasPorPai, idsAtivos);
+
+            var itens = idsAtivos
+                .Where(ativosPorId.ContainsKey)
+                .Select(id => ativosPorId[id])
+                .ToList();
+
+            // Composição por fonte do preço — mesma classificação da ilha de Posições/Patrimônio (F-L).
+            decimal comCotacao = 0m, comFechamentoB3 = 0m, comCusto = 0m;
+            int qCotacao = 0, qFechamento = 0, qCusto = 0;
+            foreach (var a in itens)
+            {
+                if (a.FontePreco == "Custo") { comCusto += a.ValorMercado; qCusto++; }
+                else if (a.FontePreco == "Fechamento B3") { comFechamentoB3 += a.ValorMercado; qFechamento++; }
+                else { comCotacao += a.ValorMercado; qCotacao++; }
+            }
+            var valorCarteira = comCotacao + comFechamentoB3 + comCusto;
+
+            // Peso atual (% do patrimônio) e peso-alvo (soma dos PesoAlvo dos ativos da árvore da carteira).
+            var pesoAtual = valorPatrimonio == 0m ? 0m : valorCarteira / valorPatrimonio * 100m;
+            var pesoAlvo = SomarPesoAlvo(carteira.Id, carteiras.ToDictionary(c => c.Id), filhasPorPai);
+
+            // Parcela de reconciliação: soma dos ajustes B3 que recaíram sobre os ativos desta carteira.
+            var ajustes = await CalcularAjustesVariacaoPorAtivoAsync(cancellationToken);
+            var ajusteCarteira = idsAtivos.Sum(id => ajustes.TryGetValue(id, out var v) ? v : 0m);
+
+            return MontadorExplicacaoValor.Carteira(new MontadorExplicacaoValor.EntradaCarteira(
+                Nome: carteira.Nome,
+                Tipo: carteira.Tipo,
+                ValorMercado: valorCarteira,
+                ComCotacao: comCotacao,
+                ComFechamentoB3: comFechamentoB3,
+                ComCusto: comCusto,
+                QtdAtivos: itens.Count,
+                QtdComCotacao: qCotacao,
+                QtdComFechamentoB3: qFechamento,
+                QtdComCusto: qCusto,
+                PesoAtual: pesoAtual,
+                PesoAlvo: pesoAlvo,
+                TemAjusteReconciliacao: ajusteCarteira != 0m,
+                ValorAjusteReconciliacao: ajusteCarteira));
+        }
+        catch
+        {
+            return MontadorExplicacaoValor.CarteiraNaoEncontrada();
+        }
+    }
+
+    // Coleta os AtivoFinanceiroId ligados a uma carteira e (recursivo) a todas as subcarteiras. Usado
+    // pela explicação da carteira para somar a composição/reconciliação da árvore inteira.
+    private static void ColetarAtivosDaCarteira(
+        CarteiraFinanceira carteira,
+        IReadOnlyDictionary<int, CarteiraFinanceira> carteirasPorId,
+        IReadOnlyDictionary<int, List<CarteiraFinanceira>> filhasPorPai,
+        HashSet<int> destino)
+    {
+        foreach (var vinculo in carteira.Ativos)
+            if (vinculo.AtivoFinanceiroId > 0)
+                destino.Add(vinculo.AtivoFinanceiroId);
+
+        if (filhasPorPai.TryGetValue(carteira.Id, out var filhas))
+            foreach (var filha in filhas)
+                if (carteirasPorId.TryGetValue(filha.Id, out var f))
+                    ColetarAtivosDaCarteira(f, carteirasPorId, filhasPorPai, destino);
+    }
+
+    // F-Q (2ª fatia) — "Explique este valor" (Proventos). Decompõe o recebido (12M) por FONTE do dado
+    // (B3 Extrato/Brapi/Informe IR/Binance Earn) e por TIPO (Dividendo/JCP/Rendimento FII/Earn) com
+    // contagem e soma, o período coberto e a nota de precedência. REUSA RotuloFonteProvento/
+    // RotuloTipoProvento (mesma lógica do card F-N e do calendário F-T). À PROVA DE FALHA: erro → vazio.
+    public async Task<ExplicacaoProventosDto> ExplicarProventosAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var hoje = DateTime.UtcNow.Date;
+            var todos = await _uow.Financas.BuscarProventosPorPeriodoAsync(new DateTime(2000, 1, 1), hoje.AddYears(5), cancellationToken);
+            // Mesma janela do card de proventos (F-N): recebido nos últimos 12 meses.
+            var inicio12m = hoje.AddMonths(-12);
+            var recebidos12m = todos
+                .Where(x => x.PaymentDate.HasValue && x.PaymentDate.Value.Date <= hoje && x.PaymentDate.Value.Date >= inicio12m)
+                .ToList();
+
+            if (recebidos12m.Count == 0)
+                return MontadorExplicacaoValor.ProventosVazio();
+
+            var porFonte = recebidos12m
+                .GroupBy(RotuloFonteProvento)
+                .Select(g => new MontadorExplicacaoValor.GrupoProvento(g.Key, Math.Round(g.Sum(ValorLiquido), 2), g.Count()))
+                .Where(x => x.Valor != 0m || x.Quantidade > 0)
+                .OrderByDescending(x => x.Valor)
+                .ToList();
+
+            var porTipo = recebidos12m
+                .GroupBy(RotuloTipoProvento)
+                .Select(g => new MontadorExplicacaoValor.GrupoProvento(g.Key, Math.Round(g.Sum(ValorLiquido), 2), g.Count()))
+                .Where(x => x.Valor != 0m || x.Quantidade > 0)
+                .OrderByDescending(x => x.Valor)
+                .ToList();
+
+            return MontadorExplicacaoValor.Proventos(new MontadorExplicacaoValor.EntradaProventos(
+                TotalRecebido: Math.Round(recebidos12m.Sum(ValorLiquido), 2),
+                Quantidade: recebidos12m.Count,
+                PeriodoInicio: recebidos12m.Min(x => x.PaymentDate!.Value),
+                PeriodoFim: recebidos12m.Max(x => x.PaymentDate!.Value),
+                PorFonte: porFonte,
+                PorTipo: porTipo));
+        }
+        catch
+        {
+            return MontadorExplicacaoValor.ProventosVazio();
+        }
+    }
+
     public async Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default)
     {
         var alertas = await _uow.Financas.BuscarAlertasAsync(cancellationToken);

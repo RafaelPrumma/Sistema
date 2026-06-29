@@ -525,6 +525,27 @@
       `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Soma das posições valoradas — sem recalcular transações.</div>`;
   }
 
+  function renderCarteira(corpo, titulo, dto) {
+    if (!dto || !dto.encontrada) {
+      titulo.textContent = 'Explique este valor';
+      corpo.innerHTML = `<div class="text-secondary py-2">Carteira não encontrada na projeção atual.</div>`;
+      return;
+    }
+    titulo.textContent = `${dto.nome} — composição do valor`;
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Soma das posições da carteira e subcarteiras — sem recalcular transações.</div>`;
+  }
+
+  function renderProventos(corpo, titulo, dto) {
+    titulo.textContent = 'Proventos — composição (12M)';
+    if (!dto || !dto.temDados) {
+      corpo.innerHTML = `<div class="text-secondary py-2">Sem proventos recebidos nos últimos 12 meses.</div>`;
+      return;
+    }
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Recebido (líquido) dos últimos 12 meses, lido dos proventos registrados.</div>`;
+  }
+
   async function abrirExplicacao(trigger) {
     const modal = garantirModal();
     if (!modal) return;
@@ -544,6 +565,14 @@
       } else if (tipo === 'patrimonio') {
         const dto = await (await fetchChecked(dashboard.dataset.explicarPatrimonioUrl, 'application/json')).json();
         renderPatrimonio(corpo, titulo, dto);
+      } else if (tipo === 'carteira') {
+        const id = trigger.dataset.carteiraId;
+        const url = `${dashboard.dataset.explicarCarteiraUrl}?carteiraId=${encodeURIComponent(id)}`;
+        const dto = await (await fetchChecked(url, 'application/json')).json();
+        renderCarteira(corpo, titulo, dto);
+      } else if (tipo === 'proventos') {
+        const dto = await (await fetchChecked(dashboard.dataset.explicarProventosUrl, 'application/json')).json();
+        renderProventos(corpo, titulo, dto);
       }
     } catch (error) {
       if (error.name === 'AbortError') return;

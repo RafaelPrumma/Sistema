@@ -186,4 +186,160 @@ public class MontadorExplicacaoValorTests
         Assert.False(dto.TemDados);
         Assert.Empty(dto.Linhas);
     }
+
+    // ─── Carteira (2ª fatia) ───────────────────────────────────────────────────────────────────────
+
+    private static MontadorExplicacaoValor.EntradaCarteira EntradaCarteira(
+        decimal valor = 1000m,
+        decimal comCotacao = 600m,
+        decimal comFechamentoB3 = 300m,
+        decimal comCusto = 100m,
+        int qCotacao = 3,
+        int qFechamento = 1,
+        int qCusto = 1,
+        decimal pesoAtual = 25m,
+        decimal? pesoAlvo = 30m,
+        decimal ajuste = 0m,
+        bool temAjuste = false)
+        => new(
+            Nome: "FIIs",
+            Tipo: "Carteira",
+            ValorMercado: valor,
+            ComCotacao: comCotacao,
+            ComFechamentoB3: comFechamentoB3,
+            ComCusto: comCusto,
+            QtdAtivos: qCotacao + qFechamento + qCusto,
+            QtdComCotacao: qCotacao,
+            QtdComFechamentoB3: qFechamento,
+            QtdComCusto: qCusto,
+            PesoAtual: pesoAtual,
+            PesoAlvo: pesoAlvo,
+            TemAjusteReconciliacao: temAjuste,
+            ValorAjusteReconciliacao: ajuste);
+
+    [Fact]
+    public void Carteira_DecompoePorFonteEMostraPesoAtualVsAlvo()
+    {
+        var dto = MontadorExplicacaoValor.Carteira(EntradaCarteira());
+
+        Assert.True(dto.Encontrada);
+        Assert.Equal("FIIs", dto.Nome);
+        Assert.Equal(1000m, dto.ValorMercado);
+        Assert.Equal(600m, dto.ComCotacao);
+        Assert.Equal(300m, dto.ComFechamentoB3);
+        Assert.Equal(100m, dto.ComCusto);
+        Assert.Equal(25m, dto.PesoAtual);
+        Assert.Equal(30m, dto.PesoAlvo);
+        // Linhas trazem valor + cada fonte + peso atual/alvo + desvio.
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Valor da carteira");
+        Assert.Contains(dto.Linhas, l => l.Rotulo.StartsWith("Cotação ao vivo", StringComparison.Ordinal));
+        Assert.Contains(dto.Linhas, l => l.Rotulo.StartsWith("Fechamento B3", StringComparison.Ordinal));
+        Assert.Contains(dto.Linhas, l => l.Rotulo.StartsWith("Custo / fallback", StringComparison.Ordinal));
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Peso atual (no patrimônio)");
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Peso-alvo" && l.Valor.Contains("30"));
+        Assert.Contains(dto.Linhas, l => l.Rotulo.StartsWith("Desvio", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Carteira_SemPesoAlvo_MostraNaoDefinidoESemDesvio()
+    {
+        var dto = MontadorExplicacaoValor.Carteira(EntradaCarteira(pesoAlvo: null));
+
+        Assert.Null(dto.PesoAlvo);
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Peso-alvo" && l.Valor.Contains("não definido"));
+        Assert.DoesNotContain(dto.Linhas, l => l.Rotulo.StartsWith("Desvio", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Carteira_ComAjusteReconciliacao_ExibeLinhaDeVariacao()
+    {
+        var dto = MontadorExplicacaoValor.Carteira(EntradaCarteira(ajuste: -80.25m, temAjuste: true));
+
+        Assert.True(dto.TemAjusteReconciliacao);
+        Assert.Equal(-80.25m, dto.ValorAjusteReconciliacao);
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Ajuste de reconciliação (B3)");
+    }
+
+    [Fact]
+    public void Carteira_SemCusto_NaoMarcaNotaDeFallback()
+    {
+        var dto = MontadorExplicacaoValor.Carteira(EntradaCarteira(comCusto: 0m, qCusto: 0, valor: 900m, comCotacao: 600m, comFechamentoB3: 300m));
+
+        // Sem custo, não há a nota de atenção sobre fallback ao custo.
+        Assert.DoesNotContain(dto.Linhas, l => l.Rotulo == "" && l.Valor.Contains("preço médio"));
+    }
+
+    [Fact]
+    public void CarteiraNaoEncontrada_MarcaEncontradaFalse()
+    {
+        var dto = MontadorExplicacaoValor.CarteiraNaoEncontrada();
+        Assert.False(dto.Encontrada);
+        Assert.Empty(dto.Linhas);
+    }
+
+    // ─── Proventos (2ª fatia) ──────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Proventos_DecompoePorFonteEPorTipoComNotaDePrecedencia()
+    {
+        var dto = MontadorExplicacaoValor.Proventos(new MontadorExplicacaoValor.EntradaProventos(
+            TotalRecebido: 1000m,
+            Quantidade: 12,
+            PeriodoInicio: new DateTime(2025, 7, 1),
+            PeriodoFim: new DateTime(2026, 6, 1),
+            PorFonte:
+            [
+                new MontadorExplicacaoValor.GrupoProvento("B3 Extrato", 700m, 8),
+                new MontadorExplicacaoValor.GrupoProvento("Brapi", 200m, 3),
+                new MontadorExplicacaoValor.GrupoProvento("Binance Earn", 100m, 1),
+            ],
+            PorTipo:
+            [
+                new MontadorExplicacaoValor.GrupoProvento("Rendimento FII", 600m, 6),
+                new MontadorExplicacaoValor.GrupoProvento("Dividendo", 300m, 5),
+                new MontadorExplicacaoValor.GrupoProvento("Earn", 100m, 1),
+            ]));
+
+        Assert.True(dto.TemDados);
+        Assert.Equal(1000m, dto.TotalRecebido);
+        Assert.Equal(12, dto.Quantidade);
+        Assert.Equal("01/07/2025", dto.PeriodoInicio);
+        Assert.Equal("01/06/2026", dto.PeriodoFim);
+        // Cabeçalhos de seção + cada fonte + cada tipo + período + nota de precedência.
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Recebido (12 meses)");
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Período coberto");
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Por fonte do dado");
+        Assert.Contains(dto.Linhas, l => l.Rotulo.Contains("B3 Extrato"));
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Por tipo");
+        Assert.Contains(dto.Linhas, l => l.Rotulo.Contains("Rendimento FII"));
+        // Nota de precedência (linha sem rótulo, tom atenção).
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "" && l.Valor.Contains("Precedência") && l.Tipo == "atencao");
+    }
+
+    [Fact]
+    public void Proventos_SemFonteNemTipo_AindaTrazTotalENota()
+    {
+        var dto = MontadorExplicacaoValor.Proventos(new MontadorExplicacaoValor.EntradaProventos(
+            TotalRecebido: 50m,
+            Quantidade: 1,
+            PeriodoInicio: null,
+            PeriodoFim: null,
+            PorFonte: [],
+            PorTipo: []));
+
+        Assert.True(dto.TemDados);
+        Assert.Null(dto.PeriodoInicio);
+        Assert.DoesNotContain(dto.Linhas, l => l.Rotulo == "Período coberto");
+        Assert.DoesNotContain(dto.Linhas, l => l.Rotulo == "Por fonte do dado");
+        Assert.Contains(dto.Linhas, l => l.Rotulo == "Recebido (12 meses)");
+        Assert.Contains(dto.Linhas, l => l.Valor.Contains("Precedência"));
+    }
+
+    [Fact]
+    public void ProventosVazio_MarcaTemDadosFalse()
+    {
+        var dto = MontadorExplicacaoValor.ProventosVazio();
+        Assert.False(dto.TemDados);
+        Assert.Empty(dto.Linhas);
+    }
 }
