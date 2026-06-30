@@ -1,6 +1,15 @@
 # Spec — Submódulo Gestão de Gastos
 
-> ⏸️ **ADIADO — só começa depois de terminar Investimentos.** Controle financeiro pessoal estilo **GuiaBolso / Minhas Economias / Mobills**: cartão + conta → categorização → receita vs despesa → orçamento e fluxo de caixa. Contexto técnico: skill `financas-dominio`. Esta spec é detalhada para servir de base aos **subagentes** quando chegar a vez.
+> ▶️ **ATIVO — iniciado jun/2026 (branch `feat/gastos-e-menu`).** Controle financeiro pessoal estilo **GuiaBolso / Minhas Economias / Mobills**: cartão + conta → categorização → receita vs despesa → orçamento e fluxo de caixa. Contexto técnico: skill `financas-dominio`. Esta spec é a base dos **subagentes** por fase (G1…G5).
+
+## Fontes reais já na pasta `arquivos/financeiro/` (confirmado jun/2026)
+- **Conta corrente (NuConta):** `NU_40648231_<ddMMMyyyy>_<ddMMMyyyy>.pdf` — extratos mensais (ago/2025 → mai/2026, 11 meses). Pix, débito, crédito em conta, salário, compra de ações/RDB, rendimentos.
+- **Cartão de crédito (fatura Nubank):** `Nubank_<yyyy-MM-dd>.pdf` (`2026-03-15`, `2026-04-15`) — compras com data/descrição/valor, parcelas, estabelecimento.
+- **CSV solto:** `dbcd8af8-…-1.csv` — investigar no G1 (possível export de extrato/fatura; usar se for lançamentos).
+- ⚠️ As **notas de negociação** (`Nubank_notas_…`) e os relatórios B3/Binance NÃO são gasto — são Investimentos (já tratados). NÃO reprocessar como despesa.
+
+## Módulo próprio (`Gastos`) — não pendurar no `FinancasController`
+As telas de gastos ficam num **controller novo `GastosController`** (`/Gastos/...`), permissão própria (ex.: `[AuthorizePermission("Gastos")]` ou reusar `Financas` — decidir no G1), e num **submódulo de menu próprio** "Gastos" (ver `_SidebarMenu.cshtml`, já reorganizado em Investimentos/IR/Gastos). Entidades de gasto vivem em `Financas.cs` (mesma convenção EF) mas com prefixo de tabela próprio (`Gasto*`/`Financeiro*` a critério do G1) para não confundir com as de investimento.
 
 ## Objetivo
 Entrar com os gastos do **cartão** e da **conta corrente**, categorizá-los (o que gastei, quanto ganhei), planejar (orçamento) e visualizar por categoria/mês — sem digitar tudo à mão, porque os dados **já estão importados**.
@@ -39,7 +48,7 @@ Hoje o importador guarda como texto bruto/alerta (`ExtratoContaNubank`/`ExtratoI
 
 ## Skills/abordagem dos subagentes (quando chegar a vez)
 Dividir em fases, **um subagente por fase**, cada um seguindo a skill `financas-dominio` (seção "Fluxo com subagentes"):
-- **G1 — Modelo + parser:** entidades (`LancamentoGasto`/`CategoriaGasto`/`RegraCategorizacao`) + mapping + migration (snapshot junto, sem `database update`) + materializador idempotente das faturas/extratos. Seed das categorias e regras iniciais. Testes do parser com fixtures reais.
+- **G1 — Modelo + parser:** entidades (`LancamentoGasto`/`CategoriaGasto`/`RegraCategorizacao`) + mapping + migration (snapshot junto, sem `database update`) + materializador idempotente das faturas/extratos (parsear o texto bruto já persistido das NuConta/faturas; investigar o `.csv`). Seed das categorias e regras iniciais. Testes do parser com fixtures reais. **Inclui um `GastosController` mínimo com `Index` ("Visão geral") à prova de falha** que mostra o que já foi parseado (nº de lançamentos, receita×despesa do mês) — assim o submódulo de menu "Gastos" deixa de cair em 404 enquanto as fases de UD (G3+) não chegam. **NÃO** mexer no `_SidebarMenu.cshtml` (o menu já foi reorganizado à parte).
 - **G2 — Categorização + correção:** auto-categorização por regra + tela de ajuste que **aprende** (cria/ajusta `RegraCategorizacao`). Ponte com Investimentos (aportes ≠ despesa).
 - **G3 — Visões/dashboard:** ilhas no padrão existente (controller `Dashboard{X}` → `Obter{X}DashboardAsync` → parcial + `financas.js`; gráfico monta no JS); receita×despesa, por categoria, evolução, maiores gastos.
 - **G4 — Orçamento + recorrências + fluxo de caixa:** `OrcamentoCategoria`/`Recorrencia` + alertas (reusa o motor de alertas) + projeção de saldo.
