@@ -29,10 +29,24 @@
                 </li>
 
                 <li class="menu-section-label text-uppercase small">Modulos</li>
-                <li class="menu-item" data-panel="menuPanelFinancas">
-                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Financas")" title="Finanças" aria-label="Abrir submenu Finanças">
+                <li class="menu-item" data-panel="menuPanelInvestimentos">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Financas")" title="Investimentos" aria-label="Abrir submenu Investimentos">
                         <i class="bi bi-graph-up-arrow"></i>
-                        <span>Finanças</span>
+                        <span>Investimentos</span>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
+                </li>
+                <li class="menu-item" data-panel="menuPanelIR">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Financas", "IR")" title="Imposto de Renda" aria-label="Abrir submenu Imposto de Renda">
+                        <i class="bi bi-receipt"></i>
+                        <span>Imposto de Renda</span>
+                        <i class="bi bi-chevron-right menu-chevron"></i>
+                    </button>
+                </li>
+                <li class="menu-item" data-panel="menuPanelGastos">
+                    <button type="button" class="menu-link menu-toggle @textClass @IsActive("Gastos")" title="Gastos" aria-label="Abrir submenu Gastos">
+                        <i class="bi bi-wallet2"></i>
+                        <span>Gastos</span>
                         <i class="bi bi-chevron-right menu-chevron"></i>
                     </button>
                 </li>
@@ -71,10 +85,10 @@
             </ul>
         </div>
 
-        <div class="menu-panel menu-panel--sub" id="menuPanelFinancas">
+        <div class="menu-panel menu-panel--sub" id="menuPanelInvestimentos">
             <div class="menu-panel-header">
                 <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
-                <span class="menu-panel-title">Finanças</span>
+                <span class="menu-panel-title">Investimentos</span>
             </div>
             <ul class="menu-list">
                 <li><a asp-controller="Financas" asp-action="Index" class="menu-sublink @textClass @IsActive("Financas", "Index")">Dashboard</a></li>
@@ -89,7 +103,26 @@
                 <li><a asp-controller="Financas" asp-action="Eventos" class="menu-sublink @textClass @IsActive("Financas", "Eventos")">Eventos corporativos</a></li>
                 <li><a asp-controller="Financas" asp-action="AlertasPreco" class="menu-sublink @textClass @IsActive("Financas", "AlertasPreco")">Alertas de preco</a></li>
                 <li><a asp-controller="Financas" asp-action="PesoAlvo" class="menu-sublink @textClass @IsActive("Financas", "PesoAlvo")">Peso-alvo (metas)</a></li>
-                <li><a asp-controller="Financas" asp-action="IR" class="menu-sublink @textClass @IsActive("Financas", "IR")">Imposto de Renda</a></li>
+            </ul>
+        </div>
+
+        <div class="menu-panel menu-panel--sub" id="menuPanelIR">
+            <div class="menu-panel-header">
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Imposto de Renda</span>
+            </div>
+            <ul class="menu-list">
+                <li><a asp-controller="Financas" asp-action="IR" class="menu-sublink @textClass @IsActive("Financas", "IR")">Apuração de IR</a></li>
+            </ul>
+        </div>
+
+        <div class="menu-panel menu-panel--sub" id="menuPanelGastos">
+            <div class="menu-panel-header">
+                <button class="menu-back" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+                <span class="menu-panel-title">Gastos</span>
+            </div>
+            <ul class="menu-list">
+                <li><a asp-controller="Gastos" asp-action="Index" class="menu-sublink @textClass @IsActive("Gastos", "Index")">Visão geral</a></li>
             </ul>
         </div>
 
