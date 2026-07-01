@@ -25,8 +25,49 @@ public static class ExtratoB3Materializador
     public static string ChaveNegociacao(string assetKey, int anoMes, TipoOperacaoFinanceira tipo, string? broker)
         => $"{Fonte}|{assetKey}|{anoMes:D6}|{(int)tipo}|{(broker ?? string.Empty).Trim().ToUpperInvariant()}";
 
+    /// <summary>
+    /// "O extrato mais recente do mês manda" (§3.1, Causa B). A <see cref="ChaveNegociacao"/> NÃO inclui
+    /// quantidade/preço: um extrato parcial no meio do mês (qtd 300) e o completo no fechamento (qtd 500)
+    /// têm a MESMA chave. Antes a reimportação do agregado era pulada e a posição travava no parcial.
+    /// Agora, quando um documento NOVO traz valores diferentes para o mesmo ticker×mês×sentido×corretora,
+    /// o staging é ATUALIZADO (o mais recente vence). Este helper diz se há mudança que justifique
+    /// reescrever o staging e remateralizar — evita churn quando os valores são idênticos (no-op real).
+    /// </summary>
+    public static bool NegociacaoMudou(
+        decimal quantidadeExistente, decimal precoExistente, decimal brutoExistente,
+        decimal quantidadeNova, decimal precoNovo, decimal brutoNovo)
+        => quantidadeExistente != quantidadeNova
+           || precoExistente != precoNovo
+           || brutoExistente != brutoNovo;
+
     /// <summary>Ano-mês no formato yyyyMM (ex.: 2022/9 → 202209).</summary>
     public static int AnoMes(int ano, int mes) => ano * 100 + mes;
+
+    /// <summary>
+    /// Precedência de PROVENTOS (mesma regra "B3 manda" das Negociações, §3.1): a fonte
+    /// <see cref="Fonte"/> (extrato consolidado mensal, custódia oficial) é primária; a Brapi
+    /// (estimada por ticker) é apenas FALLBACK. Um provento candidato da Brapi deve ser
+    /// SUPRIMIDO se a B3 já cobre o mesmo ativo no mesmo ano-mês de pagamento.
+    /// </summary>
+    /// <param name="assetId">
+    /// AssetId do candidato Brapi. Null = não dá pra casar com a cobertura → NÃO suprime
+    /// (não dá pra afirmar que a B3 cobre; mantém como fallback).
+    /// </param>
+    /// <param name="anoMesPagamento">
+    /// Ano-mês de pagamento do candidato (yyyyMM). Quando o PaymentDate da Brapi for nulo, o
+    /// chamador deriva o mês do ReferenceDate (data-com) — documentado no caminho de inserção.
+    /// </param>
+    /// <param name="cobertosPorB3">Conjunto (AssetId × ano-mês de pagamento) com provento da B3.</param>
+    /// <returns>true = suprimir o candidato Brapi (a B3 manda nesse ativo×mês).</returns>
+    public static bool DeveSuprimirProventoBrapi(int? assetId, int anoMesPagamento, ISet<(int AssetId, int AnoMes)> cobertosPorB3)
+        => assetId is int id && cobertosPorB3.Contains((id, anoMesPagamento));
+
+    /// <summary>Ano-mês (yyyyMM) de uma data; usa PaymentDate, com fallback no ReferenceDate (data-com).</summary>
+    public static int? AnoMesPagamento(DateTime? pagamento, DateTime? referencia)
+    {
+        var data = pagamento ?? referencia;
+        return data is null ? null : data.Value.Year * 100 + data.Value.Month;
+    }
 
     /// <summary>Sigla = prefixo antes de " - " no campo Produto (ex.: "BBAS3 - BANCO DO BRASIL S/A").</summary>
     public static string? ExtrairTickerProduto(string? produto)
@@ -59,7 +100,7 @@ public static class ExtratoB3Materializador
         ["IRIM11"] = "IRDM11",
     };
 
-    /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo).</summary>
+    /// <summary>Mapeia o "Tipo de Evento" do extrato para o vocabulário interno (JCP/Rendimento/Dividendo/Amortização).</summary>
     public static string MapTipoProvento(string? tipoEvento)
     {
         var texto = (tipoEvento ?? string.Empty).Trim().ToUpperInvariant();
@@ -69,6 +110,9 @@ public static class ExtratoB3Materializador
             return "Rendimento";
         if (texto.Contains("DIVIDENDO"))
             return "Dividendo";
+        // Amortização aparece no anual (devolução de principal de FII); mantém o tipo próprio.
+        if (texto.Contains("AMORTIZA"))
+            return "Amortização";
         return string.IsNullOrWhiteSpace(tipoEvento) ? "Provento" : tipoEvento!.Trim();
     }
 
@@ -173,9 +217,57 @@ public static class ExtratoB3Materializador
             Campo(row, "Produto"));
     }
 
+    /// <summary>
+    /// Interpreta a aba "Proventos Recebidos" do relatório consolidado ANUAL (3 colunas:
+    /// "Produto" | "Tipo de Evento" | "Valor líquido"). É um AGREGADO do ano por ticker × tipo,
+    /// SEM datas → vira <see cref="ProventoAnualLinha"/> (verdade oficial p/ reconciliação), nunca
+    /// RendimentoInvestimento (sem data corromperia o calendário mensal). Filtra:
+    ///  - o cabeçalho (1ª linha);
+    ///  - a linha de TOTAL (rodapé "Total" + valor) — Produto/Tipo vazios;
+    ///  - linhas em branco e valores não-positivos.
+    /// Recebe TODAS as linhas da aba (inclusive header) para ser totalmente testável sem banco.
+    /// </summary>
+    public static IReadOnlyList<ProventoAnualLinha> InterpretarProventosAnuais(IReadOnlyList<IReadOnlyList<string>> linhas)
+    {
+        var resultado = new List<ProventoAnualLinha>();
+        if (linhas is null || linhas.Count < 2)
+            return resultado;
+
+        var headers = linhas[0].Select(c => (c ?? string.Empty).Trim()).ToList();
+        for (var i = 1; i < linhas.Count; i++)
+        {
+            var row = MapearLinha(headers, linhas[i]);
+
+            // "Produto" no anual é só o código (ex.: "BBAS3"); ExtrairTickerProduto também
+            // cobre o formato "CÓDIGO - NOME" caso a B3 mude o layout.
+            var ticker = ExtrairTickerProduto(Campo(row, "Produto"));
+            if (string.IsNullOrWhiteSpace(ticker))
+                continue; // rodapé "Total" e linhas em branco têm Produto vazio → ignorados.
+
+            var tipoBruto = Campo(row, "Tipo de Evento");
+            if (string.IsNullOrWhiteSpace(tipoBruto))
+                continue; // sem tipo não há agregado válido.
+
+            var valor = ParseDecimal(Campo(row, "Valor líquido"));
+            if (valor <= 0m)
+                continue;
+
+            resultado.Add(new ProventoAnualLinha(ticker, MapTipoProvento(tipoBruto), valor, Campo(row, "Produto")));
+        }
+
+        return resultado;
+    }
+
     private static string? Campo(IReadOnlyDictionary<string, string> row, string header)
         => row.TryGetValue(header, out var value) && !string.IsNullOrWhiteSpace(value) ? value.Trim() : null;
 }
+
+/// <summary>Uma linha agregada (ano inteiro) da aba "Proventos Recebidos" do relatório ANUAL.</summary>
+public sealed record ProventoAnualLinha(
+    string Ticker,
+    string Tipo,
+    decimal ValorLiquido,
+    string? Produto);
 
 /// <summary>Um movimento (compra ou venda) extraído de uma linha agregada de Negociações.</summary>
 public sealed record MovimentoNegociacaoB3(

@@ -46,6 +46,26 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardPosicoes(CancellationToken cancellationToken)
         => PartialView("_DashboardPosicoes", await _service.ObterPosicoesDashboardAsync(cancellationToken));
 
+    // F-Q — "Explique este valor": composição/fonte de uma posição (JSON p/ o popover do dashboard).
+    [HttpGet("/Financas/Dashboard/ExplicarPosicao")]
+    public async Task<IActionResult> ExplicarPosicao(int ativoId, CancellationToken cancellationToken)
+        => Json(await _service.ExplicarPosicaoAsync(ativoId, cancellationToken));
+
+    // F-Q — "Explique este valor": composição do patrimônio total por fonte do preço + reconciliação.
+    [HttpGet("/Financas/Dashboard/ExplicarPatrimonio")]
+    public async Task<IActionResult> ExplicarPatrimonio(CancellationToken cancellationToken)
+        => Json(await _service.ExplicarPatrimonioAsync(cancellationToken));
+
+    // F-Q — "Explique este valor": composição de uma carteira por fonte do preço + peso atual/alvo.
+    [HttpGet("/Financas/Dashboard/ExplicarCarteira")]
+    public async Task<IActionResult> ExplicarCarteira(int carteiraId, CancellationToken cancellationToken)
+        => Json(await _service.ExplicarCarteiraAsync(carteiraId, cancellationToken));
+
+    // F-Q — "Explique este valor": composição dos proventos recebidos (12M) por fonte e por tipo.
+    [HttpGet("/Financas/Dashboard/ExplicarProventos")]
+    public async Task<IActionResult> ExplicarProventos(CancellationToken cancellationToken)
+        => Json(await _service.ExplicarProventosAsync(cancellationToken));
+
     [HttpGet("/Financas/Dashboard/Alertas")]
     public async Task<IActionResult> DashboardAlertas(CancellationToken cancellationToken)
         => PartialView("_DashboardAlertas", await _service.ObterAlertasDashboardAsync(cancellationToken));
@@ -54,9 +74,26 @@ public class FinancasController(IFinancasAppService service) : Controller
     public async Task<IActionResult> DashboardProventos(CancellationToken cancellationToken)
         => PartialView("_DashboardProventos", await _service.ObterProventosDashboardAsync(cancellationToken));
 
+    [HttpGet("/Financas/Dashboard/CalendarioProventos")]
+    public async Task<IActionResult> DashboardCalendarioProventos(CancellationToken cancellationToken)
+        => PartialView("_DashboardCalendarioProventos", await _service.ObterCalendarioProventosDashboardAsync(cancellationToken));
+
     [HttpGet("/Financas/Dashboard/Reconciliacao")]
     public async Task<IActionResult> DashboardReconciliacao(CancellationToken cancellationToken)
         => PartialView("_DashboardReconciliacao", await _service.ObterReconciliacaoDashboardAsync(cancellationToken));
+
+    [HttpGet("/Financas/Dashboard/ReconciliacaoProventos")]
+    public async Task<IActionResult> DashboardReconciliacaoProventos(CancellationToken cancellationToken)
+        => PartialView("_DashboardReconciliacaoProventos", await _service.ObterReconciliacaoProventosAnualDashboardAsync(cancellationToken));
+
+    [HttpGet("/Financas/Dashboard/SaudeCotacoes")]
+    public async Task<IActionResult> DashboardSaudeCotacoes(CancellationToken cancellationToken)
+        => PartialView("_DashboardSaudeCotacoes", await _service.ObterSaudeCotacoesDashboardAsync(cancellationToken));
+
+    // F-B F2: rentabilidade vs benchmark (TWR/MWR + CDI/Ibov + retorno real). Ilha vazia se não há série/posição.
+    [HttpGet("/Financas/Dashboard/Rentabilidade")]
+    public async Task<IActionResult> DashboardRentabilidade(CancellationToken cancellationToken)
+        => PartialView("_DashboardRentabilidade", await _service.ObterRentabilidadeDashboardAsync(cancellationToken));
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -68,13 +105,15 @@ public class FinancasController(IFinancasAppService service) : Controller
             // Roda em segundo plano (Hangfire) para não travar a requisição com PDFs grandes.
             // O usuarioId é capturado agora e usado para notificar quem disparou ao concluir.
             BackgroundJob.Enqueue<IFinancasAppService>(s => s.ImportarPastaMonitoradaAsync(usuarioId, CancellationToken.None));
-            TempData["MensagemSucesso"] = "Importação iniciada em segundo plano. Você será notificado ao concluir — acompanhe na tela de Fila.";
+            TempData["MensagemSucesso"] = "Atualização iniciada em segundo plano: buscando novos extratos nas pastas monitoradas. Você será notificado ao concluir — acompanhe na tela de Fila.";
         }
         catch
         {
-            // Sem Hangfire configurado: importa de forma síncrona como fallback.
-            await _service.ImportarPastaMonitoradaAsync(usuarioId, cancellationToken);
-            TempData["MensagemSucesso"] = "Pasta financeira importada.";
+            // Sem Hangfire configurado: importa de forma síncrona como fallback (feedback com a contagem).
+            var importados = await _service.ImportarPastaMonitoradaAsync(usuarioId, cancellationToken);
+            TempData["MensagemSucesso"] = importados > 0
+                ? $"{importados} novo(s) extrato(s)/arquivo(s) importado(s) e posições atualizadas."
+                : "Nenhum arquivo novo encontrado. A carteira já estava atualizada.";
         }
 
         return RedirectToAction(nameof(Index));
@@ -170,9 +209,10 @@ public class FinancasController(IFinancasAppService service) : Controller
         => View(await _service.BuscarAlertasAsync(cancellationToken));
 
     [HttpGet]
-    public IActionResult Transacoes(string? origem)
+    public IActionResult Transacoes(string? origem, string? busca)
     {
         ViewBag.Origem = origem;
+        ViewBag.Busca = busca;   // F-Q: deep-link "Ver transações de TICKER" pré-filtra a grid.
         return View();
     }
 
@@ -281,6 +321,24 @@ public class FinancasController(IFinancasAppService service) : Controller
         else
             TempData["MensagemErro"] = resultado.Mensagem;
         return RedirectToAction(nameof(Eventos));
+    }
+
+    // ===== Peso-alvo por ativo-em-carteira (F-G) — edição em lote =====
+
+    [HttpGet]
+    public async Task<IActionResult> PesoAlvo(CancellationToken cancellationToken)
+        => View(await _service.ObterPesosAlvoAsync(cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PesoAlvo(SalvarPesosAlvoInput input, CancellationToken cancellationToken)
+    {
+        var resultado = await _service.SalvarPesosAlvoAsync(input, cancellationToken);
+        if (resultado.Sucesso)
+            TempData["MensagemSucesso"] = resultado.Mensagem;
+        else
+            TempData["MensagemErro"] = resultado.Mensagem;
+        return RedirectToAction(nameof(PesoAlvo));
     }
 
     // ===== Alertas de preço (F-H) — CRUD manual =====

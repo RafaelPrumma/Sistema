@@ -257,6 +257,43 @@ public record NovoAlertaPrecoInput(
     bool Ativo = true,
     string? Observacao = null);
 
+// F-G — peso-alvo por ativo-em-carteira (CarteiraAtivoFinanceiro). Página de edição que fecha o F-G:
+// lista cada vínculo ativo↔carteira com o alvo atual (em % do patrimônio) e a quantidade em posição
+// (contexto). PesoAlvo nulo/0 = "sem alvo". A soma por carteira é só um aviso (não bloqueia).
+public record PesoAlvoItemDto(
+    int CarteiraAtivoId,
+    int CarteiraId,
+    string CarteiraNome,
+    string Ticker,
+    string AtivoNome,
+    string Classe,
+    decimal? PesoAlvo,
+    decimal Quantidade);
+
+// Agrupado por carteira para renderização; SomaPesoAlvo permite o aviso de >100% por carteira.
+public record PesoAlvoCarteiraDto(
+    int CarteiraId,
+    string CarteiraNome,
+    decimal SomaPesoAlvo,
+    IReadOnlyList<PesoAlvoItemDto> Itens);
+
+public record PesoAlvoEdicaoDto(
+    IReadOnlyList<PesoAlvoCarteiraDto> Carteiras,
+    decimal SomaTotalPesoAlvo);
+
+// Cada linha do POST: id do vínculo + novo peso (nulo/vazio = limpa o alvo).
+// Propriedades mutáveis + List<> para o model binder do MVC ligar os índices Itens[i].* do form.
+public class PesoAlvoLinhaInput
+{
+    public int CarteiraAtivoId { get; set; }
+    public decimal? PesoAlvo { get; set; }
+}
+
+public class SalvarPesosAlvoInput
+{
+    public List<PesoAlvoLinhaInput> Itens { get; set; } = [];
+}
+
 // Série de evolução: eixo de datas compartilhado + arrays de valores paralelos (payload enxuto).
 // VariacaoDia e ValorAtual vêm das cotações ao vivo (não do histórico diário).
 public record SerieEvolucaoDto(
@@ -431,6 +468,7 @@ public record FinancasProventosDashboardDto(
 // F-L: painel de saúde/transparência. Posição calculada (das transações) confrontada com a custódia
 // oficial da B3 (Preço de Fechamento da aba Posição), com a fonte do preço que valorou cada ativo.
 public record PosicaoCalculadaDto(
+    int AtivoId,             // F-Q: chave p/ o "Explique este valor" (deep-link ExplicarPosicao)
     string Ticker,
     string Classe,
     decimal Quantidade,
@@ -471,6 +509,161 @@ public record FinancasReconciliacaoDto(
     decimal CalculadoTotal,
     IReadOnlyList<ReconciliacaoAtivoDto> PrincipaisAtivos);
 
+// F-S: saúde das cotações. Linha por ativo com posição>0, com o status do preço usado para valorar,
+// a última atualização, provedor/símbolo, mensagem de erro e as lacunas da série histórica.
+// SaudeStatus é o rótulo amigável calculado pelo ClassificadorSaudeCotacao (lógica pura).
+public record SaudeCotacaoAtivoDto(
+    string Ticker,
+    string Nome,
+    string Classe,
+    string Status,           // rótulo amigável: Atual / Vencida / Falhou / Sem token / Fallback custo / B3 Custódia / ...
+    string Severidade,       // ok / atencao / critico — controla a cor do badge na view
+    string Provedor,         // provedor da cotação utilizável (ou da última tentada quando não há preço)
+    string Simbolo,
+    DateTime? AtualizadaEm,  // ConsultadoEm da cotação que valoraria a posição
+    string? Erro,            // MensagemErro da cotação (quando houver)
+    bool Lacuna1d,           // sem bucket 1d recente (fechamento) na série histórica
+    bool Lacuna30m);         // sem bucket 30m recente (snapshot intradiário) na série histórica
+
+// F-S: agrupamento por origem do preço (B3 / Cripto / B3 Custódia) + contadores de saúde para o resumo.
+public record SaudeCotacaoGrupoDto(
+    string Titulo,
+    int Total,
+    int Ok,
+    int Atencao,
+    int Critico,
+    IReadOnlyList<SaudeCotacaoAtivoDto> Ativos);
+
+public record FinancasSaudeCotacoesDto(
+    bool TemDados,
+    int TotalAtivos,
+    int Saudaveis,
+    int ComProblema,
+    DateTime? AtualizadoEm,
+    IReadOnlyList<SaudeCotacaoGrupoDto> Grupos);
+
+// F-T: calendário de proventos. Valor líquido de um tipo (Dividendo/JCP/Rendimento FII/Earn) num mês.
+public record CalendarioProventoTipoDto(
+    string Tipo,
+    decimal Valor);
+
+// F-T: um mês do calendário. PorTipo traz os tipos na MESMA ordem da lista global Tipos do DTO-raiz
+// (zeros incluídos) para a view montar a tabela sem buscar. Previsto=true quando o mês é futuro
+// (PaymentDate > hoje): provento anunciado/a receber, não realizado.
+public record CalendarioProventoMesDto(
+    string Rotulo,           // ex.: "jun/26"
+    int Ano,
+    int Mes,
+    decimal Total,           // soma líquida do mês
+    bool Previsto,           // mês inteiramente no futuro (a receber/anunciado)
+    IReadOnlyList<CalendarioProventoTipoDto> PorTipo);
+
+// F-T: de onde veio o dado do calendário (B3 Extrato / Brapi / Informe IR / Binance Earn), com o
+// total líquido e a contagem de lançamentos na janela exibida. Mesmo rótulo de fonte do F-N.
+public record CalendarioProventoFonteDto(
+    string Fonte,
+    decimal Valor,
+    int Quantidade);
+
+// F-T: ilha lazy-loaded do calendário de proventos. Realizado (PaymentDate <= hoje) por mês×tipo,
+// identificando a fonte. Previsto/anunciado = proventos JÁ PERSISTIDOS com PaymentDate futuro
+// (não há fonte separada de previstos; não chamamos API no load). TemPrevisto=false → faixa de
+// previsto vira estado vazio rotulado ("sem proventos anunciados na base").
+public record FinancasCalendarioProventosDashboardDto(
+    bool TemDados,
+    IReadOnlyList<string> Tipos,                       // ordem canônica das colunas/séries
+    IReadOnlyList<CalendarioProventoMesDto> Meses,     // janela cronológica (ascendente)
+    IReadOnlyList<CalendarioProventoFonteDto> Fontes,  // fontes presentes na janela
+    decimal TotalRealizado,
+    decimal TotalPrevisto,
+    bool TemPrevisto);
+
+// F-Q — "Explique este valor". Mecanismo reutilizável: cada número relevante do dashboard abre sua
+// composição/fonte, lendo SÓ os read models (FinanceiroPosicaoAtivo + FinanceiroCotacaoAtivo + ajustes
+// de reconciliação + FinanceiroRendimento) — nunca recalcula transações na UI nem chama API. Cobre
+// Posições, Patrimônio (1ª fatia) e Carteiras + Proventos (2ª fatia).
+
+// Uma linha "rótulo: valor" da explicação (ex.: "Preço usado: R$ 12,34"). Tipo controla a cor/ênfase
+// na UI (neutro / positivo / negativo / atencao). Já vem formatado pelo montador? Não: valor cru +
+// formato sugerido, a view formata. Mantemos cru para a view escolher moeda/quantidade/percentual.
+public record ExplicacaoLinhaDto(
+    string Rotulo,
+    string Valor,           // já formatado pelo montador (pt-BR) — a view só exibe
+    string Tipo = "neutro"); // neutro | positivo | negativo | atencao
+
+// Explicação de UMA posição (um ativo da ilha de Posições). Reúne quantidade, preço médio, preço usado
+// na valoração + a fonte do preço (Brapi/Binance/B3Custódia/custo) com fallback, o resultado
+// (mercado − custo) e, quando houver, o ajuste de reconciliação (ativo virtual VARIACAO).
+public record ExplicacaoPosicaoDto(
+    bool Encontrada,
+    string Ticker,
+    string Nome,
+    string Classe,
+    string FontePreco,          // rótulo amigável (Cotação (Brapi) / Fechamento B3 / Custo / ...)
+    string FonteStatus,         // rótulo da saúde (Atual / Vencida / B3 Custódia / Fallback custo / ...)
+    string FonteSeveridade,     // ok | atencao | critico — cor do selo da fonte
+    bool ValoradoPeloCusto,     // true = caiu no fallback ao custo (sem cotação utilizável)
+    decimal ValorMercado,
+    decimal Custo,
+    decimal Resultado,
+    decimal ResultadoPercentual,
+    bool TemAjusteReconciliacao,
+    decimal ValorAjusteReconciliacao,   // valor que a reconciliação B3 parou no ativo VARIACAO p/ este ativo
+    string? BuscaTransacoes,            // termo p/ deep-link da grid de transações (filtra pelo ticker)
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// Explicação do card de Patrimônio: a composição do total por fonte do preço (cotação ao vivo ×
+// fechamento B3 × custo/fallback) e quanto está em reconciliação (VARIACAO). Reusa exatamente os
+// números que o dashboard já calcula (composição do F-L + reconciliação do F-M) — sem cálculo paralelo.
+public record ExplicacaoPatrimonioDto(
+    bool TemDados,
+    decimal Total,
+    decimal ComCotacao,
+    decimal ComFechamentoB3,
+    decimal ComCusto,
+    int QtdAtivos,
+    int QtdComCotacao,
+    int QtdComFechamentoB3,
+    int QtdComCusto,
+    bool TemReconciliacao,
+    decimal ValorReconciliacao,         // valor líquido parado no ativo virtual VARIACAO
+    int QtdAjustesReconciliacao,
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// F-Q (2ª fatia) — explicação de UMA carteira (topo/subcarteira). Decompõe o valor da carteira por
+// fonte do preço (cotação ao vivo × fechamento B3 × custo/fallback) reusando os mesmos números da ilha
+// de Carteiras, mostra o peso atual no patrimônio vs o peso-alvo (PesoAlvo) quando definido e a parcela
+// de reconciliação (VARIACAO) que recaiu sobre os ativos da carteira (e subcarteiras).
+public record ExplicacaoCarteiraDto(
+    bool Encontrada,
+    string Nome,
+    string Tipo,
+    decimal ValorMercado,
+    decimal ComCotacao,
+    decimal ComFechamentoB3,
+    decimal ComCusto,
+    int QtdAtivos,
+    int QtdComCotacao,
+    int QtdComFechamentoB3,
+    int QtdComCusto,
+    decimal PesoAtual,                  // participação no patrimônio hoje (%)
+    decimal? PesoAlvo,                  // soma dos PesoAlvo dos ativos da carteira (e subcarteiras), em %
+    bool TemAjusteReconciliacao,
+    decimal ValorAjusteReconciliacao,   // valor da reconciliação B3 que recaiu sobre ativos desta carteira
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
+// F-Q (2ª fatia) — explicação do card de Proventos. Decompõe o recebido (12M) por FONTE do dado
+// (B3 Extrato/Brapi/Informe IR/Binance Earn) e por TIPO (Dividendo/JCP/Rendimento FII/Earn), com
+// contagem e soma de cada, o período coberto e a nota de precedência (B3 manda; Brapi só fallback).
+// Reusa RotuloFonteProvento/RotuloTipoProvento — sem cálculo paralelo.
+public record ExplicacaoProventosDto(
+    bool TemDados,
+    decimal TotalRecebido,              // recebido na janela coberta (12M)
+    int Quantidade,                     // nº de lançamentos na janela
+    string? PeriodoInicio,              // dd/MM/yyyy do provento mais antigo na janela
+    string? PeriodoFim,                 // dd/MM/yyyy do provento mais recente na janela
+    IReadOnlyList<ExplicacaoLinhaDto> Linhas);
+
 public class FinancasDashboardDto
 {
     public string GeradoEm { get; set; } = string.Empty;
@@ -496,3 +689,64 @@ public class FinancasDashboardDto
     public string? DashboardJson { get; set; }
     public IReadOnlyList<ProventoMensalDto> ProventosMensais { get; set; } = [];
 }
+
+// F-V: reconciliação ANUAL de proventos — oficial (relatório anual da B3, ProventoAnualB3) × materializado
+// (soma dos RendimentoInvestimento do ano), por ticker×tipo. Status calculado pelo ReconciliadorProventosAnuais
+// (lógica pura). Base = valor líquido (oficial já é líquido; materializado = Amount - TaxWithheld).
+public record ReconciliacaoProventoLinhaDto(
+    string Ticker,
+    string Tipo,                 // Dividendo / JCP / Rendimento / Amortização
+    decimal Oficial,             // total líquido do ano na planilha anual da B3
+    decimal Materializado,       // soma líquida materializada (B3 Extrato + Brapi + IR) no mesmo ano×ticker×tipo
+    decimal Diferenca,           // Materializado - Oficial (negativo = falta materializar)
+    string Status);              // Bate / Falta materializado / Sobra materializado / Sem ativo
+
+// F-V: um ano da reconciliação, com os totais do ano e as linhas por ticker×tipo.
+public record ReconciliacaoProventoAnoDto(
+    int Ano,
+    decimal TotalOficial,
+    decimal TotalMaterializado,
+    decimal Diferenca,
+    string Status,               // status do TOTAL do ano (mesma régua de tolerância das linhas)
+    int LinhasDivergentes,       // quantas linhas do ano não batem (para o resumo/badge)
+    IReadOnlyList<ReconciliacaoProventoLinhaDto> Linhas);
+
+// F-V: ilha lazy-loaded da reconciliação anual de proventos. TemDados=false → ilha vazia (sem anual importado).
+public record FinancasReconciliacaoProventosAnualDto(
+    bool TemDados,
+    decimal TotalOficial,
+    decimal TotalMaterializado,
+    bool TemDivergencia,
+    IReadOnlyList<ReconciliacaoProventoAnoDto> Anos);
+
+// F-B F2 — comparativo da carteira contra um benchmark acumulado no período (CDI/Ibovespa).
+//  Disponivel=false → não havia série persistida do índice no período (degrade gracioso na UI).
+//  Excesso = carteira − índice (pontos); Relativo = (1+carteira)/(1+índice)−1 (ex.: % do CDI).
+public record RentabilidadeBenchmarkDto(
+    string Nome,
+    bool Disponivel,
+    decimal RetornoBenchmark,
+    decimal Excesso,
+    decimal Relativo);
+
+// F-B F2 — ilha lazy-loaded de Rentabilidade vs benchmark. TemDados=false → ilha vazia (sem série/posição).
+//  - Twr/TwrAnualizado: time-weighted (neutraliza aportes), base de comparação com benchmark.
+//  - Mwr: money-weighted (TIR anualizada), experiência real do investidor.
+//  - RetornoReal: TWR descontado do IPCA do período (IpcaDisponivel diz se foi possível calcular).
+//  - Datas + séries base 100 (carteira/CDI/Ibov acumulados) para o gráfico sobreposto (montado no JS).
+public record FinancasRentabilidadeDto(
+    bool TemDados,
+    int Dias,
+    decimal Twr,
+    decimal TwrAnualizado,
+    decimal Mwr,
+    bool IpcaDisponivel,
+    decimal IpcaAcumulado,
+    decimal RetornoReal,
+    IReadOnlyList<RentabilidadeBenchmarkDto> Benchmarks,
+    IReadOnlyList<string> Datas,
+    IReadOnlyList<decimal> CarteiraBase100,
+    IReadOnlyList<decimal> CdiBase100,
+    IReadOnlyList<decimal> IbovBase100,
+    bool CdiDisponivel,
+    bool IbovDisponivel);

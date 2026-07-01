@@ -33,7 +33,11 @@
             <div class="col-6 col-lg-3">
                 <div class="border rounded-2 p-2 h-100">
                     <div class="small text-secondary">Total recebido</div>
-                    <div class="fs-5 fw-semibold">@r.RecebidoTotal.ToString("C2", br)</div>
+                    @* F-Q: a figura de proventos abre a explicação (composição por fonte e por tipo, 12M). *@
+                    <button type="button" class="btn btn-link p-0 text-reset text-decoration-none fs-5 fw-semibold"
+                            data-explicar="proventos" data-titulo="Proventos" title="Explicar este valor">
+                        @r.RecebidoTotal.ToString("C2", br) <i class="bi bi-info-circle fs-6 text-secondary align-text-top"></i>
+                    </button>
                 </div>
             </div>
             <div class="col-6 col-lg-3">

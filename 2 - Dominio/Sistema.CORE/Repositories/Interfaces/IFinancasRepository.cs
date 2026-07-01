@@ -24,6 +24,12 @@ public interface IFinancasRepository
     Task<IReadOnlyList<AgregadoFinanceiro>> BuscarAgregadosAsync(string dimensao, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarRendimentosAsync(CancellationToken cancellationToken = default);
 
+    // F-V: agregados oficiais anuais de proventos do relatório anual da B3 (verdade do ano p/ reconciliação).
+    Task<IReadOnlyList<ProventoAnualB3>> BuscarProventosAnuaisB3Async(CancellationToken cancellationToken = default);
+
+    // F-B F2: série temporal dos benchmarks (CDI/IPCA/Ibov) desde a data informada, p/ acumular no período.
+    Task<IReadOnlyList<SerieBenchmark>> BuscarSeriesBenchmarkAsync(DateTime inicio, CancellationToken cancellationToken = default);
+
     // Proventos (dividendos/JCP/rendimentos), independentes de carga — incluem os buscados na Brapi.
     Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RendimentoInvestimento>> BuscarProventosPorPeriodoAsync(DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
@@ -33,6 +39,11 @@ public interface IFinancasRepository
     Task SubstituirPosicoesAtivosAsync(IReadOnlyList<PosicaoAtivo> posicoes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PrecoHistoricoAtivoFinanceiro>> BuscarHistoricoPrecosAsync(DateTime inicio, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CarteiraFinanceira>> BuscarCarteirasComAtivosAsync(CancellationToken cancellationToken = default);
+
+    // F-G: peso-alvo por ativo-em-carteira. A leitura vem AsNoTracking (lista da tela); a edição em lote
+    // busca os vínculos TRACKED pelos ids para gravar o novo PesoAlvo via ConfirmarAsync.
+    Task<IReadOnlyList<CarteiraAtivoFinanceiro>> BuscarVinculosCarteiraAtivoAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CarteiraAtivoFinanceiro>> BuscarVinculosCarteiraAtivoPorIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default);
     // F-L(b): rastreabilidade dos arquivos importados (kind/parse/status + contagem de abas/linhas lidas
     // de ConteudoBruto + nº de alertas por documento). Agregação por fonte/status fica na camada APP.

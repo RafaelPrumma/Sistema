@@ -1,0 +1,97 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model FinancasRentabilidadeDto
+@{
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    string Pct(decimal v) => (v >= 0m ? "+" : "") + (v * 100m).ToString("N2", br) + "%";
+    string Tom(decimal v) => v >= 0m ? "text-success" : "text-danger";
+
+    var cdi = Model.Benchmarks.FirstOrDefault(b => b.Nome == "CDI");
+    var ibov = Model.Benchmarks.FirstOrDefault(b => b.Nome == "Ibovespa");
+
+    // Séries base 100 para o gráfico (montado no financas.js — script em parcial injetada NÃO executa).
+    var series = new List<object> { new { name = "Carteira", data = Model.CarteiraBase100 } };
+    if (Model.CdiDisponivel) series.Add(new { name = "CDI", data = Model.CdiBase100 });
+    if (Model.IbovDisponivel) series.Add(new { name = "Ibovespa", data = Model.IbovBase100 });
+}
+
+@if (Model.TemDados)
+{
+    <div class="card" data-aos="fade-up" data-aos-duration="220">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-speedometer2 me-1"></i>Rentabilidade vs benchmark</h6>
+                <span class="small text-secondary">Últimos @Model.Dias dias</span>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">Rentabilidade (TWR)</div>
+                        <div class="fs-5 fw-semibold @Tom(Model.Twr)">@Pct(Model.Twr)</div>
+                        <div class="small text-secondary">@Pct(Model.TwrAnualizado) ao ano</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary" title="Money-weighted (TIR): considera o tamanho e o momento dos aportes">Retorno do investidor (TIR)</div>
+                        <div class="fs-5 fw-semibold @Tom(Model.Mwr)">@Pct(Model.Mwr)</div>
+                        <div class="small text-secondary">ao ano</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">vs CDI</div>
+                        @if (cdi is not null && cdi.Disponivel)
+                        {
+                            <div class="fs-5 fw-semibold @Tom(cdi.Excesso)">@Pct(cdi.Excesso)</div>
+                            <div class="small text-secondary">@((1m + cdi.Relativo).ToString("P0", br).Replace(" ", "")) do CDI · CDI @Pct(cdi.RetornoBenchmark)</div>
+                        }
+                        else
+                        {
+                            <div class="small text-secondary mt-1">Benchmark indisponível.</div>
+                        }
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="border rounded-2 p-2 h-100">
+                        <div class="small text-secondary">vs Ibovespa</div>
+                        @if (ibov is not null && ibov.Disponivel)
+                        {
+                            <div class="fs-5 fw-semibold @Tom(ibov.Excesso)">@Pct(ibov.Excesso)</div>
+                            <div class="small text-secondary">Ibov @Pct(ibov.RetornoBenchmark)</div>
+                        }
+                        else
+                        {
+                            <div class="small text-secondary mt-1">Benchmark indisponível.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
+                <div>
+                    <span class="small text-secondary me-1">Retorno real (− IPCA):</span>
+                    @if (Model.IpcaDisponivel)
+                    {
+                        <span class="fw-semibold @Tom(Model.RetornoReal)">@Pct(Model.RetornoReal)</span>
+                        <span class="small text-secondary ms-1">IPCA @Pct(Model.IpcaAcumulado) no período</span>
+                    }
+                    else
+                    {
+                        <span class="small text-secondary">IPCA indisponível.</span>
+                    }
+                </div>
+            </div>
+
+            <div class="small text-secondary mb-1">Evolução base 100 (carteira × benchmarks)</div>
+            <div id="financeRentabilidadeChart"
+                 class="finance-rentabilidade-chart"
+                 style="min-height:300px;"
+                 data-datas='@Html.Raw(Json.Serialize(Model.Datas))'
+                 data-series='@Html.Raw(Json.Serialize(series))'></div>
+
+            <div class="small text-secondary mt-2"><i class="bi bi-info-circle me-1"></i>TWR (time-weighted) neutraliza o efeito dos aportes para comparar com o índice; a TIR reflete sua experiência real. Benchmarks: CDI/IPCA (BCB) e Ibovespa, acumulados no mesmo período. Não é recomendação de investimento.</div>
+        </div>
+    </div>
+}

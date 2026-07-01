@@ -40,20 +40,23 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
 
         await _repairService.RepararAsync(cancellationToken);
 
-        // Importa as pastas monitoradas (financeiro + extratos B3) que ainda não foram varridas.
-        // Cada pasta é guardada pelo próprio SourceFolder → idempotente entre execuções.
-        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
-        var precisaImportar = false;
-        foreach (var pasta in pastas)
+        // Importa as pastas monitoradas (financeiro + extratos B3). O Rafael alimenta as pastas aos
+        // poucos (extratos B3 mês a mês), então a varredura precisa RE-RODAR quando aparece arquivo
+        // novo — não basta o gate antigo "pasta nunca varrida" (que travava em false para sempre e
+        // ignorava arquivos largados depois). Detecção BARATA e à prova de falha (try-catch): para
+        // cada pasta, compara os arquivos suportados presentes com os caminhos já importados
+        // (DocumentoFinanceiro.StoredPath) — sem recalcular Sha256 de tudo. Se houver caminho novo,
+        // re-varre (ImportarPastaAsync já deduplica por Sha256/chave natural → reimport é idempotente).
+        try
         {
-            if (!await _context.ImportacoesFinanceirasArquivo.AnyAsync(x => x.SourceFolder == pasta, cancellationToken))
-            {
-                precisaImportar = true;
-                break;
-            }
+            if (await ExistemArquivosNovosAsync(cancellationToken))
+                await ImportarPastaMonitoradaAsync(cancellationToken);
         }
-        if (precisaImportar)
-            await ImportarPastaMonitoradaAsync(cancellationToken);
+        catch (Exception ex)
+        {
+            // A detecção/varredura NÃO pode derrubar o load do dashboard (constraint da skill).
+            FinancasImportadorLogMessages.DeteccaoNovosArquivosFalhou(_logger, ex);
+        }
 
         // Garante que a tabela única reflita a regra de materialização atual.
         // Barato quando já está na versão certa; faz o resync completo quando a regra muda.
@@ -79,21 +82,59 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
         await GarantirCarteirasPadraoAsync(cancellationToken);
     }
 
-    public async Task ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
+    // Devolve quantos arquivos NOVOS foram importados (0 = nada novo) — usado pelo botão on-demand
+    // para dar feedback ao Rafael ("N novos extratos importados").
+    public async Task<int> ImportarPastaMonitoradaAsync(CancellationToken cancellationToken = default)
     {
         var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
         if (pastas.Count == 0)
-            return;
+            return 0;
 
-        var importou = false;
+        var importados = 0;
         foreach (var pasta in pastas)
-            importou |= await ImportarPastaAsync(pasta, cancellationToken);
+            importados += await ImportarPastaAsync(pasta, cancellationToken);
 
-        if (importou)
+        if (importados > 0)
         {
             await GarantirCarteirasPadraoAsync(cancellationToken);
             await SincronizarTransacoesCanonicasAsync(cancellationToken);
         }
+
+        return importados;
+    }
+
+    // Detecção BARATA de arquivo novo nas pastas monitoradas (sem recalcular Sha256). Compara os
+    // caminhos suportados presentes em cada pasta com os StoredPaths já importados. Uma pasta que
+    // nunca foi varrida (StoredPaths vazio) com qualquer arquivo → novo; um arquivo largado depois
+    // numa pasta já varrida → novo. Reimportar o MESMO arquivo (mesmo caminho) não dispara nada (e,
+    // se o caminho mudasse, o dedup por Sha256 em ImportarPastaAsync ainda pularia o conteúdo igual).
+    private async Task<bool> ExistemArquivosNovosAsync(CancellationToken cancellationToken)
+    {
+        var pastas = await ResolverPastasMonitoradasAsync(cancellationToken);
+        if (pastas.Count == 0)
+            return false;
+
+        foreach (var pasta in pastas)
+        {
+            var arquivos = Directory.EnumerateFiles(pasta).Where(IsSupportedFile).ToList();
+            if (arquivos.Count == 0)
+                continue;
+
+            // StoredPath dos documentos já importados desta pasta (arquivo normal = próprio caminho;
+            // zip = caminho do zip). Filtra pelo prefixo da pasta para a consulta ser barata.
+            var prefixo = pasta;
+            var jaImportados = await _context.DocumentosFinanceiros
+                .Where(d => d.StoredPath != null && d.StoredPath.StartsWith(prefixo))
+                .Select(d => d.StoredPath!)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var conjunto = new HashSet<string>(jaImportados, StringComparer.OrdinalIgnoreCase);
+
+            if (DeteccaoNovosArquivos.HaArquivoNovo(arquivos, conjunto))
+                return true;
+        }
+
+        return false;
     }
 
     // Pastas varridas pelo importador: a monitorada (notas Nubank/Binance) e a dos extratos B3.
@@ -137,8 +178,8 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     }
 
     // Varre uma pasta: classifica e processa os arquivos suportados, com idempotência por
-    // SourceFolder (o batch) e por Sha256 do documento. Devolve true se importou algo novo.
-    private async Task<bool> ImportarPastaAsync(string folder, CancellationToken cancellationToken)
+    // SourceFolder (o batch) e por Sha256 do documento. Devolve quantos arquivos novos importou.
+    private async Task<int> ImportarPastaAsync(string folder, CancellationToken cancellationToken)
     {
         var files = Directory.EnumerateFiles(folder)
             .Where(IsSupportedFile)
@@ -222,7 +263,7 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             : batch.StructuredRowsImported == 0 ? StatusImportacaoFinanceira.ConcluidaComAlertas : StatusImportacaoFinanceira.Concluida;
 
         await _context.SaveChangesAsync(cancellationToken);
-        return batch.FilesImported > 0;
+        return batch.FilesImported;
     }
 
     private async Task ProcessarZipMonitoradoAsync(string zipFile, CargaFinanceira carga, ImportacaoFinanceiraArquivo batch, Dictionary<string, AtivoFinanceiro> ativos, CancellationToken cancellationToken)
@@ -297,7 +338,10 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
     // passa a usar chave por linha de staging ("BinanceLedger|TransacaoCripto|{StagingId}"). Linhas
     // legítimas idênticas do ledger Binance (caso USDT, que fecha em zero) não colapsam mais → o
     // resync re-materializa a cripto sem o saldo fantasma em FinanceiroPosicaoAtivo.
-    private const int MaterializacaoVersao = 13;
+    // 13→14 (jun/2026, Causa B): o staging de Negociações da B3 passa a ser ATUALIZADO no reimport
+    // ("o extrato mais recente do mês manda"). O bump força um resync completo para regenerar as
+    // transações de quem já tinha o staging travado num extrato parcial (qtd antiga) antes do fix.
+    private const int MaterializacaoVersao = 14;
 
     // Materializa o staging bruto na tabela única TransacaoFinanceira (fonte de verdade).
     // B3: todas as notas canônicas (têm preço). Cripto (F1 — netting): o ledger da Binance é a fonte
@@ -461,6 +505,28 @@ public partial class FinancasImportador(AppDbContext context, IConfiguration con
             await _context.TransacoesFinanceiras.AddRangeAsync(novas, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    // Remove a transação canônica (TransacaoFinanceira) materializada de uma linha de staging
+    // específica, para o resync reconstruí-la com o valor atualizado. Usado quando o staging muda no
+    // reimport (Causa B): o DuplicateGroupKey continua o mesmo ("{StagingTipo}#{StagingId}"), então
+    // sem remover a transação antiga o SincronizarTransacoesCanonicasAsync a pularia por já-materializada
+    // e a posição ficaria no valor velho. A remoção fica pendente no ChangeTracker e é persistida pelo
+    // SaveChanges de ImportarPastaAsync; o resync seguinte recria a transação a partir do staging novo.
+    private void RemoverTransacaoCanonicaDoStaging(string stagingTipo, int stagingId)
+    {
+        // A consulta ao DbSet já mescla com o ChangeTracker (entidades tracked não duplicam), então
+        // basta materializar o filtro uma vez. Inclui as ainda-não-salvas via Local (Id == 0).
+        var canonicas = _context.TransacoesFinanceiras
+            .Where(x => x.StagingTipo == stagingTipo && x.StagingId == stagingId)
+            .ToList();
+        var pendentesLocais = _context.TransacoesFinanceiras.Local
+            .Where(x => x.StagingTipo == stagingTipo && x.StagingId == stagingId)
+            .Where(local => canonicas.All(c => !ReferenceEquals(c, local)));
+        canonicas.AddRange(pendentesLocais);
+
+        if (canonicas.Count > 0)
+            _context.TransacoesFinanceiras.RemoveRange(canonicas);
     }
 
     // F1/F2 (cripto) — netting da Binance: materializa a posição correta por QUANTIDADE a partir do ledger
@@ -2167,4 +2233,7 @@ internal static partial class FinancasImportadorLogMessages
 
     [LoggerMessage(EventId = 24, Level = LogLevel.Warning, Message = "Falha ao registrar alerta de preço cripto faltante para {Asset}; ignorada para não derrubar a materialização.")]
     public static partial void MaterializacaoCriptoFalhou(ILogger logger, string asset, Exception exception);
+
+    [LoggerMessage(EventId = 25, Level = LogLevel.Error, Message = "Detecção/varredura de arquivos novos falhou; ignorada para não derrubar o dashboard.")]
+    public static partial void DeteccaoNovosArquivosFalhou(ILogger logger, Exception exception);
 }

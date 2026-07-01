@@ -19,10 +19,16 @@
     posicoes: document.getElementById('financePosicoesIsland'),
     alertas: document.getElementById('financeAlertasIsland'),
     proventos: document.getElementById('financeProventosIsland'),
-    reconciliacao: document.getElementById('financeReconciliacaoIsland')
+    calendarioProventos: document.getElementById('financeCalendarioProventosIsland'),
+    reconciliacao: document.getElementById('financeReconciliacaoIsland'),
+    reconciliacaoProventos: document.getElementById('financeReconciliacaoProventosIsland'),
+    saudeCotacoes: document.getElementById('financeSaudeCotacoesIsland'),
+    rentabilidade: document.getElementById('financeRentabilidadeIsland')
   };
 
   let proventosChart = null;
+  let calendarioProventosChart = null;
+  let rentabilidadeChart = null;
 
   const PERIODOS = [
     { cod: '1D', label: '1D', dias: 1 },
@@ -127,6 +133,97 @@
       tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
     });
     proventosChart.render();
+  }
+
+  // F-T calendário de proventos: gráfico mensal empilhado por tipo (Dividendo/JCP/Rendimento FII/Earn).
+  // Mesma regra dos demais: script em parcial não roda; dados via data-*, monta aqui.
+  async function loadCalendarioProventos(island, url) {
+    await loadPartial(island, url);
+    const el = island.querySelector('#financeCalendarioProventosChart');
+    if (!el || !window.ApexCharts) return;
+
+    let labels = [];
+    let series = [];
+    try {
+      labels = JSON.parse(el.dataset.labels || '[]');
+      series = JSON.parse(el.dataset.series || '[]');
+    } catch (error) {
+      console.error('Falha ao ler série do calendário de proventos.', error);
+      return;
+    }
+    if (!series.length) return;
+
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    // Paleta estável por tipo; cai para a paleta padrão do Apex se surgir um tipo novo.
+    const coresTipo = {
+      'Dividendo': cssVar('--bs-success', '#16a34a'),
+      'JCP': cssVar('--bs-primary', '#0d6efd'),
+      'Rendimento FII': cssVar('--bs-info', '#0dcaf0'),
+      'Earn': cssVar('--bs-warning', '#ffc107'),
+      'Outro': cssVar('--bs-secondary', '#6c757d')
+    };
+    const colors = series.map(s => coresTipo[s.name] || cssVar('--bs-secondary', '#6c757d'));
+
+    calendarioProventosChart = new ApexCharts(el, {
+      chart: { type: 'bar', height: 280, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, background: 'transparent', animations: { enabled: !prefersReducedMotion } },
+      theme: { mode: dark ? 'dark' : 'light' },
+      series: series.map(s => ({ name: s.name, data: s.data })),
+      colors,
+      plotOptions: { bar: { columnWidth: '60%', borderRadius: 3 } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(148,163,184,.18)' },
+      xaxis: { categories: labels, axisBorder: { show: false }, axisTicks: { show: false }, labels: { rotate: -45, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      yaxis: { labels: { formatter: compact, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      legend: { position: 'top', horizontalAlign: 'left', labels: { colors: cssVar('--bs-body-color', '#212529') } },
+      tooltip: { theme: dark ? 'dark' : 'light', y: { formatter: value => money.format(value) } }
+    });
+    calendarioProventosChart.render();
+  }
+
+  // F-B F2 rentabilidade vs benchmark: linha sobrepondo a cota da carteira (base 100) × CDI × Ibov.
+  // Mesma regra: script em parcial não roda; dados via data-*, monta aqui. Eixo de datas compartilhado.
+  async function loadRentabilidade(island, url) {
+    await loadPartial(island, url);
+    const el = island.querySelector('#financeRentabilidadeChart');
+    if (!el || !window.ApexCharts) return;
+
+    let datas = [];
+    let series = [];
+    try {
+      datas = JSON.parse(el.dataset.datas || '[]');
+      series = JSON.parse(el.dataset.series || '[]');
+    } catch (error) {
+      console.error('Falha ao ler série de rentabilidade.', error);
+      return;
+    }
+    if (!series.length || !datas.length) return;
+
+    const dark = document.body.getAttribute('data-bs-theme') === 'dark';
+    const coresSerie = {
+      'Carteira': cssVar('--bs-primary', '#0d6efd'),
+      'CDI': cssVar('--bs-secondary', '#6c757d'),
+      'Ibovespa': cssVar('--bs-warning', '#ffc107')
+    };
+    const colors = series.map(s => coresSerie[s.name] || cssVar('--bs-info', '#0dcaf0'));
+    const apexSeries = series.map(s => ({
+      name: s.name,
+      data: s.data.map((y, i) => ({ x: datas[i], y }))
+    }));
+
+    rentabilidadeChart = new ApexCharts(el, {
+      chart: { type: 'line', height: 300, fontFamily: 'inherit', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', animations: { enabled: !prefersReducedMotion } },
+      theme: { mode: dark ? 'dark' : 'light' },
+      series: apexSeries,
+      colors,
+      stroke: { curve: 'smooth', width: series.map(s => s.name === 'Carteira' ? 2.5 : 1.5), dashArray: series.map(s => s.name === 'Carteira' ? 0 : 4) },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(148,163,184,.18)', strokeDashArray: 4 },
+      xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: cssVar('--bs-secondary-color', '#6c757d') } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
+      yaxis: { labels: { formatter: value => value.toFixed(0), style: { colors: cssVar('--bs-secondary-color', '#6c757d') } } },
+      legend: { position: 'top', horizontalAlign: 'left', labels: { colors: cssVar('--bs-body-color', '#212529') } },
+      tooltip: { theme: dark ? 'dark' : 'light', shared: true, x: { format: 'dd/MM/yyyy' }, y: { formatter: value => `base ${value.toFixed(1)}` } }
+    });
+    rentabilidadeChart.render();
   }
 
   function corPositiva() { return cssVar('--bs-success', '#16a34a'); }
@@ -298,7 +395,19 @@
     const cor = positivo ? corPositiva() : corNegativa();
 
     document.getElementById('financeHeaderTitulo').textContent = rotuloDe(serieAtual);
-    document.getElementById('financeHeaderValor').textContent = money.format(atual);
+    // F-Q: "Explique este valor" só faz sentido sobre o patrimônio total (a explicação decompõe o total
+    // por fonte do preço). Em uma série de setor, mostra só o valor sem o gatilho.
+    const valorEl = document.getElementById('financeHeaderValor');
+    if (serieAtual === 'total') {
+      valorEl.innerHTML = `${money.format(atual)} <i class="bi bi-info-circle fs-6 text-secondary align-text-top"></i>`;
+      valorEl.setAttribute('data-explicar', 'patrimonio');
+      valorEl.removeAttribute('disabled');
+      valorEl.classList.remove('pe-none');
+    } else {
+      valorEl.textContent = money.format(atual);
+      valorEl.removeAttribute('data-explicar');
+      valorEl.classList.add('pe-none');
+    }
     document.getElementById('financeHeaderDelta').innerHTML =
       `<span class="${positivo ? 'text-success' : 'text-danger'}">${positivo ? '+' : ''}${money.format(variacao)} (${positivo ? '+' : ''}${pct.format(percentual)}%)</span>` +
       `<span class="finance-hero-today ${variacaoDia >= 0 ? 'text-success' : 'text-danger'}">${variacaoDia >= 0 ? '+' : ''}${pct.format(variacaoDia)}% hoje</span>`;
@@ -333,7 +442,7 @@
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
                 <div>
                   <div class="text-secondary small" id="financeHeaderTitulo">Patrimônio total</div>
-                  <div class="finance-hero-value" id="financeHeaderValor">${money.format(payload.valorMercadoTotal)}</div>
+                  <button type="button" class="btn btn-link p-0 text-reset text-decoration-none border-0 finance-hero-value" id="financeHeaderValor" data-explicar="patrimonio" title="Explicar este valor">${money.format(payload.valorMercadoTotal)} <i class="bi bi-info-circle fs-6 text-secondary align-text-top"></i></button>
                   <div class="finance-hero-delta ${payload.resultadoNaoRealizadoTotal >= 0 ? 'text-success' : 'text-danger'}" id="financeHeaderDelta">${money.format(payload.resultadoNaoRealizadoTotal)}</div>
                 </div>
                 <div class="d-flex flex-column align-items-end gap-2">
@@ -363,6 +472,172 @@
     }
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // F-Q — "Explique este valor". Mecanismo reutilizável: qualquer elemento com
+  // data-explicar="posicao|patrimonio" abre um modal Bootstrap com a composição/fonte do número,
+  // buscada de um endpoint que lê SÓ os read models (sem recalcular transações na UI).
+  // ───────────────────────────────────────────────────────────────────────────
+  let explicarModal = null;
+  let explicarModalEl = null;
+
+  function tomClasse(tipo) {
+    switch (tipo) {
+      case 'positivo': return 'text-success';
+      case 'negativo': return 'text-danger';
+      case 'atencao': return 'text-warning-emphasis';
+      default: return '';
+    }
+  }
+
+  function severidadeBadge(sev) {
+    const map = { ok: 'text-bg-success', atencao: 'text-bg-warning', critico: 'text-bg-danger' };
+    return map[sev] || 'text-bg-secondary';
+  }
+
+  function garantirModal() {
+    if (explicarModal) return explicarModal;
+    if (!window.bootstrap) return null;
+    explicarModalEl = document.createElement('div');
+    explicarModalEl.className = 'modal fade';
+    explicarModalEl.tabIndex = -1;
+    explicarModalEl.setAttribute('aria-hidden', 'true');
+    explicarModalEl.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i><span data-explicar-titulo>Explique este valor</span></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body" data-explicar-corpo></div>
+        </div>
+      </div>`;
+    document.body.appendChild(explicarModalEl);
+    explicarModal = new window.bootstrap.Modal(explicarModalEl);
+    return explicarModal;
+  }
+
+  function linhasHtml(linhas) {
+    if (!linhas || !linhas.length) return '';
+    return `<ul class="list-group list-group-flush">${linhas.map(l => {
+      // Linha sem rótulo = nota explicativa (texto secundário em largura total).
+      if (!l.rotulo) {
+        return `<li class="list-group-item px-0 small text-secondary">${escapeHtml(l.valor)}</li>`;
+      }
+      return `<li class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
+        <span class="text-secondary">${escapeHtml(l.rotulo)}</span>
+        <span class="fw-medium text-end ${tomClasse(l.tipo)}">${escapeHtml(l.valor)}</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+
+  function linkTransacoes(busca) {
+    const base = dashboard.dataset.transacoesUrl;
+    if (!base || !busca) return '';
+    const url = `${base}?busca=${encodeURIComponent(busca)}`;
+    return `<div class="mt-3 text-end">
+      <a class="btn btn-sm btn-outline-secondary" href="${url}">
+        <i class="bi bi-list-ul me-1"></i>Ver transações de ${escapeHtml(busca)}
+      </a></div>`;
+  }
+
+  function corpoCarregando() {
+    return `<div class="text-center text-secondary py-4">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>Carregando explicação...</div>`;
+  }
+
+  function corpoErro() {
+    return `<div class="text-center text-secondary py-4">
+      <i class="bi bi-exclamation-triangle d-block fs-4 mb-2"></i>Não foi possível explicar este valor agora.</div>`;
+  }
+
+  function renderPosicao(corpo, titulo, dto) {
+    if (!dto || !dto.encontrada) {
+      titulo.textContent = 'Explique este valor';
+      corpo.innerHTML = `<div class="text-secondary py-2">Posição não encontrada na projeção atual.</div>`;
+      return;
+    }
+    titulo.textContent = `${dto.ticker} — composição do valor`;
+    const fonte = `<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="badge ${severidadeBadge(dto.fonteSeveridade)}">Fonte: ${escapeHtml(dto.fontePreco)}</span>
+        <span class="small text-secondary">${escapeHtml(dto.fonteStatus)}</span>
+      </div>`;
+    corpo.innerHTML = fonte + linhasHtml(dto.linhas) + linkTransacoes(dto.buscaTransacoes);
+  }
+
+  function renderPatrimonio(corpo, titulo, dto) {
+    titulo.textContent = 'Patrimônio total — composição';
+    if (!dto || !dto.temDados) {
+      corpo.innerHTML = `<div class="text-secondary py-2">Sem posições para compor o patrimônio.</div>`;
+      return;
+    }
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Soma das posições valoradas — sem recalcular transações.</div>`;
+  }
+
+  function renderCarteira(corpo, titulo, dto) {
+    if (!dto || !dto.encontrada) {
+      titulo.textContent = 'Explique este valor';
+      corpo.innerHTML = `<div class="text-secondary py-2">Carteira não encontrada na projeção atual.</div>`;
+      return;
+    }
+    titulo.textContent = `${dto.nome} — composição do valor`;
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Soma das posições da carteira e subcarteiras — sem recalcular transações.</div>`;
+  }
+
+  function renderProventos(corpo, titulo, dto) {
+    titulo.textContent = 'Proventos — composição (12M)';
+    if (!dto || !dto.temDados) {
+      corpo.innerHTML = `<div class="text-secondary py-2">Sem proventos recebidos nos últimos 12 meses.</div>`;
+      return;
+    }
+    corpo.innerHTML = linhasHtml(dto.linhas) +
+      `<div class="small text-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Recebido (líquido) dos últimos 12 meses, lido dos proventos registrados.</div>`;
+  }
+
+  async function abrirExplicacao(trigger) {
+    const modal = garantirModal();
+    if (!modal) return;
+    const tipo = trigger.dataset.explicar;
+    const corpo = explicarModalEl.querySelector('[data-explicar-corpo]');
+    const titulo = explicarModalEl.querySelector('[data-explicar-titulo]');
+    titulo.textContent = trigger.dataset.titulo ? `${trigger.dataset.titulo}` : 'Explique este valor';
+    corpo.innerHTML = corpoCarregando();
+    modal.show();
+
+    try {
+      if (tipo === 'posicao') {
+        const id = trigger.dataset.ativoId;
+        const url = `${dashboard.dataset.explicarPosicaoUrl}?ativoId=${encodeURIComponent(id)}`;
+        const dto = await (await fetchChecked(url, 'application/json')).json();
+        renderPosicao(corpo, titulo, dto);
+      } else if (tipo === 'patrimonio') {
+        const dto = await (await fetchChecked(dashboard.dataset.explicarPatrimonioUrl, 'application/json')).json();
+        renderPatrimonio(corpo, titulo, dto);
+      } else if (tipo === 'carteira') {
+        const id = trigger.dataset.carteiraId;
+        const url = `${dashboard.dataset.explicarCarteiraUrl}?carteiraId=${encodeURIComponent(id)}`;
+        const dto = await (await fetchChecked(url, 'application/json')).json();
+        renderCarteira(corpo, titulo, dto);
+      } else if (tipo === 'proventos') {
+        const dto = await (await fetchChecked(dashboard.dataset.explicarProventosUrl, 'application/json')).json();
+        renderProventos(corpo, titulo, dto);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error('Falha ao explicar valor.', error);
+      corpo.innerHTML = corpoErro();
+    }
+  }
+
+  // Delegação: dispara para qualquer gatilho atual ou futuro (ilhas carregam depois via innerHTML).
+  dashboard.addEventListener('click', event => {
+    const trigger = event.target.closest('[data-explicar]');
+    if (!trigger || !dashboard.contains(trigger)) return;
+    event.preventDefault();
+    abrirExplicacao(trigger);
+  });
+
   async function initialize() {
     try {
       await fetchChecked(dashboard.dataset.prepareUrl, 'application/json');
@@ -377,10 +652,14 @@
       loadPartial(islands.carteiras, dashboard.dataset.carteirasUrl),
       loadPartial(islands.metas, dashboard.dataset.metasUrl),
       loadPartial(islands.reconciliacao, dashboard.dataset.reconciliacaoUrl),
+      loadPartial(islands.reconciliacaoProventos, dashboard.dataset.reconciliacaoProventosUrl),
+      loadPartial(islands.saudeCotacoes, dashboard.dataset.saudeCotacoesUrl),
       loadPartial(islands.importacao, dashboard.dataset.importacaoUrl),
       loadPartial(islands.posicoes, dashboard.dataset.posicoesUrl),
       loadPartial(islands.alertas, dashboard.dataset.alertasUrl),
-      loadProventos(islands.proventos, dashboard.dataset.proventosUrl)
+      loadProventos(islands.proventos, dashboard.dataset.proventosUrl),
+      loadCalendarioProventos(islands.calendarioProventos, dashboard.dataset.calendarioProventosUrl),
+      loadRentabilidade(islands.rentabilidade, dashboard.dataset.rentabilidadeUrl)
     ]);
   }
 
@@ -388,6 +667,9 @@
     controller.abort();
     chart?.destroy();
     proventosChart?.destroy();
+    calendarioProventosChart?.destroy();
+    rentabilidadeChart?.destroy();
+    explicarModal?.dispose();
   }, { once: true });
 
   initialize();

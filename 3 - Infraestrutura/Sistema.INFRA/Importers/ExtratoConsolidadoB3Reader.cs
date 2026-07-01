@@ -96,6 +96,31 @@ public static class ExtratoConsolidadoB3Reader
         return null;
     }
 
+    /// <summary>
+    /// Deriva o ANO do relatório consolidado ANUAL no padrão
+    /// "relatorio-consolidado-anual-AAAA.xlsx" (sem mês — é um agregado do ano inteiro).
+    /// Distinto de <see cref="DerivarPeriodo"/> (mensal): o anual NÃO tem aba Negociações nem
+    /// datas nos proventos; serve só de VERDADE OFICIAL do total do ano (reconciliação).
+    /// Retorna null quando não bate o padrão "anual" (nunca quebra a importação).
+    /// </summary>
+    public static int? DerivarAno(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return null;
+
+        var nome = Path.GetFileNameWithoutExtension(fileName);
+        var normalizado = RemoverAcentos(nome).ToLowerInvariant();
+
+        // Precisa conter "anual" para não confundir com o mensal (que também tem ano no nome).
+        if (!System.Text.RegularExpressions.Regex.IsMatch(normalizado, @"\banual\b"))
+            return null;
+
+        var anoMatch = System.Text.RegularExpressions.Regex.Match(normalizado, @"20\d{2}");
+        return anoMatch.Success && int.TryParse(anoMatch.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ano)
+            ? ano
+            : null;
+    }
+
     private static List<List<string>> LerLinhasDaAba(ZipArchiveEntry entry, IReadOnlyList<string> shared)
     {
         var document = XDocument.Load(entry.Open());

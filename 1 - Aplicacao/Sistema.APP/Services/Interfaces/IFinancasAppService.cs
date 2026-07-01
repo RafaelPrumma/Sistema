@@ -9,11 +9,28 @@ public interface IFinancasAppService
     Task<FinancasPatrimonioDto> ObterPatrimonioDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasCarteirasDto> ObterCarteirasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasMetasDto> ObterMetasDashboardAsync(decimal aporteHipotetico = 0m, CancellationToken cancellationToken = default);
+
+    // F-G: edição do peso-alvo por ativo-em-carteira (fecha o F-G ponta a ponta).
+    Task<PesoAlvoEdicaoDto> ObterPesosAlvoAsync(CancellationToken cancellationToken = default);
+    Task<ResultadoOperacao> SalvarPesosAlvoAsync(SalvarPesosAlvoInput input, CancellationToken cancellationToken = default);
     Task<FinancasImportacaoDto> ObterImportacaoDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasPosicoesDashboardDto> ObterPosicoesDashboardAsync(CancellationToken cancellationToken = default);
+
+    // F-Q — "Explique este valor": composição/fonte de um número do dashboard (lê só read models).
+    Task<ExplicacaoPosicaoDto> ExplicarPosicaoAsync(int ativoId, CancellationToken cancellationToken = default);
+    Task<ExplicacaoPatrimonioDto> ExplicarPatrimonioAsync(CancellationToken cancellationToken = default);
+    Task<ExplicacaoCarteiraDto> ExplicarCarteiraAsync(int carteiraId, CancellationToken cancellationToken = default);
+    Task<ExplicacaoProventosDto> ExplicarProventosAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> ObterAlertasDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasProventosDashboardDto> ObterProventosDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasCalendarioProventosDashboardDto> ObterCalendarioProventosDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasReconciliacaoDto> ObterReconciliacaoDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasReconciliacaoProventosAnualDto> ObterReconciliacaoProventosAnualDashboardAsync(CancellationToken cancellationToken = default);
+    Task<FinancasSaudeCotacoesDto> ObterSaudeCotacoesDashboardAsync(CancellationToken cancellationToken = default);
+
+    // F-B F2: rentabilidade vs benchmark — TWR/MWR/TIR + comparação CDI/Ibov + retorno real (− IPCA) +
+    // séries base 100 p/ o gráfico. À prova de falha: erro → DTO vazio (TemDados=false → ilha some).
+    Task<FinancasRentabilidadeDto> ObterRentabilidadeDashboardAsync(CancellationToken cancellationToken = default);
     Task<FinancasDashboardDto> ObterDashboardAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<DocumentoFinanceiroDto>> BuscarDocumentosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<(DocumentoFinanceiroDto? Documento, IReadOnlyList<ConteudoBrutoFinanceiroDto> Conteudos)> ObterDocumentoAsync(int id, CancellationToken cancellationToken = default);
@@ -21,7 +38,7 @@ public interface IFinancasAppService
     Task<PagedResult<TransacaoCriptoDto>> BuscarTransacoesCriptoAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PosicaoFinanceiraDto>> BuscarPosicoesAsync(bool? somenteAbertas, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AlertaConfiabilidadeDto>> BuscarAlertasAsync(CancellationToken cancellationToken = default);
-    Task ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
+    Task<int> ImportarPastaMonitoradaAsync(int? usuarioId = null, CancellationToken cancellationToken = default);
     Task AtualizarCotacoesAsync(CancellationToken cancellationToken = default);
     Task AtualizarProventosAsync(CancellationToken cancellationToken = default);
     Task<ProventosPaginaDto> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default);

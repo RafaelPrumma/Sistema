@@ -293,6 +293,96 @@ public class FinancasCarteiraTests
         Assert.Equal(100m, dto.PorFonte.Sum(x => x.Percentual), 0);
     }
 
+    [Fact]
+    public async Task CalendarioProventosDeveAgruparRealizadoPorMesETipoEFonte()
+    {
+        var fii = new AtivoFinanceiro { Id = 1, Chave = "DEVA11", Sigla = "DEVA11", Nome = "FII DEVANT", Classe = ClasseAtivo.FII, Mercado = "B3" };
+        var acao = new AtivoFinanceiro { Id = 2, Chave = "BBAS3", Sigla = "BBAS3", Nome = "Banco do Brasil", Classe = ClasseAtivo.Acao, Mercado = "B3" };
+        var cripto = new AtivoFinanceiro { Id = 3, Chave = "BTC", Sigla = "BTC", Nome = "Bitcoin", Classe = ClasseAtivo.Cripto, EhCripto = true, Mercado = "Binance" };
+
+        var hoje = DateTime.UtcNow.Date;
+        var mesPassado = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-1);
+        var proventos = new List<RendimentoInvestimento>
+        {
+            ProventoTipo(fii, 100m, "Rendimento", "B3 Extrato", mesPassado.AddDays(4)),            // Rendimento FII
+            ProventoTipo(acao, 50m, "JCP", "B3 Extrato", mesPassado.AddDays(9), irrf: 7.5m),       // JCP — líquido 42.50
+            ProventoTipo(acao, 30m, "Dividendo", "InformeIR2025", mesPassado.AddDays(9)),          // Dividendo
+            ProventoTipo(cripto, 10m, "Rendimento (Earn)", "Binance", mesPassado.AddDays(14)),     // Earn
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarProventosPorPeriodoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterCalendarioProventosDashboardAsync();
+
+        Assert.True(dto.TemDados);
+        Assert.False(dto.TemPrevisto);
+        Assert.Equal(0m, dto.TotalPrevisto);
+        // Realizado líquido total = 100 + 42.50 (JCP líq) + 30 + 10.
+        Assert.Equal(182.50m, dto.TotalRealizado);
+
+        // Os 4 tipos com valor aparecem nas colunas (na ordem canônica).
+        Assert.Equal(new[] { "Dividendo", "JCP", "Rendimento FII", "Earn" }, dto.Tipos.ToArray());
+
+        // O mês passado tem os buckets por tipo corretos.
+        var mes = dto.Meses.Single(m => m.Ano == mesPassado.Year && m.Mes == mesPassado.Month);
+        Assert.False(mes.Previsto);
+        decimal Bucket(string tipo) => mes.PorTipo.Single(t => t.Tipo == tipo).Valor;
+        Assert.Equal(100m, Bucket("Rendimento FII"));
+        Assert.Equal(42.50m, Bucket("JCP"));   // 50 − 7.50 de IRRF
+        Assert.Equal(30m, Bucket("Dividendo"));
+        Assert.Equal(10m, Bucket("Earn"));
+        Assert.Equal(182.50m, mes.Total);
+
+        // Quebra por fonte (rótulos amigáveis, combinada → primeira manda; InformeIR → Informe IR).
+        var fontes = dto.Fontes.ToDictionary(f => f.Fonte, f => f.Valor);
+        Assert.Equal(142.50m, fontes["B3 Extrato"]);   // 100 (FII) + 42.50 (JCP líq)
+        Assert.Equal(30m, fontes["Informe IR"]);
+        Assert.Equal(10m, fontes["Binance Earn"]);
+    }
+
+    [Fact]
+    public async Task CalendarioProventosDeveExporMesFuturoComoPrevisto()
+    {
+        var fii = new AtivoFinanceiro { Id = 1, Chave = "DEVA11", Sigla = "DEVA11", Nome = "FII DEVANT", Classe = ClasseAtivo.FII, Mercado = "B3" };
+        var hoje = DateTime.UtcNow.Date;
+        var proximoMes = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(1);
+        var proventos = new List<RendimentoInvestimento>
+        {
+            ProventoTipo(fii, 100m, "Rendimento", "B3 Extrato", new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-1).AddDays(4)),
+            ProventoTipo(fii, 80m, "Rendimento", "Brapi", proximoMes.AddDays(9)),   // futuro → previsto/anunciado
+        };
+
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarProventosPorPeriodoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(proventos);
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterCalendarioProventosDashboardAsync();
+
+        Assert.True(dto.TemPrevisto);
+        Assert.Equal(80m, dto.TotalPrevisto);
+        Assert.Equal(100m, dto.TotalRealizado);
+        var futuro = dto.Meses.Single(m => m.Ano == proximoMes.Year && m.Mes == proximoMes.Month);
+        Assert.True(futuro.Previsto);
+        Assert.Equal(80m, futuro.Total);
+    }
+
+    [Fact]
+    public async Task CalendarioProventosVazioQuandoNaoHaProventos()
+    {
+        var repo = new Mock<IFinancasRepository>();
+        repo.Setup(r => r.BuscarProventosPorPeriodoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RendimentoInvestimento>());
+        var service = CriarService(repo.Object);
+
+        var dto = await service.ObterCalendarioProventosDashboardAsync();
+
+        Assert.False(dto.TemDados);
+        Assert.Empty(dto.Meses);
+        Assert.Equal(0m, dto.TotalRealizado);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -633,6 +723,20 @@ public class FinancasCarteiraTests
             TaxWithheld = 0m,
             PaymentDate = pagamento,
             IncomeType = "Rendimento",
+            Source = fonte,
+            Fonte = fonte,
+            RawJson = "{}"
+        };
+
+    private static RendimentoInvestimento ProventoTipo(AtivoFinanceiro ativo, decimal valor, string tipo, string fonte, DateTime pagamento, decimal irrf = 0m)
+        => new()
+        {
+            AssetId = ativo.Id,
+            Asset = ativo,
+            Amount = valor,
+            TaxWithheld = irrf,
+            PaymentDate = pagamento,
+            IncomeType = tipo,
             Source = fonte,
             Fonte = fonte,
             RawJson = "{}"

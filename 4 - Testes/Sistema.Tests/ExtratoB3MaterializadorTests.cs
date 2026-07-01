@@ -43,6 +43,67 @@ public class ExtratoB3MaterializadorTests
         Assert.True(ExtratoB3Materializador.DeveMaterializarNotaB3(1, 2022, 10, cobertosPorB3));
     }
 
+    // --- Precedência "B3 manda" aplicada aos PROVENTOS (Brapi vira fallback) ---
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AtivoMesCobertoPelaB3_Suprime()
+    {
+        // BBAS3 (assetId 1) tem provento B3 em 2024-04 → o candidato Brapi do mesmo ativo×mês é suprimido.
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202404, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AtivoMesNaoCobertoPelaB3_Mantem()
+    {
+        // A B3 cobre BBAS3/2024-04; onde NÃO cobre, a Brapi complementa:
+        // outro ativo no mesmo mês (assetId 2 / 2024-04) e o MESMO ativo em outro mês (1 / 2024-05).
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(2, 202404, cobertura));
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202405, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_MesmoAtivoVariosMeses_SuprimeSoOsCobertos()
+    {
+        // B3 cobre HGLG11 (assetId 7) em jan e mar/2025, mas não fev → só jan e mar são suprimidos.
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (7, 202501), (7, 202503) };
+
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202501, cobertura));
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202502, cobertura));
+        Assert.True(ExtratoB3Materializador.DeveSuprimirProventoBrapi(7, 202503, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_AssetIdNulo_NaoSuprime()
+    {
+        // Sem AssetId não dá pra casar com a cobertura → mantém (não dá pra afirmar que a B3 cobre).
+        var cobertura = new HashSet<(int AssetId, int AnoMes)> { (1, 202404) };
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(null, 202404, cobertura));
+    }
+
+    [Fact]
+    public void DeveSuprimirProventoBrapi_CoberturaVazia_NuncaSuprime()
+    {
+        var cobertura = new HashSet<(int AssetId, int AnoMes)>();
+
+        Assert.False(ExtratoB3Materializador.DeveSuprimirProventoBrapi(1, 202404, cobertura));
+    }
+
+    [Fact]
+    public void AnoMesPagamento_UsaPagamento_ComFallbackNaReferencia()
+    {
+        // Caminho normal: ano-mês vem do PaymentDate.
+        Assert.Equal(202404, ExtratoB3Materializador.AnoMesPagamento(new DateTime(2024, 4, 15), null));
+        // PaymentDate nulo: cai na ReferenceDate (data-com) — documentado no caminho de inserção.
+        Assert.Equal(202403, ExtratoB3Materializador.AnoMesPagamento(null, new DateTime(2024, 3, 20)));
+        // Ambos nulos: não dá pra datar.
+        Assert.Null(ExtratoB3Materializador.AnoMesPagamento(null, null));
+    }
+
     [Fact]
     public void InterpretarNegociacao_LinhaSoCompra_GeraUmaCompra()
     {
@@ -136,8 +197,92 @@ public class ExtratoB3MaterializadorTests
     [InlineData("Dividendo", "Dividendo")]
     [InlineData("Rendimento", "Rendimento")]
     [InlineData("Juros Sobre Capital Próprio", "JCP")]
-    public void MapTipoProvento_ReconheceOsTresTipos(string evento, string esperado)
+    [InlineData("Amortização", "Amortização")]      // aparece no relatório ANUAL (devolução de principal de FII)
+    public void MapTipoProvento_ReconheceOsTipos(string evento, string esperado)
         => Assert.Equal(esperado, ExtratoB3Materializador.MapTipoProvento(evento));
+
+    // --- Parser do relatório ANUAL: aba "Proventos Recebidos" (3 colunas, agregado por ticker×tipo) ---
+
+    [Fact]
+    public void InterpretarProventosAnuais_ParseiaAgregadosEIgnoraTotalEVazias()
+    {
+        // Layout real do anual: Produto | Tipo de Evento | Valor líquido. Agregado do ano (sem datas).
+        // O rodapé tem uma linha vazia, a linha "Total" (label) e o valor do total — todas devem ser ignoradas.
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "BBAS3", "Dividendo", "59.77" },
+            new[] { "BBAS3", "Juros Sobre Capital Próprio", "299.01" },
+            new[] { "AFHI11", "Rendimento", "255.74" },
+            new[] { "BRCR11", "Amortização", "3.8" },
+            new[] { "", "", "" },           // linha em branco
+            new[] { "", "", "Total" },      // label do rodapé
+            new[] { "", "", "7272.27" },    // valor oficial do total (não é um agregado por ativo)
+            new[] { "", "", "" }
+        };
+
+        var agregados = ExtratoB3Materializador.InterpretarProventosAnuais(linhas);
+
+        Assert.Equal(4, agregados.Count);
+        Assert.Contains(agregados, a => a.Ticker == "BBAS3" && a.Tipo == "Dividendo" && a.ValorLiquido == 59.77m);
+        Assert.Contains(agregados, a => a.Ticker == "BBAS3" && a.Tipo == "JCP" && a.ValorLiquido == 299.01m);
+        Assert.Contains(agregados, a => a.Ticker == "AFHI11" && a.Tipo == "Rendimento" && a.ValorLiquido == 255.74m);
+        Assert.Contains(agregados, a => a.Ticker == "BRCR11" && a.Tipo == "Amortização" && a.ValorLiquido == 3.8m);
+        // A linha "Total" (7272.27) NÃO entra como agregado — só os 4 por-ativo somam.
+        Assert.Equal(59.77m + 299.01m + 255.74m + 3.8m, agregados.Sum(a => a.ValorLiquido));
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_NormalizaFracionarioEAplicaAlias()
+    {
+        // Produto às vezes vem "CÓDIGO - NOME" (mensal) ou só "CÓDIGO" (anual): ambos resolvem o ticker.
+        // Fracionário (sufixo F) e alias (IRIM11→IRDM11) são unificados como no resto do código.
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "ITUB4F", "Dividendo", "10" },
+            new[] { "IRIM11", "Rendimento", "20" },
+            new[] { "BBAS3 - BANCO DO BRASIL S/A", "Dividendo", "30" }
+        };
+
+        var agregados = ExtratoB3Materializador.InterpretarProventosAnuais(linhas);
+
+        Assert.Equal("ITUB4", agregados[0].Ticker);
+        Assert.Equal("IRDM11", agregados[1].Ticker);
+        Assert.Equal("BBAS3", agregados[2].Ticker);
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_ValorNaoPositivoOuSemTicker_Ignora()
+    {
+        var linhas = new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" },
+            new[] { "PETR4", "Dividendo", "0" },     // valor zero → ignora
+            new[] { "PETR4", "Dividendo", "-5" },    // valor negativo → ignora
+            new[] { "", "Dividendo", "10" },         // sem ticker → ignora
+            new[] { "VALE3", "", "10" }              // sem tipo → ignora
+        };
+
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(linhas));
+    }
+
+    [Fact]
+    public void InterpretarProventosAnuais_AbaVaziaOuSoHeader_RetornaVazio()
+    {
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(new List<IReadOnlyList<string>>()));
+        Assert.Empty(ExtratoB3Materializador.InterpretarProventosAnuais(new List<IReadOnlyList<string>>
+        {
+            new[] { "Produto", "Tipo de Evento", "Valor líquido" }
+        }));
+    }
+
+    [Fact]
+    public void ProventoAnualB3_GerarChaveNatural_NormalizaAnoAssetTipo()
+    {
+        var chave = ProventoAnualB3.GerarChaveNatural(2024, 7, "jcp");
+        Assert.Equal("2024|7|JCP", chave);
+    }
 
     [Fact]
     public void ChaveNegociacao_IncluiTickerAnoMesSentidoCorretora()
@@ -153,6 +298,38 @@ public class ExtratoB3MaterializadorTests
         Assert.Equal(ClasseAtivo.FII, ExtratoB3Materializador.ClassePorTicker("AFHI11"));
         Assert.Equal(ClasseAtivo.Acao, ExtratoB3Materializador.ClassePorTicker("BBAS3"));
     }
+
+    // --- Causa B: "o extrato mais recente do mês manda" (atualização do staging no reimport) ---
+
+    [Fact]
+    public void NegociacaoMudou_QuantidadeMaior_DetectaMudanca()
+    {
+        // Extrato parcial (qtd 300) e depois o completo (qtd 500): a quantidade muda → atualiza staging.
+        Assert.True(ExtratoB3Materializador.NegociacaoMudou(
+            quantidadeExistente: 300m, precoExistente: 10m, brutoExistente: 3000m,
+            quantidadeNova: 500m, precoNovo: 10m, brutoNovo: 5000m));
+    }
+
+    [Fact]
+    public void NegociacaoMudou_MesmosValores_NaoEhMudanca()
+    {
+        // Reimportar o agregado com os MESMOS valores é no-op (não remateraliza à toa).
+        Assert.False(ExtratoB3Materializador.NegociacaoMudou(
+            quantidadeExistente: 500m, precoExistente: 10m, brutoExistente: 5000m,
+            quantidadeNova: 500m, precoNovo: 10m, brutoNovo: 5000m));
+    }
+
+    [Theory]
+    // só o preço mudou
+    [InlineData(500, 10, 5000, 500, 11, 5500, true)]
+    // só o bruto mudou (ex.: arredondamento/recálculo)
+    [InlineData(500, 10, 5000, 500, 10, 5001, true)]
+    // tudo igual
+    [InlineData(100, 9.5, 950, 100, 9.5, 950, false)]
+    public void NegociacaoMudou_CobrePrecoEBruto(
+        decimal qExist, decimal pExist, decimal bExist,
+        decimal qNova, decimal pNovo, decimal bNovo, bool esperado)
+        => Assert.Equal(esperado, ExtratoB3Materializador.NegociacaoMudou(qExist, pExist, bExist, qNova, pNovo, bNovo));
 
     private static Dictionary<string, string> LinhaNegociacao(
         string ticker, string periodoInicial, string periodoFinal, string instituicao,

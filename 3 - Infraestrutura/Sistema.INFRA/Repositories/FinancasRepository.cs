@@ -146,6 +146,22 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .ToListAsync(cancellationToken);
     }
 
+    // F-V: agregados oficiais anuais (ProventoAnualB3) com o ativo, p/ a reconciliação anual de proventos.
+    // Independente de carga (o anual é a verdade oficial do ano — não filtra por carga corrente).
+    public async Task<IReadOnlyList<ProventoAnualB3>> BuscarProventosAnuaisB3Async(CancellationToken cancellationToken = default)
+        => await _context.ProventosAnuaisB3
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .OrderByDescending(x => x.Year)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SerieBenchmark>> BuscarSeriesBenchmarkAsync(DateTime inicio, CancellationToken cancellationToken = default)
+        => await _context.SeriesBenchmark
+            .AsNoTracking()
+            .Where(x => x.Date >= inicio)
+            .OrderBy(x => x.Date)
+            .ToListAsync(cancellationToken);
+
     public async Task<PagedResult<RendimentoInvestimento>> BuscarProventosAsync(int page, int pageSize, string? termo, CancellationToken cancellationToken = default)
     {
         var query = _context.RendimentosInvestimento.AsNoTracking().Include(x => x.Asset).AsQueryable();
@@ -217,6 +233,26 @@ public class FinancasRepository(AppDbContext context) : IFinancasRepository
             .OrderBy(x => x.Ordem)
             .ThenBy(x => x.Nome)
             .ToListAsync(cancellationToken);
+
+    // F-G: vínculos ativo↔carteira ativos (lista da tela de peso-alvo). AsNoTracking + includes da carteira
+    // e do ativo para montar a UI sem recalcular nada.
+    public async Task<IReadOnlyList<CarteiraAtivoFinanceiro>> BuscarVinculosCarteiraAtivoAsync(CancellationToken cancellationToken = default)
+        => await _context.CarteirasAtivosFinanceiros
+            .AsNoTracking()
+            .Include(x => x.CarteiraFinanceira)
+            .Include(x => x.AtivoFinanceiro)
+            .Where(x => x.Ativo && x.CarteiraFinanceira!.Ativo)
+            .ToListAsync(cancellationToken);
+
+    // F-G: vínculos TRACKED pelos ids para a gravação em lote do PesoAlvo.
+    public async Task<IReadOnlyList<CarteiraAtivoFinanceiro>> BuscarVinculosCarteiraAtivoPorIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids is null || ids.Count == 0)
+            return [];
+        return await _context.CarteirasAtivosFinanceiros
+            .Where(x => ids.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<DocumentoFinanceiro>> BuscarDocumentosMonitoradosAsync(CancellationToken cancellationToken = default)
         => await _context.DocumentosFinanceiros

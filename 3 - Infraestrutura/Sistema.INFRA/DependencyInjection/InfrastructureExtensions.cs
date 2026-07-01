@@ -46,10 +46,13 @@ public static class InfrastructureExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<FinancasDataRepairService>();
         services.AddScoped<IFinancasImportador, FinancasImportador>();
+        services.AddScoped<IGastosService, GastosService>();
         services.AddScoped<IFinancasMarketDataService, FinancasMarketDataService>();
         services.AddScoped<IFinancasAlertaService, FinancasAlertaService>();
         services.AddHttpClient("Brapi", client => client.BaseAddress = new Uri("https://brapi.dev/"));
         services.AddHttpClient("Binance", client => client.BaseAddress = new Uri("https://api.binance.com/"));
+        // F-B F2: benchmarks via BCB SGS (API pública, sem token): CDI/IPCA (e Ibov opcional).
+        services.AddHttpClient("Bcb", client => client.BaseAddress = new Uri("https://api.bcb.gov.br/"));
         services.AddScoped<IEmailAppService, EmailService>();
         services.Configure<EmailOptions>(configuration.GetSection("AzureAd"));
         services.AddScoped<IExecutionContext, HttpExecutionContext>();

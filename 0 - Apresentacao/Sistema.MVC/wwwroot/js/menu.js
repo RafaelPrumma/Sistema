@@ -16,6 +16,8 @@
       expandedCheckboxSelector: '#MenuLateralExpandido',
       collapsedClass: 'menu-collapsed',
       mobileOpenClass: 'menu-mobile-open',
+      openClass: 'open',
+      openStateKey: 'menuOpenBranches',
       ...options
     };
 
@@ -27,23 +29,89 @@
     const $checkbox = $(config.expandedCheckboxSelector);
     const desktop = window.matchMedia('(min-width: 992px)');
 
-    let activePanelId = null;
-
-    const findCurrentRoutePanelId = () => {
-      const $activeSubLink = $menu.find('.menu-panel--sub .menu-sublink.active').first();
-
-      if ($activeSubLink.length) {
-        return $activeSubLink.closest('.menu-panel--sub').attr('id') || null;
-      }
-
-      const fallbackPanelId = $menu.find('.menu-panel--root .menu-toggle.active')
-        .first()
-        .closest('.menu-item')
-        .data('panel');
-
-      return fallbackPanelId || null;
+    // ---- Identidade estável de cada ramo (para persistir estado aberto) -----
+    const branchKey = ($branch) => {
+      const $toggle = $branch.children('.menu-toggle').first();
+      const label = $toggle.find('> span').first().text().trim();
+      const depth = $branch.attr('data-menu-depth') || '0';
+      // Inclui os rótulos dos ancestrais para desambiguar rótulos repetidos.
+      const trail = $branch.parents('.menu-branch')
+        .map(function () { return $(this).children('.menu-toggle').first().find('> span').first().text().trim(); })
+        .get()
+        .reverse()
+        .join(' / ');
+      return (trail ? trail + ' / ' : '') + label + '#' + depth;
     };
 
+    const readOpenState = () => {
+      try {
+        const raw = window.sessionStorage.getItem(config.openStateKey);
+        return raw ? new Set(JSON.parse(raw)) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const writeOpenState = () => {
+      try {
+        const keys = [];
+        $menu.find('.menu-branch.' + config.openClass).each(function () {
+          keys.push(branchKey($(this)));
+        });
+        window.sessionStorage.setItem(config.openStateKey, JSON.stringify(keys));
+      } catch {
+        // Storage indisponível em contextos privados/bloqueados; segue sem persistir.
+      }
+    };
+
+    // ---- Expansão/recolhimento de um ramo (accordion recursivo) -------------
+    const setBranchOpen = ($branch, open) => {
+      const $toggle = $branch.children('.menu-toggle').first();
+      $branch.toggleClass(config.openClass, open);
+      $toggle.attr('aria-expanded', open ? 'true' : 'false');
+    };
+
+    const toggleBranch = ($branch) => {
+      const willOpen = !$branch.hasClass(config.openClass);
+      setBranchOpen($branch, willOpen);
+      // Ao fechar um ramo, recolhe também os descendentes para um reabrir limpo.
+      if (!willOpen) {
+        $branch.find('.menu-branch.' + config.openClass).each(function () {
+          setBranchOpen($(this), false);
+        });
+      }
+      writeOpenState();
+    };
+
+    // Garante que a trilha do item ativo esteja aberta (ancestrais do ativo).
+    const expandActiveTrail = () => {
+      const $active = $menu.find('.menu-leaf .menu-link.active').first();
+      if (!$active.length) return;
+      $active.parents('.menu-branch').each(function () {
+        setBranchOpen($(this), true);
+      });
+    };
+
+    // Restaura ramos abertos da sessão anterior; se não houver estado salvo,
+    // mantém apenas o que veio do servidor (trilha ativa já marcada com .open).
+    const restoreOpenState = () => {
+      const saved = readOpenState();
+      if (saved) {
+        $menu.find('.menu-branch').each(function () {
+          const $branch = $(this);
+          setBranchOpen($branch, saved.has(branchKey($branch)));
+        });
+      }
+      expandActiveTrail();
+    };
+
+    const collapseAllBranches = () => {
+      $menu.find('.menu-branch.' + config.openClass).each(function () {
+        setBranchOpen($(this), false);
+      });
+    };
+
+    // ---- Estado desktop (recolhido/expandido) e mobile (aberto/fechado) -----
     const rememberExpandedState = (expanded) => {
       const value = expanded ? 'true' : 'false';
       $menu.data('menu-expanded', value);
@@ -51,35 +119,7 @@
       try {
         window.sessionStorage.setItem('menuExpandedState', expanded ? 'open' : 'closed');
       } catch {
-        // Storage can be unavailable in private or locked-down browser contexts.
-      }
-    };
-
-    const showPanel = (panelId) => {
-      const $root = $menu.find('.menu-panel--root');
-      const $sub = $menu.find('#' + panelId);
-      if (!$sub.length) return;
-
-      $menu.find('.menu-panel--sub').each(function () {
-        $(this).removeClass('panel-slide-in');
-      });
-
-      $root.addClass('panel-slide-out');
-      $sub.addClass('panel-slide-in');
-      activePanelId = panelId;
-    };
-
-    const showRoot = () => {
-      $menu.find('.menu-panel--root').removeClass('panel-slide-out');
-      $menu.find('.menu-panel--sub').removeClass('panel-slide-in');
-      activePanelId = null;
-    };
-
-    const showCurrentRoutePanel = () => {
-      const panelId = findCurrentRoutePanelId();
-
-      if (panelId) {
-        showPanel(panelId);
+        // Storage pode estar indisponível.
       }
     };
 
@@ -88,30 +128,18 @@
       $hamburger.attr('aria-expanded', expanded ? 'true' : 'false');
       $checkbox.prop('checked', expanded);
       rememberExpandedState(expanded);
-      if (!expanded) showRoot();
     };
 
     const setMobileOpen = (open) => {
       document.body.classList.toggle(config.mobileOpenClass, open);
       $hamburger.attr('aria-expanded', open ? 'true' : 'false');
-
-      if (open) {
-        showCurrentRoutePanel();
-      } else {
-        showRoot();
-      }
     };
 
     const sync = (desktopExpanded) => {
       if (desktop.matches) {
         $checkbox.prop('disabled', false);
-        const expanded = Boolean(desktopExpanded);
-        setDesktopExpanded(expanded);
+        setDesktopExpanded(Boolean(desktopExpanded));
         document.body.classList.remove(config.mobileOpenClass);
-
-        if (expanded) {
-          showCurrentRoutePanel();
-        }
       } else {
         $checkbox.prop('disabled', true);
         setMobileOpen(false);
@@ -122,45 +150,27 @@
     const bindEvents = () => {
       $hamburger.on('click', function (e) {
         e.preventDefault();
-
         if (desktop.matches) {
           const isCollapsed = document.body.classList.contains(config.collapsedClass);
-          const willExpand = isCollapsed;
-          setDesktopExpanded(willExpand);
+          setDesktopExpanded(isCollapsed);
         } else {
           const isOpen = document.body.classList.contains(config.mobileOpenClass);
           setMobileOpen(!isOpen);
         }
       });
 
-      $menu.on('click', '.menu-arrow, .menu-toggle', function (e) {
+      // Clique num toggle de ramo: expande/recolhe o próprio ramo (qualquer nível).
+      $menu.on('click', '.menu-toggle', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        const panelId = $(this).closest('.menu-item').data('panel');
-        if (!panelId) return;
-
-        if (activePanelId === panelId) {
-          showRoot();
-        } else {
-          showPanel(panelId);
-        }
+        toggleBranch($(this).closest('.menu-branch'));
       });
 
-      $menu.on('click', '.menu-link:not(.menu-toggle)', function (e) {
-        const $item = $(this).closest('.menu-item');
-        const panelId = $item.data('panel');
-        if (!panelId) return;
-        e.preventDefault();
-        if (activePanelId === panelId) {
-          showRoot();
-        } else {
-          showPanel(panelId);
+      // Ao seguir um link folha no mobile, fecha o off-canvas.
+      $menu.on('click', '.menu-leaf .menu-link', function () {
+        if (!desktop.matches) {
+          setMobileOpen(false);
         }
-      });
-
-      $menu.on('click', '.menu-back', function (e) {
-        e.preventDefault();
-        showRoot();
       });
 
       $backdrop.on('click', function () {
@@ -171,10 +181,6 @@
         if (e.key !== 'Escape') return;
         if (!desktop.matches && document.body.classList.contains(config.mobileOpenClass)) {
           setMobileOpen(false);
-          return;
-        }
-        if (activePanelId) {
-          showRoot();
         }
       });
 
@@ -184,7 +190,6 @@
       });
 
       desktop.addEventListener('change', () => {
-        showRoot();
         document.body.classList.remove(config.mobileOpenClass);
         document.body.classList.remove(config.collapsedClass);
         const saved = $menu.data('menu-expanded');
@@ -193,12 +198,12 @@
     };
 
     bindEvents();
-    showCurrentRoutePanel();
+    restoreOpenState();
 
     return {
       sync,
-      showRoot,
-      closeMobile() { setMobileOpen(false); }
+      closeMobile() { setMobileOpen(false); },
+      collapseAll: collapseAllBranches
     };
   };
 

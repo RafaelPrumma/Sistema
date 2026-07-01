@@ -24,4 +24,9 @@ public interface IFinancasMarketDataService
     // Consolida o fechamento diário (1d) a partir dos buckets 30m do dia e aplica a retenção do
     // intradiário (apaga 30m > 24h quando o 1d já existe). Roda após o fechamento (job recorrente).
     Task ConsolidarHistoricoDiarioAsync(CancellationToken cancellationToken = default);
+
+    // F-B F2: busca a série dos benchmarks (CDI=SGS 12, IPCA=SGS 433; Ibov via SGS 7 ou Brapi opcional)
+    // e faz upsert idempotente em FinanceiroSerieBenchmark. À prova de falha: fonte offline → loga e
+    // mantém o que já tem; nunca estoura. NÃO é chamado no load do dashboard (job recorrente).
+    Task AtualizarBenchmarksAsync(bool force = false, CancellationToken cancellationToken = default);
 }

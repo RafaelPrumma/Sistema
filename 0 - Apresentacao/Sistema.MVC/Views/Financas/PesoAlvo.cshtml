@@ -1,0 +1,148 @@
+@using System.Globalization
+@using Sistema.APP.DTOs
+@model PesoAlvoEdicaoDto
+@{
+    ViewData["Title"] = "Peso-alvo por ativo";
+    var br = CultureInfo.GetCultureInfo("pt-BR");
+    var inv = CultureInfo.InvariantCulture;
+    string Pct(decimal value) => value.ToString("N2", br);
+    var totalForaDeCem = System.Math.Abs(Model.SomaTotalPesoAlvo - 100m) > 0.5m && Model.SomaTotalPesoAlvo > 0m;
+    // Índice global da linha no form (Itens[i].*), contínuo entre carteiras.
+    var indice = 0;
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = "Peso-alvo por ativo",
+    Description = "Defina o peso-alvo (% do patrimônio) de cada ativo dentro de uma carteira. A ilha de Metas e rebalanceamento do dashboard soma esses alvos por carteira e compara com o peso atual. Deixe em branco (ou 0) para \"sem alvo\"."
+})
+
+@await Html.PartialAsync("_FlashMessages")
+
+@if (Model.Carteiras.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-secondary py-5">
+            <i class="bi bi-bullseye fs-3 d-block mb-2"></i>
+            Nenhum ativo vinculado a uma carteira ainda. Vincule ativos às carteiras para poder definir o peso-alvo.
+        </div>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="PesoAlvo" id="formPesoAlvo">
+        @Html.AntiForgeryToken()
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <span class="small text-secondary">
+                Soma total dos alvos: <strong id="somaTotal">@Pct(Model.SomaTotalPesoAlvo)%</strong>
+                <span class="text-secondary">(idealmente 100%)</span>
+            </span>
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-save me-1"></i>Salvar pesos-alvo
+            </button>
+        </div>
+
+        @if (totalForaDeCem)
+        {
+            <div class="alert alert-warning py-2 px-3 small" role="alert">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                A soma de todos os pesos-alvo é <strong>@Pct(Model.SomaTotalPesoAlvo)%</strong>. O ideal é totalizar 100% do patrimônio.
+            </div>
+        }
+
+        @foreach (var carteira in Model.Carteiras)
+        {
+            var somaForaDeCem = carteira.SomaPesoAlvo > 100m;
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0"><i class="bi bi-folder me-1"></i>@carteira.CarteiraNome</h6>
+                    <span class="small @(somaForaDeCem ? "text-danger" : "text-secondary")"
+                          data-soma-carteira="@carteira.CarteiraId">
+                        Soma da carteira: <strong class="js-soma-valor">@Pct(carteira.SomaPesoAlvo)</strong>%
+                        @if (somaForaDeCem)
+                        {
+                            <i class="bi bi-exclamation-triangle ms-1" title="Acima de 100%"></i>
+                        }
+                    </span>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Ativo</th>
+                                <th>Classe</th>
+                                <th class="text-end">Quantidade</th>
+                                <th class="text-end" style="width:160px">Peso-alvo (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var item in carteira.Itens)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@item.Ticker</td>
+                                <td class="small text-secondary">@item.AtivoNome</td>
+                                <td class="small">@item.Classe</td>
+                                <td class="text-end small text-secondary">@item.Quantidade.ToString("N8", br).TrimEnd('0').TrimEnd(',')</td>
+                                <td class="text-end">
+                                    <input type="hidden" name="Itens[@indice].CarteiraAtivoId" value="@item.CarteiraAtivoId" />
+                                    <input type="number" step="0.0001" min="0" max="100"
+                                           class="form-control form-control-sm text-end js-peso"
+                                           data-carteira="@carteira.CarteiraId"
+                                           name="Itens[@indice].PesoAlvo"
+                                           value="@(item.PesoAlvo.HasValue ? item.PesoAlvo.Value.ToString(inv) : "")"
+                                           placeholder="sem alvo" />
+                                </td>
+                            </tr>
+                            indice++;
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex justify-content-end">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-save me-1"></i>Salvar pesos-alvo
+            </button>
+        </div>
+    </form>
+}
+
+@section Scripts {
+<script>
+(function () {
+    var br = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function recalcular() {
+        var total = 0;
+        var porCarteira = {};
+        document.querySelectorAll('.js-peso').forEach(function (input) {
+            var v = parseFloat((input.value || '').replace(',', '.'));
+            if (isNaN(v)) v = 0;
+            total += v;
+            var c = input.dataset.carteira;
+            porCarteira[c] = (porCarteira[c] || 0) + v;
+        });
+
+        var somaTotal = document.getElementById('somaTotal');
+        if (somaTotal) somaTotal.textContent = br.format(total) + '%';
+
+        document.querySelectorAll('[data-soma-carteira]').forEach(function (span) {
+            var c = span.dataset.somaCarteira;
+            var soma = porCarteira[c] || 0;
+            var alvo = span.querySelector('.js-soma-valor');
+            if (alvo) alvo.textContent = br.format(soma);
+            span.classList.toggle('text-danger', soma > 100.0001);
+            span.classList.toggle('text-secondary', soma <= 100.0001);
+        });
+    }
+
+    document.querySelectorAll('.js-peso').forEach(function (input) {
+        input.addEventListener('input', recalcular);
+    });
+})();
+</script>
+}

@@ -1,211 +1,83 @@
 # Spec — Submódulo Investimentos
 
-> Acompanhamento da carteira B3 + cripto. Parte já existe; aqui ficam as features que faltam. Contexto técnico: skill `financas-dominio`.
+> Acompanhamento da carteira B3 + cripto. **A maior parte já está feita** (jun/2026) — esta spec agora lista o que está pronto (resumido) e foca no que **falta para terminar Investimentos**. Contexto técnico: skill `financas-dominio`.
 
-## Estado atual
-Importação (notas/Binance), posição/preço médio (`CalcularPosicoes`), proventos (Brapi+earn+IR), dashboard em ilhas, carteiras/grupos, resumo analítico. Falta o abaixo.
+## Arquitetura (decisões vigentes)
 
-### Modelo financeiro materializado (jun/2026)
-`FinanceiroTransacao` continua sendo a fonte da verdade auditavel. A tabela `FinanceiroPosicaoAtivo` e um read model/projecao recalculavel: pode ser apagada e reconstruida a partir das transacoes canonicas, ja com eventos corporativos aplicados pelo carregador central.
+### Modelo financeiro materializado
+`FinanceiroTransacao` é a fonte da verdade auditável. `FinanceiroPosicaoAtivo` é um **read model/projeção recalculável**: pode ser apagada e reconstruída a partir das transações canônicas, já com eventos corporativos aplicados pelo carregador central.
+- Dashboard (patrimônio, carteiras, posições) lê `FinanceiroPosicaoAtivo` + `FinanceiroCotacaoAtivo` + `FinanceiroCarteiraAtivo`, evitando recalcular todas as transações em cada ilha.
+- Recalcular `FinanceiroPosicaoAtivo` após importação/reprocessamento, ressincronização canônica, CRUD manual de transação e CRUD de evento corporativo.
+- Campos das entidades financeiras padronizados em **PT-BR** (`Chave`, `Sigla`, `Nome`, `Classe`, `Mercado`, `EhCripto`, `PrecoMedio`, `ResultadoRealizado`…); `Slug` permanece em inglês (identificador técnico). `FinanceiroPosicaoAtivo` não tem `RawJson` (é projeção calculada).
+- Hotfix de dados deve preservar `FinanceiroTransacao` como fonte auditável e depois **recalcular** ou ajustar explicitamente a projeção.
 
-- Dashboard financeiro: patrimonio, carteiras e posicoes devem ler `FinanceiroPosicaoAtivo` + `FinanceiroCotacaoAtivo` + `FinanceiroCarteiraAtivo`, evitando recalcular todas as transacoes em cada ilha.
-- Recalcular `FinanceiroPosicaoAtivo` apos importacao/reprocessamento, ressincronizacao canonica, CRUD manual de transacao e CRUD de evento corporativo.
-- `RawJson` permanece como nome padrao nas tabelas que ja guardam payload bruto. `FinanceiroPosicaoAtivo` nao tem `RawJson`, pois nao representa payload externo; e uma projecao calculada.
-- Nomes fisicos das tabelas principais permanecem: `FinanceiroAtivo`, `FinanceiroCarteira`, `FinanceiroCarteiraAtivo`, `FinanceiroCotacaoAtivo`, `FinanceiroPosicaoEstimativa`.
-- Campos padronizados em PT-BR: `Chave`, `Sigla`, `Nome`, `Classe`, `Mercado`, `Moeda`, `EhCripto`, `Ativo`, `PapelConceitual`, `CarteiraPaiId`, `CarteiraPai`, `EhSistema`, `AtivoFinanceiroId`, `AtivoFinanceiro`, `Simbolo`, `Preco`, `PrecoBRL`, `Variacao`, `VariacaoPercentual`, `HorarioMercado`, `ConsultadoEm`, `ExpiraEm`, `MensagemErro`, `Quantidade`, `PrecoMedio`, `TotalInvestido`, `TotalVendido`, `ResultadoRealizado`, `PosicaoAtualEstimada`, `NivelConfianca`, `UltimaOperacaoEm`.
-- `Slug` fica em ingles por ser identificador tecnico estavel para URL/chave interna.
-- O card Carteiras depende de `FinanceiroPosicaoAtivo`; hotfixes de dados devem preservar `FinanceiroTransacao` como fonte auditavel e depois recalcular ou ajustar explicitamente a projecao.
+### Modelo de cotações e histórico
+**Não criar terceira tabela de cotações.** Série temporal central = `FinanceiroPrecoHistoricoAtivo`; `FinanceiroCotacaoAtivo` é só cache/status da última cotação por ativo/provedor.
+- `FinanceiroPrecoHistoricoAtivo`: `Interval="30m"` (snapshots do job) + `Interval="1d"` (fechamento permanente); `Date` em UTC; upsert idempotente por `AtivoFinanceiroId + Provedor + Interval + Date`.
+- Ao cotar: (1) atualiza `FinanceiroCotacaoAtivo`; (2) upsert do bucket `30m` (novo: O=H=L=C=preço; existente: preserva Open, estende High/Low, atualiza Close/CloseBRL); (3) dashboard nunca chama API para histórico.
+- Consolidação `1d` a partir dos `30m` (ou candle oficial). Retenção: `1d` indefinido; apaga `30m` >24h só quando o `1d` já existir.
+- Agenda: `financas-cotacoes` 30 min; B3 só em pregão/dias úteis; cripto 24/7 (fechamento 23:59 UTC). Proventos seguem em `FinanceiroRendimento`.
 
-### Modelo de cotacoes e historico (jun/2026)
-Decisao arquitetural: **nao criar uma terceira tabela de cotacoes**. A tabela central para serie temporal de precos e `FinanceiroPrecoHistoricoAtivo`; `FinanceiroCotacaoAtivo` nao e historico, e apenas cache/status da ultima cotacao conhecida por ativo/provedor.
+## ✅ Concluído (jun/2026)
+Importação (notas/Binance/extratos B3), posição/preço médio, proventos, dashboard em ilhas — **mais**:
+- **F-A Eventos corporativos** (split/grupamento) — `eventos-corporativos.spec.md` (F1+F2+F3; 5 splits semeados).
+- **F-E Importador B3** — extrato consolidado como **fonte de verdade**; precedência invertida (B3 manda); reconciliação pela Posição + ativo virtual `VARIACAO`; fracionário unificado; alias IRIM11→IRDM11. `importador-b3.spec.md`.
+- **Read model `FinanceiroPosicaoAtivo` + padronização PT-BR.**
+- **Cotações/histórico** — `FinanceiroPrecoHistoricoAtivo` (buckets 30m/1d + consolidação + retenção + agenda).
+- **F-I Carteiras hierárquicas** — `CarteiraPaiId`; topo Bancário e Seguridade / FIIs / Minério e energia / Criptomoedas + subcarteiras; `ClassificadorCarteira` (mapa por ticker + fallback). Reparo: FII gravado como ETF reclassificado pelo nome (corrige IR 20% vs 15%).
+- **F-J Carteiras zeradas / Resultado** — custo como piso + status `SemCotacao`; cotação `B3Custodia` (Preço de Fechamento da Posição) para o Resultado não ficar 0 sem token Brapi.
+- **F-C Linha de aportes** no gráfico de evolução.
+- **F-G Metas + rebalanceamento** — peso atual vs `PesoAlvo` + sugestão de aporte (falta a tela de edição do peso-alvo).
+- **F-H Alertas** — entidade `AlertaPreco` + job `financas-alertas` + CRUD + notificação interna (preço com re-arme; provento novo).
+- **Dashboard transparência** — F-K card de proventos · F-L painel de saúde/rastreabilidade + composição do valor + "Posições calculadas vs custódia" · F-M card de reconciliação B3 · F-N proventos por fonte · F-O aviso "cripto parcialmente reconciliado".
+- **Cripto/IR** (`cripto.spec.md` + `ir.spec.md`) — netting fonte única + §11 idempotência (USDT); F2 valoração BRL das pernas; IR cripto exterior (Lei 14.754) + B&D código RFB + IN 1888 + export 8 abas.
+- **F-G (fim)** — tela `/Financas/PesoAlvo`: edição em lote do peso-alvo por ativo-em-carteira (link na ilha de Metas + menu). Fecha o F-G ponta a ponta. *(branch `feat/investimentos-final`)*
+- **F-S Saúde das cotações** — ilha dedicada (`DashboardSaudeCotacoes`): por ativo com posição>0, status (atual/vencida/falhou/sem token/fallback custo/B3Custodia) + provedor/símbolo/última atualização/erro + lacunas 1d/30m, agrupado B3 / cripto / B3Custódia. Lógica pura `ClassificadorSaudeCotacao`.
+- **F-T Calendário de proventos** — ilha (`DashboardCalendarioProventos`): realizado mês×tipo×fonte (B3 Extrato/Brapi/IR/Binance Earn) + faixa "previsto/anunciado" (PaymentDate futuro já persistido).
+- **F-H (fim)** — 3 tipos de alerta novos no `FinancasAlertaService`: cotação vencida/sem fonte (reusa `ClassificadorSaudeCotacao`), ativo posição>0 sem carteira, divergência calculado×custódia (reusa o nº do card F-M); dedup/re-arme por marcador `AlertaConfiabilidade`; config `Alertas:DivergenciaValorLimiar`/`:DivergenciaPctLimiar`.
+- **F-Q (1ª fatia)** — "Explique este valor" em **Posições + Patrimônio**: modal mostra qtd, PM, preço usado, fonte do preço/fallback (reusa `ClassificadorSaudeCotacao`), resultado, ajuste de reconciliação (`VARIACAO`) + deep-link p/ transações do ticker. Mecanismo reutilizável (`MontadorExplicacaoValor` puro). **Falta: Carteiras + Proventos.**
+- **Fix proventos — dupla contagem B3+Brapi** — a precedência "B3 manda" agora vale também p/ proventos: Brapi suprimida onde `Fonte='B3 Extrato'` cobre o ativo×mês de pagamento; limpeza self-healing dos duplicados históricos (soft-delete). Inflava ~+R$1,6k (2023)/+R$0,9k (2024)/+R$1,2k (2025).
+- **F-Q (completo)** — "Explique este valor" estendido a **Carteiras + Proventos** (além de Posições+Patrimônio): mesmo modal `[data-explicar]` + `MontadorExplicacaoValor` puro. Carteira mostra fonte do preço/peso-alvo/reconciliação; Proventos mostra fonte×tipo + nota de precedência.
+- **F-E (reimport on-demand)** — a varredura nunca re-rodava (gate por-pasta) → arquivos novos largados em `arquivos/b3/` não entravam. Agora: **detecção de arquivo novo no load** (compara arquivos da pasta com `DocumentoFinanceiro` já importados, barato/à prova de falha) + **botão "Atualizar / importar novos extratos"** na ilha de Importação (recalcula a projeção e diz quantos entraram) → **posições atualizáveis a qualquer momento**. E o staging passou a **atualizar no reimport** ("extrato mais recente do mês manda": parcial do dia 15 se autocorrige no completo do fechamento; antes pulava e travava no parcial). `MaterializacaoVersao` 13→14.
+- **F-V (relatórios anuais → validação de proventos)** — o relatório consolidado **anual** da B3 (`relatorio-consolidado-anual-AAAA.xlsx`) traz a aba `Proventos Recebidos` como **agregado anual por ticker×tipo, SEM datas** (não serve p/ preencher meses, mas é a verdade oficial do total do ano). Nova entidade `ProventoAnualB3` (parser puro, upsert idempotente, migration `AddProventoAnualB3`) + **ilha de reconciliação anual** (oficial B3 × materializado, por ticker×tipo e total, base líquida, status bate/falta/sobra) — torna visível mês faltando / dupla contagem. (Abas de Posição do anual = evolução futura.)
+- **F-B (rentabilidade vs benchmark)** — motor `CalculadoraRentabilidade` (TWR/MWR/TIR) agora alimentado pela curva diária de `CriarEvolucaoPatrimonio`; benchmarks **CDI/IPCA via BCB SGS (séries 12/433, sem token)** + **Ibov via Brapi `^BVSP`** (opcional, degrada sem token; SGS 7 está 404). Entidade `SerieBenchmark` + job `financas-benchmarks` (diário, à prova de falha) + acumulador puro `AcumuladorBenchmark` (∏ diário/mensal). Ilha `DashboardRentabilidade`: TWR/MWR, vs CDI (% do CDI), vs Ibov, **retorno real (− IPCA)** + gráfico base 100 (carteira × CDI × Ibov). ⚠️ o job precisa rodar 1× pra popular a série antes dos benchmarks aparecerem.
 
-- `FinanceiroPrecoHistoricoAtivo` deve guardar tanto snapshots intradiarios quanto fechamento diario:
-  - `Interval = "30m"` para snapshots do job recorrente;
-  - `Interval = "1d"` para fechamento diario permanente;
-  - `Date` em UTC: inicio do bucket para `30m`; data do fechamento para `1d`.
-- O indice unico existente por `AtivoFinanceiroId + Provedor + Interval + Date` deve ser preservado e usado para upsert idempotente.
-- Ao buscar cotacao por API, o fluxo correto e:
-  1. atualizar `FinanceiroCotacaoAtivo` com a ultima cotacao/status;
-  2. gravar ou atualizar o bucket `30m` em `FinanceiroPrecoHistoricoAtivo`;
-  3. nunca chamar API diretamente a partir do dashboard para obter preco historico.
-- Upsert do bucket `30m`:
-  - se o bucket nao existir: `Open = High = Low = Close = preco atual`, `CloseBRL = preco atual BRL`;
-  - se ja existir: preservar `Open`, atualizar `High/Low` com maxima/minima, atualizar `Close/CloseBRL` com a cotacao mais recente do bucket.
-- Consolidacao diaria:
-  - gerar `Interval = "1d"` a partir dos buckets `30m`;
-  - `Open` = primeiro preco do dia, `High/Low` = maxima/minima, `Close/CloseBRL` = ultimo preco valido antes do fechamento;
-  - preferir candle diario oficial da API quando disponivel; usar buckets `30m` como fallback e para auditoria da coleta local.
-- Retencao:
-  - manter `1d` indefinidamente;
-  - apagar buckets `30m` com mais de 24h somente quando o `1d` daquele ativo/provedor/dia ja existir.
-- Agenda:
-  - `financas-cotacoes` deve ter default de 30 minutos;
-  - B3 roda apenas em janela configuravel de pregao e dias uteis;
-  - cripto roda 24/7;
-  - fechamento diario de cripto deve considerar `23:59 UTC`, equivalente a `20:59 America/Sao_Paulo`.
-- Proventos/dividendos nao entram nessa tabela: continuam em `FinanceiroRendimento`. Perguntas como "quanto pagou de dividendo 6 meses atras" devem consultar `FinanceiroRendimento`; perguntas como "qual era a cotacao 6 meses atras" devem consultar `FinanceiroPrecoHistoricoAtivo`.
-
-## Features
-
-### F-A · Eventos corporativos (split/grupamento) — #2
-Ver `eventos-corporativos.spec.md` (já detalhado). Causa de saldo negativo; ajuste de cotas no carregador central. **Pré-requisito** de quase tudo (posição correta).
-
-### F-B · Rentabilidade vs benchmark — #3
-Mostrar **TWR** (ponderado pelo tempo / sistema de cotas — neutraliza aportes, compara com benchmark) **e TIR/MWR** (experiência real). Benchmarks: **CDI, Ibovespa, IPCA** (+ rentabilidade real = descontando inflação). Reaproveita a curva diária de `CriarEvolucaoPatrimonio`. Concorrentes: Warren/Meu Dinheiro usam TWR; Investidor10 compara com índices.
-
-**F1 — motor de cálculo: ✅ feito (jun/2026).** `CalculadoraRentabilidade` (puro/testável, `Sistema.APP/Services/CalculadoraRentabilidade.cs`) + DTOs: TWR (sistema de cotas), MWR/TIR (bissecção), anualização, comparação com benchmark (excesso + relativo) e rentabilidade real (desconta IPCA). 7 testes, `dotnet test` verde. **F2 (a fazer):** alimentar a série diária (valor + fluxo de aportes) a partir de `CriarEvolucaoPatrimonio` e **buscar CDI/Ibov/IPCA** (BCB/Brapi) para os benchmarks; expor na UI/gráfico.
-
-### F-C · Linha de aportes no gráfico — #4
-Sobrepor **custo acumulado (aportes)** × **patrimônio** no gráfico de evolução. Barato — o custo já é calculado.
-
-### F-D · Unificar fallback de preço — #5
-Hoje ativo sem cotação contribui 0 no histórico e custo no card (inconsistente). Unificar: usar custo como fallback consistente e sinalizar status "sem cotação".
-
-### F-E · Import do export oficial da B3 — **prioridade #1**
-Ver `importador-b3.spec.md` (detalhado). Substitui a "Conexão B3" (inviável p/ app pessoal). Importa o **relatório consolidado mensal** da Área do Investidor B3 (1 `.xlsx`/mês, 6 abas) → completa compras faltantes (aba **Negociações**) e traz **rendimento de FII** (aba **Proventos Recebidos**, que não está em informe nenhum); abas de **Posição** dão snapshot para aceite e detecção de split. Novo `DocumentKind` + parser.
-
-### F-F · Baldes Trade/Rendimentos — #9
-Earn/staking cripto entra na **posição** (não só como renda), em balde separado do "Trade", com custo = valor de mercado na data (sem lucro artificial). Preço médio limpo só dos trades; total = soma dos baldes (bate com a corretora).
-
-### F-G · Metas + rebalanceamento — #8
-Peso-alvo por carteira/classe + desvio atual vs alvo + sugestão de aporte para rebalancear. Já existe `PesoAlvo` em `CarteiraAtivoFinanceiro`.
-
-### F-H · Alertas de preço/provento — #7
-Job (Hangfire) + notificação interna quando preço cruza limiar ou provento é anunciado/pago. Reaproveita `AlertaConfiabilidade` + mensagens.
-
-- Alertas iniciais:
-  - preco acima/abaixo de alvo manual por ativo;
-  - cotacao vencida ou sem fonte confiavel;
-  - ativo com posicao > 0 sem carteira/subcarteira;
-  - divergencia entre posicao calculada e custodia/snapshot;
-  - provento novo/anunciado/pago;
-  - cripto parcialmente reconciliado.
-- Cada alerta deve ter severidade, origem, data, entidade relacionada e estado resolvido/pendente.
-- Evitar alertas ruidosos: dedup por chave natural e janela de tempo.
-
-### F-P · Historico de cotacoes intradiario/diario — jun/2026
-Implementar a decisao do **Modelo de cotacoes e historico** acima. Objetivo: dashboard e graficos sempre leem do banco; APIs ficam restritas a jobs/acoes explicitas; consultas historicas nao batem na API.
-
-- Nao criar `FinanceiroCotacaoIntradiaria` nem outra tabela paralela.
-- Usar `FinanceiroPrecoHistoricoAtivo` com `Interval = "30m"` e `Interval = "1d"`.
-- Manter `FinanceiroCotacaoAtivo` somente como cache da ultima cotacao/status para leitura rapida do dashboard.
-- Ajustar/expandir Hangfire:
-  - `financas-cotacoes`: default 30 minutos;
-  - job de consolidacao diaria apos fechamento;
-  - job de limpeza de intradiario apos fechamento persistido.
-- B3:
-  - coletar apenas em janela configuravel de pregao e dias uteis;
-  - manter `B3Custodia` como fonte de fechamento importada da custodia quando nao houver cotacao Brapi utilizavel.
-- Cripto:
-  - coletar 24/7;
-  - considerar fechamento diario em `23:59 UTC` (`20:59 America/Sao_Paulo`);
-  - preservar fechamento diario de Binance em `FinanceiroPrecoHistoricoAtivo` para valoracao de permutas, earn e IR.
-- Testes obrigatorios: upsert idempotente por bucket, OHLC correto no mesmo bucket, consolidacao diaria B3/cripto, limpeza segura de `30m`, e consulta historica usando apenas `FinanceiroPrecoHistoricoAtivo`.
-
-### Sequencia sugerida de evolucao (pos-cotacoes)
-Implementar nesta ordem para aumentar confianca antes de sofisticar calculos:
-
-1. **F-Q Explique este valor**: todo numero relevante do dashboard precisa abrir sua composicao e fonte.
-2. **F-R Reconciliacao cripto por snapshot**: trazer saldo real por moeda/data e comparar com o calculado.
-3. **F-S Saude das cotacoes**: explicitar cotacoes vencidas, faltantes, fallback e fonte usada.
-4. **F-B Rentabilidade F2**: alimentar TWR/MWR com serie diaria confiavel e benchmarks.
-5. **F-N/F-T Proventos por fonte + calendario**: separar realizado, previsto e origem da informacao.
-6. **F-G Metas + rebalanceamento**: usar `PesoAlvo` para sugestao de aporte e desvio.
-7. **F-H Alertas**: transformar divergencias, preco alvo e proventos em notificacoes acionaveis.
-
-### F-I · Carteiras hierárquicas (rework) — jun/2026 (✅ FEITO)
-Reorganizar os grupos com **subcarteiras** (hierarquia via `CarteiraPaiId` self-FK nullable + `Ordem` na `FinanceiroCarteira`).
-
-- **Topo (4):** `Bancário e Seguridade` · `FIIs` · `Minério e energia` · `Criptomoedas`.
-  - "Minério e energia" **junta** petróleo + minério/metais + energia (petróleo é commodity *e* energia; cabe VALE, ouro e Petrobras).
-- **Subcarteiras:** Bancário e Seguridade → **Bancos** / **Seguridade**; FIIs → **Papel** / **Tijolo**; Minério e energia → **Petróleo** / **Mineração e Metais** (VALE + ouro) / **Energia**; Criptos → **BTC** / **Altcoins** / **Memecoins**.
-
-**Mapa de classificação (custódia B3 2026-maio + cripto §10 cripto.spec) — semeado, editável na tela depois:**
+**Mapa de classificação de carteiras** (referência; semeado, editável na tela):
 | Topo | Sub | Ativos |
 |---|---|---|
-| Bancário e Seguridade | Bancos | BBAS3, BBDC4, ITUB4 |
-| Bancário e Seguridade | Seguridade | CXSE3 |
-| FIIs | Papel | AFHI11, AFHI12, CPTS11, DEVA11, FYTO11, KNSC11, RECR11, RECR12, RZAK11 |
-| FIIs | Tijolo | HGLG11 |
-| Minério e energia | Petróleo | PETR4 |
-| Minério e energia | Mineração e Metais | VALE3, GOLD11 (ouro) |
-| Minério e energia | Energia | TAEE4 |
-| Criptomoedas | BTC | BTC |
-| Criptomoedas | Altcoins | WBETH, BNSOL, XRP, BNB |
-| Criptomoedas | Memecoins | DOGE |
+| Bancário e Seguridade | Bancos / Seguridade | BBAS3, BBDC4, ITUB4 / CXSE3 |
+| FIIs | Papel / Tijolo | AFHI11, CPTS11, DEVA11, FYTO11, KNSC11, RECR11, RZAK11… / HGLG11 |
+| Minério e energia | Petróleo / Mineração e Metais / Energia | PETR4 / VALE3, GOLD11 / TAEE4 |
+| Criptomoedas | BTC / Altcoins / Memecoins | BTC / WBETH, BNSOL, XRP, BNB / DOGE |
 
-- **Regra p/ ativos novos** (fallback até cadastro manual): FII com "RECEBÍVEIS/CRI/SECURITIES" no nome → Papel, senão Tijolo; cripto: BTC→BTC, lista de memecoins (DOGE, SHIB, PEPE, FLOKI, BONK, WIF…) → Memecoins, resto → Altcoins; ação/ETF sem mapa → sem subcarteira (só topo) + alerta para classificar.
-- **BDR/KEPL3 NÃO entram** — o usuário não detém (vendidos; net ≤ 0 → pisados em 0). Não criar carteira de BDR. Só ativos com **posição > 0** entram nos cards.
-- A **auto-sugestão** (`GarantirCarteirasPadraoAsync`) cria topo+sub idempotente e vincula os ativos detidos à subcarteira-folha. UI do dashboard agrupa carteira→subcarteira com agregação de valor para cima (pai = soma dos filhos).
+Fallback p/ ativos novos: FII com "RECEBÍVEIS/CRI/SECURITIES"→Papel senão Tijolo; cripto BTC→BTC, memecoins (DOGE/SHIB/PEPE…)→Memecoins, resto→Altcoins; ação/ETF sem mapa→só topo + alerta.
 
-### F-J · Carteiras com valor zerado (bug) — jun/2026
-Algumas carteiras apareciam com **valor zerado** no dashboard. ✅ FEITO: (1) custo (PM) como piso consistente quando não há cotação + status `SemCotacao` confiável; (2) a coluna **Resultado** ficava 0 nas carteiras B3 (ação/FII não cota sem token Brapi → mercado = custo → resultado 0) — resolvido alimentando uma cotação `ProvedorCotacao.B3Custodia` com o **Preço de Fechamento** da aba Posição do extrato B3 (custódia oficial), e fazendo a valoração preferir cotação utilizável (`PrecoBRL` > 0) à mais recente.
+## 🔲 Falta para TERMINAR Investimentos
 
-### F-K · Card de proventos no dashboard — jun/2026 (✅ FEITO)
-Ilha lazy-loaded `_DashboardProventos` (resumo do período + top pagadores + gráfico mensal, montado no `financas.js` porque script em parcial via innerHTML não executa). Reusa `RendimentoInvestimento` + a lógica da tela de Proventos.
+> Atualizado (jun/2026, branch `feat/investimentos-final`): **F-G(fim), F-S, F-T, F-H(fim), F-Q(completo), F-E(reimport on-demand), F-V(validação anual) e F-B(rentabilidade vs benchmark) entregues** (ver ✅ Concluído) + fix da dupla contagem de proventos.
 
-### F-L · Painel de saúde dos dados & transparência (revisão Codex, jun/2026)
-Hoje a ilha "Dados & importação" mostra pasta/documentos/cotações, mas não explica **de onde vem cada valor**. Transformar em painel de **saúde/rastreabilidade**:
-- **Última Posição B3 usada** + período do snapshot; **meses faltantes** (extratos não contíguos).
-- **Arquivos por fonte** (B3/Nubank/Binance/IR): importados, processados, parciais, falhos, duplicados ignorados, abas/linhas lidas, erros. (Há ~58 em `arquivos/b3`, ~26 em `arquivos/financeiro`, vários em `arquivos/ir`.)
-- **Composição do valor**: separar "valor com cotação atual" × "preço de fechamento B3Custodia" × "custo/fallback" (o fallback já existe em `CriarAtivosCotadosDaTabela`, mas a tela mostra só o número final).
-- Trocar **"Posições estimadas"** por **"Posições calculadas vs custódia"**: colunas valor, preço médio, **fonte do preço** e **diferença vs B3**.
+**Prioridade alta (resta)**
+1. **F-F · Baldes Trade/Rendimentos (cripto).** Separar a posição em balde **Trade** (PM limpo) e **Rendimentos** (earn, custo = mercado na data); total = soma dos baldes. `cripto.spec.md §6`. ⚠️ mexe no netting.
+2. **F-R · Reconciliação cripto por snapshot.** Equivalente ao da B3: importar/cadastrar saldo real por moeda/data (Spot/Earn/Funding/staking), comparar com `FinanceiroPosicaoAtivo`, status (bate/falta/sobra/sem cotação/sem ativo), ajuste auditável (não apaga histórico). Remove o aviso "parcialmente reconciliado". ⚠️ depende de o Rafael fornecer o snapshot de saldos.
 
-### F-M · Card de reconciliação B3 (revisão Codex)
-Tornar a reconciliação (`ReconciliadorPosicaoB3`) explícita p/ o usuário confiar no número: alvo da custódia, calculado por transações, nº de ajustes, **valor total no VARIACAO**, principais ativos ajustados e link p/ as transações `Fonte="Reconciliação"`.
+**Proventos — verificar no app (não é mais bug de código)**
+- **Nov/2025 (~R$660):** o extrato mensal já está em `arquivos/b3/` e, com o F-E, é **importado na detecção de arquivo novo no próximo start** (ou pelo botão "Atualizar"). Conferir que aparece após o resync.
+- **Dupla contagem B3+Brapi** corrigida (precedência + limpeza self-healing no `AtualizarProventosAsync`). A **ilha de reconciliação anual (F-V)** mostra, por ano/ativo, oficial B3 × materializado — usar pra validar os totais (2023 R$6.053 / 2024 R$7.267 / 2025 R$8.381) e caçar buracos restantes.
 
-### F-N · Proventos por fonte (revisão Codex)
-No card de proventos, **separar/rotular as fontes**: B3 Extrato, Brapi, IR e Binance Earn (é informação de confiança — FII vem da B3 porque o informe de IR não cobre). Complementa o fix de valores do earn (já feito).
+**Pendências menores**
+- **Troca de ticker / incorporação** (ex.: TAEE3→TAEE4) — fora do split.
+- **Aba Compras_BRL** no export de IR + **exchange nacional como opção** (config) — `ir.spec.md`.
+- **Varredura de encoding** nos docs/specs (acentos quebrados).
+- **Aceite real** (posição/IR vs informes de `arquivos/ir/`) — só rodando o app.
 
-### F-O · Aviso de cripto parcialmente reconciliado (revisão Codex)
-Enquanto não houver saldo de abertura/snapshot real da Binance, o dashboard deve sinalizar **"cripto parcialmente reconciliado"** (a `cripto.spec.md` ainda aponta lacunas de saldo/Earn/valoração). Honestidade > número cego.
-
-### F-Q · "Explique este valor" no dashboard
-Todo card/valor relevante deve permitir abrir um detalhamento de composicao, para o usuario confiar no numero sem precisar consultar o banco.
-
-- Aplicar primeiro em: Patrimonio, Carteiras, Posicoes, Proventos e Dados & importacao.
-- Mostrar, conforme o caso: quantidade, preco medio, preco usado, fonte do preco, data/hora da cotacao, fallback aplicado, carteira/subcarteira, transacoes consideradas e ajustes de reconciliacao.
-- Para valores agregados, mostrar quebra por ativo e por fonte de preco (`Brapi`, `Binance`, `B3Custodia`, custo/fallback).
-- Nao recalcular tudo na UI: usar read models/repositorios existentes (`FinanceiroPosicaoAtivo`, `FinanceiroPrecoHistoricoAtivo`, `FinanceiroCotacaoAtivo`, `FinanceiroRendimento`) e consultas agregadas.
-- Aceite: cada valor exibido no card deve responder "de onde veio?", "quando foi atualizado?" e "qual fallback foi usado?".
-
-### F-R · Reconciliacao cripto por snapshot
-Criar mecanismo equivalente ao da B3 para cripto: importar ou cadastrar um snapshot real de saldo por moeda/data, comparar com a posicao calculada e registrar divergencias de forma auditavel.
-
-- Fonte inicial pode ser manual/importada de export da Binance; API ao vivo fica para uma fase futura.
-- Snapshot minimo: exchange, data/hora, moeda, quantidade, carteira/produto quando disponivel (`Spot`, `Earn`, `Funding`, staking), documento/fonte e `RawJson`.
-- Comparar snapshot com `FinanceiroPosicaoAtivo` por ativo e gerar status: bate, falta, sobra, sem cotacao, sem ativo cadastrado.
-- Ajuste automatico deve seguir a filosofia da B3: nao apagar historico; se necessario, gerar ajuste auditavel/explicito, com contrapartida de variacao ou alerta antes de materializar.
-- Enquanto snapshot nao existir, manter o aviso de cripto parcialmente reconciliado.
-- Aceite: dashboard consegue dizer quais moedas batem com a Binance e quais dependem de ajuste/arquivo adicional.
-
-### F-S · Saude das cotacoes
-Evoluir a saude de dados para um painel especifico de cotacoes, usando `FinanceiroCotacaoAtivo` como status atual e `FinanceiroPrecoHistoricoAtivo` como historico.
-
-- Mostrar ativos com posicao > 0 e status: atual, vencida, falhou, sem token, nao suportada, fallback por custo, fechamento B3Custodia.
-- Mostrar ultima atualizacao, proxima expiracao, provedor, simbolo usado e mensagem de erro.
-- Destacar lacunas do historico diario (`1d`) e ausencia de buckets intradiarios (`30m`) quando o job estiver ativo.
-- Separar B3, cripto e B3Custodia, pois as fontes e horarios sao diferentes.
-- Aceite: usuario consegue saber por que um ativo esta com valor atualizado, zerado, estimado ou baseado em custo.
-
-### F-T · Calendario de proventos e rendimentos
-Complementar "Proventos por fonte" com visao temporal de realizado vs previsto.
-
-- Realizado vem de `FinanceiroRendimento` com fontes B3 Extrato, Brapi, IR e Binance Earn.
-- Previsto/anunciado pode vir de Brapi quando houver data-com/data-pagamento futura; sem token, manter lacuna explicita.
-- Separar por tipo: Dividendo, JCP, Rendimento FII, Rendimento (Earn), Airdrop/Rewards quando existirem.
-- Mostrar mensalmente: recebido, previsto, pendente de confirmacao e fonte.
-- Aceite: card/tela permite responder "quanto recebi", "de onde veio" e "o que esta previsto".
-
-### Higiene de specs/skills (revisão Codex) — parcial
-Encoding quebrado em alguns docs (acentos) e notas de agentes desatualizadas. ✅ Corrigido: agente `importador-b3-materializa` dizia "notas mandam" (a decisão final é **B3 manda**). Pendente: varredura de encoding.
-
-### Ideias novas (pesquisa)
-- **A · Yield on Cost / DY da carteira** — dividendo anual ÷ preço médio (renda futura).
-- **B · Risco × retorno** — volatilidade, Sharpe, max drawdown (Kinvo Premium tem).
-- **C · Preço-teto** (Bazin/Graham) — "caro ou barato" via fundamentos.
-- **D · Calendário de proventos** — futuros anunciados (data-com/pagamento).
-- **E · Comparador de ativos** lado a lado.
+## 💡 Backlog de evolução (inspiração Status Invest / Investidor10 / Kinvo / TradeMap)
+- **Renda passiva projetada:** DY × posição → "quanto recebo por mês/ano" (dados já existem: proventos históricos + posição). **Yield on Cost** por ativo (dividendo anual ÷ PM).
+- **Indicadores fundamentalistas** (P/L, P/VP, DY, ROE) + **preço-teto** (Bazin/Graham, "caro ou barato") por ativo — precisa fonte (Brapi/Status Invest).
+- **Risco × retorno:** volatilidade, Sharpe, max drawdown, beta vs Ibov (já há série diária).
+- **Comparador de ativos** lado a lado.
+- **Metas de patrimônio / FIRE:** "quanto falta para viver de renda".
+- **Notícias por ativo** (estilo TradeMap), se houver fonte.
+- **PWA responsivo** (mobile nativo foi descartado; PWA aproveita o que existe).
 
 ## Critério de aceite
-Posições e preço médio batem com a **carteira real do usuário** (tabela no `eventos-corporativos.spec.md` §3); rentabilidade comparável a benchmark; vendidos zerados.
+Posições e preço médio batem com a carteira real do usuário (`eventos-corporativos.spec.md` §3); rentabilidade comparável a benchmark; vendidos zerados; cada número do dashboard explica sua origem (F-Q).

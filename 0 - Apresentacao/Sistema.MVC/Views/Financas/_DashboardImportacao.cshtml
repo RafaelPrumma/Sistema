@@ -37,7 +37,7 @@
                 <div class="d-flex flex-wrap gap-2">
                     <form asp-action="ImportarPasta" method="post">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-folder-symlink me-1"></i>Importar arquivos</button>
+                        <button type="submit" class="btn btn-outline-primary" title="Varre as pastas monitoradas, importa extratos novos e recalcula as posições"><i class="bi bi-folder-symlink me-1"></i>Atualizar / importar novos extratos</button>
                     </form>
                     <form asp-action="AtualizarCotacoes" method="post">
                         @Html.AntiForgeryToken()

@@ -39,6 +39,7 @@ public class AppDbContext : DbContext
     public DbSet<TransacaoCripto> TransacoesCripto => Set<TransacaoCripto>();
     public DbSet<TransacaoFinanceira> TransacoesFinanceiras => Set<TransacaoFinanceira>();
     public DbSet<NegociacaoMensalB3> NegociacoesMensaisB3 => Set<NegociacaoMensalB3>();
+    public DbSet<ProventoAnualB3> ProventosAnuaisB3 => Set<ProventoAnualB3>();
     public DbSet<EstimativaPosicaoCarteira> EstimativasPosicaoCarteira => Set<EstimativaPosicaoCarteira>();
     public DbSet<PosicaoAtivo> PosicoesAtivos => Set<PosicaoAtivo>();
     public DbSet<RendimentoInvestimento> RendimentosInvestimento => Set<RendimentoInvestimento>();
@@ -46,6 +47,12 @@ public class AppDbContext : DbContext
     public DbSet<AlertaConfiabilidade> AlertasConfiabilidade => Set<AlertaConfiabilidade>();
     public DbSet<EventoCorporativo> EventosCorporativos => Set<EventoCorporativo>();
     public DbSet<AlertaPreco> AlertasPreco => Set<AlertaPreco>();
+    public DbSet<SerieBenchmark> SeriesBenchmark => Set<SerieBenchmark>();
+
+    // Submódulo Gastos (G1).
+    public DbSet<CategoriaGasto> CategoriasGasto => Set<CategoriaGasto>();
+    public DbSet<RegraCategorizacao> RegrasCategorizacao => Set<RegraCategorizacao>();
+    public DbSet<LancamentoGasto> LancamentosGasto => Set<LancamentoGasto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
