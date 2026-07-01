@@ -1,0 +1,101 @@
+@model Sistema.MVC.Models.MenuNode
+@{
+    // Contexto compartilhado propagado via ViewData (não muda entre níveis).
+    var textClass = ViewData["MenuTextClass"] as string ?? string.Empty;
+    var unread = ViewData["MenuUnread"] as int? ?? 0;
+    var depth = ViewData["MenuDepth"] as int? ?? 0;
+
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+
+    bool LeafActive(Sistema.MVC.Models.MenuNode n)
+    {
+        if (n.Controller is null) return false;
+        var controllerMatch = string.Equals(n.Controller, currentController, StringComparison.OrdinalIgnoreCase);
+        var actionMatch = n.Action is null || string.Equals(n.Action, currentAction, StringComparison.OrdinalIgnoreCase);
+        return controllerMatch && actionMatch;
+    }
+
+    // Um ramo está na "trilha ativa" se qualquer descendente (folha) casa a rota atual.
+    bool BranchOnActiveTrail(Sistema.MVC.Models.MenuNode n)
+    {
+        foreach (var c in n.Children)
+        {
+            if (c.IsLeaf && LeafActive(c)) return true;
+            if (c.HasChildren && BranchOnActiveTrail(c)) return true;
+        }
+        return false;
+    }
+
+    int? Badge(Sistema.MVC.Models.MenuNode n) => n.Badge == "unread" ? unread : null;
+}
+
+@if (Model.IsSectionLabel)
+{
+    <li class="menu-section-label text-uppercase small">@Model.Label</li>
+}
+else if (Model.HasChildren)
+{
+    var onTrail = BranchOnActiveTrail(Model);
+    var badge = Badge(Model);
+    <li class="menu-item menu-branch @(onTrail ? "open" : null)" data-menu-depth="@depth">
+        <button type="button"
+                class="menu-link menu-toggle @textClass @(onTrail ? "active" : null)"
+                aria-expanded="@(onTrail ? "true" : "false")"
+                title="@Model.Label"
+                aria-label="Abrir submenu @Model.Label">
+            @if (!string.IsNullOrEmpty(Model.Icon))
+            {
+                <i class="@Model.Icon"></i>
+            }
+            <span>@Model.Label</span>
+            @if (badge is > 0)
+            {
+                <span class="badge bg-primary ms-auto menu-branch-badge">@badge</span>
+            }
+            <i class="bi bi-chevron-right menu-chevron"></i>
+        </button>
+        <ul class="menu-list menu-sublist" data-menu-depth="@(depth + 1)">
+            @{
+                var childViewData = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(ViewData)
+                {
+                    ["MenuDepth"] = depth + 1
+                };
+            }
+            @foreach (var child in Model.Children)
+            {
+                <partial name="_MenuNode" model="child" view-data="childViewData" />
+            }
+        </ul>
+    </li>
+}
+else
+{
+    var active = LeafActive(Model);
+    <li class="menu-item menu-leaf" data-menu-depth="@depth">
+        @if (!string.IsNullOrEmpty(Model.Href))
+        {
+            <a href="@Model.Href" class="menu-link @textClass @(active ? "active" : null)" title="@Model.Label">
+                @if (!string.IsNullOrEmpty(Model.Icon))
+                {
+                    <i class="@Model.Icon"></i>
+                }
+                <span>@Model.Label</span>
+            </a>
+        }
+        else
+        {
+            <a asp-controller="@Model.Controller"
+               asp-action="@Model.Action"
+               asp-fragment="@Model.Fragment"
+               class="menu-link @textClass @(active ? "active" : null)"
+               title="@Model.Label">
+                @if (!string.IsNullOrEmpty(Model.Icon))
+                {
+                    <i class="@Model.Icon"></i>
+                }
+                <span>@Model.Label</span>
+            </a>
+        }
+    </li>
+}

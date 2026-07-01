@@ -75,80 +75,15 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 760;
 }
 
-.menu-panels-track {
+// Container rolável da árvore (substitui o antigo sistema de painéis deslizantes).
+.menu-tree {
   position: relative;
   flex: 1;
-  overflow: hidden;
-  width: 100%;
-  transition: width $transition-speed $transition-ease, box-shadow $transition-speed $transition-ease;
-}
-
-.menu-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
   overflow-x: hidden;
+  overflow-y: auto;
+  width: 100%;
   padding: 0.75rem 0 1rem;
-  display: flex;
-  flex-direction: column;
-  transition: transform $transition-speed $transition-ease;
-  will-change: transform;
-}
-
-.menu-panel--root {
-  transform: translateX(0);
-}
-
-.menu-panel--sub {
-  transform: translateX(100%);
-}
-
-.menu-panel--root.panel-slide-out {
-  transform: translateX(-100%);
-}
-
-.menu-panel--sub.panel-slide-in {
-  transform: translateX(0);
-}
-
-.menu-panel-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  margin-bottom: 0.5rem;
-  flex-shrink: 0;
-}
-
-.menu-panel-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.menu-back {
-  border: none;
-  background: transparent;
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.15s ease;
-
-  &:hover,
-  &:focus-visible {
-    background-color: rgba(255, 255, 255, 0.12);
-  }
+  transition: width $transition-speed $transition-ease, box-shadow $transition-speed $transition-ease;
 }
 
 .menu-list {
@@ -158,6 +93,20 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+
+// Sublistas (filhos de um ramo): recolhidas por padrão, expandem no .open do pai.
+.menu-sublist {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height $transition-speed $transition-ease, opacity 0.18s ease;
+}
+
+.menu-branch.open > .menu-sublist {
+  // Alto o bastante para qualquer submenu; a rolagem do container cobre excessos.
+  max-height: 1500px;
+  opacity: 1;
 }
 
 .menu-section-label {
@@ -172,6 +121,13 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
   display: block;
   padding-inline: 0.4rem;
 }
+
+// Indentação progressiva por nível (data-menu-depth = profundidade da folha/ramo).
+.menu-item[data-menu-depth="1"] > .menu-link { padding-left: 2.1rem; }
+.menu-item[data-menu-depth="2"] > .menu-link { padding-left: 3.0rem; }
+.menu-item[data-menu-depth="3"] > .menu-link { padding-left: 3.9rem; }
+.menu-item[data-menu-depth="4"] > .menu-link { padding-left: 4.8rem; }
+.menu-item[data-menu-depth="5"] > .menu-link { padding-left: 5.7rem; }
 
 .menu-link {
   border: 0;
@@ -235,38 +191,35 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
+// O badge de não lidas fica antes do chevron; empurra o chevron para a direita.
+.menu-branch-badge {
+  margin-left: auto;
+}
+
 .menu-chevron {
   opacity: 0.72;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  flex: 0 0 auto;
+  transition: opacity 0.15s ease, transform $transition-speed $transition-ease;
+}
+
+// Sem badge, o chevron encosta na direita.
+.menu-toggle .menu-chevron {
+  margin-left: auto;
+}
+
+.menu-branch-badge + .menu-chevron {
+  margin-left: 0.4rem;
 }
 
 .menu-link:hover .menu-chevron,
 .menu-link:focus-visible .menu-chevron {
   opacity: 1;
-  transform: translateX(2px);
 }
 
-.menu-sublink {
-  display: block;
-  padding: 0.6rem 1rem;
-  margin-inline: 0.4rem;
-  border-radius: 0.6rem;
-  color: inherit;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background-color 0.15s ease;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: inherit;
-  }
-
-  &.active {
-    background-color: color-mix(in srgb, var(--app-accent) 20%, transparent);
-    font-weight: 600;
-  }
+// Chevron gira 90deg quando o ramo está aberto.
+.menu-branch.open > .menu-toggle .menu-chevron {
+  transform: rotate(90deg);
+  opacity: 1;
 }
 
 .menu-hamburger {
@@ -324,12 +277,21 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
     padding: 0;
   }
 
-  body.menu-collapsed .app-menu .menu-panels-track {
+  body.menu-collapsed .app-menu .menu-tree {
     width: var(--iconbar-width);
+  }
+
+  // Recolhido: só os itens de nível raiz viram ícones; sublistas ficam ocultas.
+  body.menu-collapsed .app-menu .menu-sublist {
+    display: none;
   }
 
   body.menu-collapsed .app-menu .menu-item {
     padding-inline: 0;
+  }
+
+  body.menu-collapsed .app-menu .menu-item[data-menu-depth] > .menu-link {
+    padding-left: 0;
   }
 
   body.menu-collapsed .app-menu .menu-link {
@@ -354,6 +316,7 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
     font-size: 0.55rem;
     min-width: 14px;
     padding: 1px 3px;
+    margin-left: 0;
   }
 
   body.menu-collapsed .app-menu:hover {
@@ -372,14 +335,25 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
     width: auto;
   }
 
-  body.menu-collapsed .app-menu:hover .menu-panels-track {
+  body.menu-collapsed .app-menu:hover .menu-tree {
     width: var(--sidebar-width);
     box-shadow: 4px 14px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  // Ao passar o mouse na barra recolhida, restaura sublistas dos ramos abertos.
+  body.menu-collapsed .app-menu:hover .menu-sublist {
+    display: block;
   }
 
   body.menu-collapsed .app-menu:hover .menu-item {
     padding-inline: 0.4rem;
   }
+
+  body.menu-collapsed .app-menu:hover .menu-item[data-menu-depth="1"] > .menu-link { padding-left: 2.1rem; }
+  body.menu-collapsed .app-menu:hover .menu-item[data-menu-depth="2"] > .menu-link { padding-left: 3.0rem; }
+  body.menu-collapsed .app-menu:hover .menu-item[data-menu-depth="3"] > .menu-link { padding-left: 3.9rem; }
+  body.menu-collapsed .app-menu:hover .menu-item[data-menu-depth="4"] > .menu-link { padding-left: 4.8rem; }
+  body.menu-collapsed .app-menu:hover .menu-item[data-menu-depth="5"] > .menu-link { padding-left: 5.7rem; }
 
   body.menu-collapsed .app-menu:hover .menu-link span,
   body.menu-collapsed .app-menu:hover .menu-section-label,
@@ -388,6 +362,10 @@ $transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: auto;
     width: auto;
     overflow: visible;
+  }
+
+  body.menu-collapsed .app-menu:hover .menu-chevron {
+    width: 1.35rem;
   }
 
   body.menu-collapsed .app-menu:hover .menu-section-label {
