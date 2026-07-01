@@ -425,3 +425,59 @@ public class SerieBenchmarkMap : IEntityTypeConfiguration<SerieBenchmark>
         builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
     }
 }
+
+// =====================================================================================
+// Submódulo GASTOS (G1) — tabelas com prefixo próprio "Gasto*".
+// =====================================================================================
+
+public class CategoriaGastoMap : IEntityTypeConfiguration<CategoriaGasto>
+{
+    public void Configure(EntityTypeBuilder<CategoriaGasto> builder)
+    {
+        builder.ToTable("GastoCategoria");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Nome).IsRequired().HasMaxLength(120);
+        builder.Property(x => x.Icone).HasMaxLength(60);
+        builder.Property(x => x.Cor).HasMaxLength(20);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(140);
+        // Índice único filtrado: idempotência do seed (nome normalizado).
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        // Self-FK (subcategorias): Restrict para não cascatear ao excluir a categoria-pai.
+        builder.HasOne(x => x.CategoriaPai).WithMany(x => x.Filhas).HasForeignKey(x => x.CategoriaPaiId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class RegraCategorizacaoMap : IEntityTypeConfiguration<RegraCategorizacao>
+{
+    public void Configure(EntityTypeBuilder<RegraCategorizacao> builder)
+    {
+        builder.ToTable("GastoRegraCategorizacao");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Padrao).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(220);
+        // Índice único filtrado: idempotência do seed (padrão + tipo de match).
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasIndex(x => new { x.Ativo, x.Prioridade });
+        builder.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class LancamentoGastoMap : IEntityTypeConfiguration<LancamentoGasto>
+{
+    public void Configure(EntityTypeBuilder<LancamentoGasto> builder)
+    {
+        builder.ToTable("GastoLancamento");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Descricao).IsRequired().HasMaxLength(400);
+        builder.Property(x => x.Valor).HasPrecision(18, 2);
+        builder.Property(x => x.Estabelecimento).HasMaxLength(200);
+        builder.Property(x => x.ChaveNatural).HasMaxLength(500);
+        builder.Property(x => x.RawJson).IsRequired();
+        // Índice único filtrado na chave natural (data+descrição+valor+fonte+tipo, normalizado) —
+        // reimportar a mesma fatura/extrato NÃO duplica o lançamento.
+        builder.HasIndex(x => x.ChaveNatural).IsUnique().HasFilter("[ChaveNatural] IS NOT NULL AND [DataExclusao] IS NULL");
+        builder.HasIndex(x => new { x.Data, x.Fonte });
+        builder.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasOne(x => x.SourceDocument).WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

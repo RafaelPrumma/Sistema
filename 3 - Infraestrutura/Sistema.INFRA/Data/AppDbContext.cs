@@ -49,6 +49,11 @@ public class AppDbContext : DbContext
     public DbSet<AlertaPreco> AlertasPreco => Set<AlertaPreco>();
     public DbSet<SerieBenchmark> SeriesBenchmark => Set<SerieBenchmark>();
 
+    // Submódulo Gastos (G1).
+    public DbSet<CategoriaGasto> CategoriasGasto => Set<CategoriaGasto>();
+    public DbSet<RegraCategorizacao> RegrasCategorizacao => Set<RegraCategorizacao>();
+    public DbSet<LancamentoGasto> LancamentosGasto => Set<LancamentoGasto>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

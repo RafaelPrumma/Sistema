@@ -617,3 +617,128 @@ public class SerieBenchmark : AuditableEntity
     public static string GerarChaveNatural(IndiceBenchmark indice, DateTime data)
         => $"{indice}|{data:yyyyMMdd}";
 }
+
+// =====================================================================================
+// Submódulo GASTOS (G1) — controle financeiro pessoal estilo Mobills/GuiaBolso.
+// Entidades vivem aqui (mesma convenção EF do módulo Investimentos), mas em tabelas com
+// prefixo próprio "Gasto*" para não se confundir com as de investimento (Financeiro*).
+// =====================================================================================
+
+// Natureza de um lançamento de gasto. Separa o que é despesa real do que é movimento de
+// investimento/caixa (NÃO duplica com o módulo Investimentos): "Compra de Ações", "Aplicação
+// RDB", "Transferência para corretora" = Aporte/Transferência, nunca Despesa.
+public enum TipoLancamentoGasto
+{
+    Receita = 1,
+    Despesa = 2,
+    Transferencia = 3,
+    Aporte = 4
+}
+
+// Origem do lançamento: a fatura do cartão de crédito ou o extrato da conta corrente.
+public enum FonteLancamentoGasto
+{
+    Cartao = 1,
+    Conta = 2
+}
+
+// Natureza da categoria (uma categoria de Receita não classifica uma Despesa e vice-versa).
+public enum TipoCategoriaGasto
+{
+    Receita = 1,
+    Despesa = 2
+}
+
+// Como uma RegraCategorizacao casa com a descrição do lançamento.
+public enum TipoMatchRegra
+{
+    Contem = 1,
+    Regex = 2
+}
+
+// De onde veio a regra: semeada pelo sistema (G1) ou aprendida com correção manual (G2).
+public enum OrigemRegraCategorizacao
+{
+    Sistema = 1,
+    Aprendida = 2
+}
+
+// Categoria de gasto/receita (Alimentação, Transporte, Salário…). Subcategorias via self-FK.
+public class CategoriaGasto : AuditableEntity
+{
+    public int Id { get; set; }
+    public string Nome { get; set; } = string.Empty;
+    public TipoCategoriaGasto Tipo { get; set; } = TipoCategoriaGasto.Despesa;
+    public string? Icone { get; set; }
+    public string? Cor { get; set; }
+    public int? CategoriaPaiId { get; set; }
+    public CategoriaGasto? CategoriaPai { get; set; }
+    public ICollection<CategoriaGasto> Filhas { get; set; } = new List<CategoriaGasto>();
+    public bool Ativo { get; set; } = true;
+
+    // Chave natural (nome normalizado) — idempotência do seed (índice único filtrado).
+    public string? ChaveNatural { get; set; }
+
+    /// <summary>Chave natural canônica da categoria: nome normalizado (trim + maiúsculas).</summary>
+    public static string GerarChaveNatural(string nome)
+        => (nome ?? string.Empty).Trim().ToUpperInvariant();
+}
+
+// Regra de auto-categorização: se a descrição do lançamento casar com Padrao (Contém/Regex),
+// aplica CategoriaId. Prioridade menor vence (a 1ª regra que casa, em ordem de prioridade).
+public class RegraCategorizacao : AuditableEntity
+{
+    public int Id { get; set; }
+    public string Padrao { get; set; } = string.Empty;
+    public TipoMatchRegra TipoMatch { get; set; } = TipoMatchRegra.Contem;
+    public int CategoriaId { get; set; }
+    public CategoriaGasto? Categoria { get; set; }
+    public int Prioridade { get; set; }
+    public OrigemRegraCategorizacao Origem { get; set; } = OrigemRegraCategorizacao.Sistema;
+    public bool Ativo { get; set; } = true;
+
+    // Chave natural (padrão normalizado + tipo de match) — idempotência do seed.
+    public string? ChaveNatural { get; set; }
+
+    /// <summary>Chave natural canônica da regra: padrão normalizado | tipo de match.</summary>
+    public static string GerarChaveNatural(string padrao, TipoMatchRegra tipoMatch)
+        => $"{(padrao ?? string.Empty).Trim().ToUpperInvariant()}|{(int)tipoMatch}";
+}
+
+// Lançamento de gasto/receita materializado de uma fatura (cartão) ou extrato (conta).
+// Fonte de verdade do submódulo Gastos. Idempotente pela ChaveNatural (data+descrição+valor+
+// fonte normalizados): reimportar a mesma fatura/extrato NÃO duplica.
+public class LancamentoGasto : AuditableEntity
+{
+    public int Id { get; set; }
+    public DateTime Data { get; set; }
+    public string Descricao { get; set; } = string.Empty;
+    // Valor SEMPRE positivo (o sentido é dado por Tipo): Receita entra, Despesa sai.
+    public decimal Valor { get; set; }
+    public TipoLancamentoGasto Tipo { get; set; } = TipoLancamentoGasto.Despesa;
+    public int? CategoriaId { get; set; }
+    public CategoriaGasto? Categoria { get; set; }
+    public FonteLancamentoGasto Fonte { get; set; }
+    public string? Estabelecimento { get; set; }
+    public int? ParcelaAtual { get; set; }
+    public int? ParcelaTotal { get; set; }
+
+    // Rastreio de origem (documento do qual o lançamento foi materializado).
+    public int? SourceDocumentId { get; set; }
+    public DocumentoFinanceiro? SourceDocument { get; set; }
+
+    // Chave natural (fonte|data|descrição|valor|tipo, normalizada) — índice único filtrado.
+    public string? ChaveNatural { get; set; }
+    public string RawJson { get; set; } = "{}";
+
+    /// <summary>
+    /// Chave natural canônica do lançamento. Independe do arquivo de origem: a mesma compra
+    /// vinda de duas exportações da fatura gera a MESMA chave → o índice único deduplica.
+    /// </summary>
+    public static string GerarChaveNatural(FonteLancamentoGasto fonte, DateTime data, string descricao, decimal valor, TipoLancamentoGasto tipo)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var desc = System.Text.RegularExpressions.Regex.Replace((descricao ?? string.Empty).Trim().ToUpperInvariant(), @"\s+", " ");
+        return $"{(int)fonte}|{data:yyyyMMdd}|{desc}|{valor.ToString("0.00", inv)}|{(int)tipo}";
+    }
+}

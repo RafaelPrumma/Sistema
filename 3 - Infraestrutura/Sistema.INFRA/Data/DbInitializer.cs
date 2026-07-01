@@ -28,6 +28,7 @@ public static class DbInitializer
 
         SeedConfiguracoes(context);
         SeedEventosCorporativos(context);
+        SeedGastos(context);
     }
 
     private static void RenomearFinancasLegadas(AppDbContext context)
@@ -166,5 +167,75 @@ public static class DbInitializer
 
         context.EventosCorporativos.AddRange(novos);
         context.SaveChanges();
+    }
+
+    // Seed do submódulo Gastos (G1): categorias + regras de auto-categorização iniciais.
+    // Idempotente por ChaveNatural; à prova de falha (try-catch para não derrubar o startup).
+    private static void SeedGastos(AppDbContext context)
+    {
+        try
+        {
+            var categoriasExistentes = context.CategoriasGasto
+                .IgnoreQueryFilters()
+                .Where(c => c.ChaveNatural != null)
+                .Select(c => c.ChaveNatural!)
+                .ToHashSet();
+
+            var novasCategorias = GastosSeed.GetCategorias()
+                .Where(c => c.ChaveNatural != null && !categoriasExistentes.Contains(c.ChaveNatural!))
+                .ToList();
+
+            if (novasCategorias.Count > 0)
+            {
+                context.CategoriasGasto.AddRange(novasCategorias);
+                context.SaveChanges();
+            }
+
+            // Mapa nome-normalizado → CategoriaId (já no banco + recém-semeadas).
+            var categoriaPorChave = context.CategoriasGasto
+                .IgnoreQueryFilters()
+                .Where(c => c.ChaveNatural != null)
+                .ToList()
+                .GroupBy(c => c.ChaveNatural!)
+                .ToDictionary(g => g.Key, g => g.First().Id);
+
+            var regrasExistentes = context.RegrasCategorizacao
+                .IgnoreQueryFilters()
+                .Where(r => r.ChaveNatural != null)
+                .Select(r => r.ChaveNatural!)
+                .ToHashSet();
+
+            var novasRegras = new List<RegraCategorizacao>();
+            foreach (var (padrao, tipoMatch, categoria, prioridade) in GastosSeed.GetRegras())
+            {
+                var chave = RegraCategorizacao.GerarChaveNatural(padrao, tipoMatch);
+                if (regrasExistentes.Contains(chave))
+                    continue;
+                if (!categoriaPorChave.TryGetValue(CategoriaGasto.GerarChaveNatural(categoria), out var categoriaId))
+                    continue; // categoria-alvo ausente (não deveria ocorrer) — pula.
+
+                novasRegras.Add(new RegraCategorizacao
+                {
+                    Padrao = padrao,
+                    TipoMatch = tipoMatch,
+                    CategoriaId = categoriaId,
+                    Prioridade = prioridade,
+                    Origem = OrigemRegraCategorizacao.Sistema,
+                    Ativo = true,
+                    ChaveNatural = chave,
+                    UsuarioInclusao = "seed"
+                });
+            }
+
+            if (novasRegras.Count > 0)
+            {
+                context.RegrasCategorizacao.AddRange(novasRegras);
+                context.SaveChanges();
+            }
+        }
+        catch
+        {
+            // O seed de Gastos é opcional e NÃO pode derrubar o startup/seed geral.
+        }
     }
 }
